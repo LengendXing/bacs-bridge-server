@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>飞书 × Claude Code 桥接管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            surface: { light: '#f8f9fa', dark: '#1a1a2e' },
+            card: { light: '#ffffff', dark: '#16213e' },
+            border: { light: '#e5e7eb', dark: '#2a2a4a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --text: #111827;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
+      --accent: #1a1a2e;
+    }
+    .dark {
+      --bg: #0f0f1a;
+      --card: #1a1a2e;
+      --text: #e5e7eb;
+      --text-secondary: #9ca3af;
+      --border: #2a2a4a;
+      --accent: #f8f9fa;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .card {
+      background-color: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #fff; border: none; }
+    .btn-danger { background: #ef4444; color: #fff; border: none; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    input, select {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 14px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #6366f1; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 12px 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+    td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--border); }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-online { background: #16a34a20; color: #16a34a; }
+    .badge-offline { background: #ef444420; color: #ef4444; }
+    .badge-unbound { background: #6b728020; color: #6b7280; }
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    .toast-success { background: #16a34a; }
+    .toast-error { background: #ef4444; }
+    .toast-info { background: #6366f1; }
+
+    .theme-toggle {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      background: var(--border);
+      border-radius: 13px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .theme-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .dark .theme-toggle { background: #6366f1; }
+    .dark .theme-toggle::after { transform: translateX(22px); }
+
+    .log-entry {
+      padding: 8px 12px;
+      border-left: 3px solid var(--border);
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-family: monospace;
+      border-radius: 0 4px 4px 0;
+    }
+    .log-info { border-left-color: #6366f1; }
+    .log-warn { border-left-color: #f59e0b; }
+    .log-error { border-left-color: #ef4444; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-6xl mx-auto px-6 py-8">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">飞书 × Claude Code 桥接管理</h1>
+        <p class="text-sm mt-1" style="color: var(--text-secondary)">进程绑定状态监控与管理</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-sm" style="color: var(--text-secondary)">🌙</span>
+          <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle"></div>
+          <span class="text-sm" style="color: var(--text-secondary)">☀️</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+      <div class="card text-center">
+        <div class="text-3xl font-bold" id="statTotal">0</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">总绑定数</div>
+      </div>
+      <div class="card text-center">
+        <div class="text-3xl font-bold text-green-600" id="statOnline">0</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">在线进程</div>
+      </div>
+      <div class="card text-center">
+        <div class="text-3xl font-bold text-red-500" id="statOffline">0</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">离线进程</div>
+      </div>
+      <div class="card text-center">
+        <div class="text-3xl font-bold" style="color: #6366f1" id="statSessions">0</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">Tmux 会话</div>
+      </div>
+    </div>
+
+    <!-- Bind Form -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold mb-4">新建绑定</h2>
+      <form id="bindForm" class="flex gap-4 items-end flex-wrap">
+        <div class="flex-1 min-w-[160px]">
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">进程名称</label>
+          <input type="text" id="bindProcess" placeholder="如: work, personal" required class="w-full">
+        </div>
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书目标 ID</label>
+          <input type="text" id="bindTarget" placeholder="oc_xxxxxx 或 ou_yyyyyy" required class="w-full">
+        </div>
+        <div class="w-[120px]">
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">目标类型</label>
+          <select id="bindType" class="w-full">
+            <option value="chat">群 (chat)</option>
+            <option value="user">用户 (user)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary h-[42px] px-6">绑定</button>
+      </form>
+    </div>
+
+    <!-- Status Table -->
+    <div class="card mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">进程绑定状态</h2>
+        <button class="btn btn-sm" onclick="refreshStatus()">刷新</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>进程名</th>
+              <th>飞书目标</th>
+              <th>目标类型</th>
+              <th>状态</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="statusTable">
+            <tr><td colspan="6" style="color: var(--text-secondary); text-align: center; padding: 32px;">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Logs -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">最近日志</h2>
+        <button class="btn btn-sm" onclick="refreshLogs()">刷新日志</button>
+      </div>
+      <div id="logContainer" style="max-height: 300px; overflow-y: auto;">
+        <p style="color: var(--text-secondary); text-align: center; padding: 24px;">点击刷新加载日志</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

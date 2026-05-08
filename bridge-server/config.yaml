@@ -1,0 +1,19 @@
+server:
+  port: 3456
+  host: "0.0.0.0"
+
+feishu:
+  app_id: ""
+  app_secret: ""
+  encrypt_key: ""
+  verification_token: ""
+
+bridge:
+  progress_interval: 30
+  timeout: 600
+  poll_interval: 2
+  max_concurrent: 4
+
+logging:
+  level: "info"
+  dir: "./logs"
