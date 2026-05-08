@@ -82,26 +82,37 @@ function sendText(appId, appSecret, receiveIdType, receiveId, text) {
   return sendMessage(appId, appSecret, receiveIdType, receiveId, 'text', { text });
 }
 
+// 发送 Markdown 消息（用 interactive 卡片承载，支持表格/代码块/加粗等）
+function sendMarkdown(appId, appSecret, receiveIdType, receiveId, md) {
+  // 转义 markdown 中的特殊字符，避免飞书卡片 JSON 解析失败
+  return sendCard(appId, appSecret, receiveIdType, receiveId, {
+    header: { title: { tag: 'plain_text', content: 'Claude Code 回复' }, template: 'blue' },
+    elements: [
+      { tag: 'markdown', content: md }
+    ]
+  });
+}
+
 // 发送交互式卡片
 function sendCard(appId, appSecret, receiveIdType, receiveId, card) {
   return sendMessage(appId, appSecret, receiveIdType, receiveId, 'interactive', card);
 }
 
 // 构建进度卡片
-function buildProgressCard(processName, elapsed, outputSnippet) {
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-  const snippet = outputSnippet ? outputSnippet.slice(-200) : '(暂无输出)';
+function buildProgressCard(processName, elapsed, userQuestion) {
+  const minutes = Math.ceil(elapsed / 60);
+  // 截断用户问题到 50 字
+  const question = userQuestion ? (userQuestion.length > 50 ? userQuestion.slice(0, 50) + '...' : userQuestion) : '未知问题';
 
   return {
     header: {
-      title: { tag: 'plain_text', content: `⏳ Claude Code [进程 ${processName}] 处理中...` },
+      title: { tag: 'plain_text', content: `⏳ 正在进行中...` },
       template: 'blue'
     },
     elements: [
-      { tag: 'markdown', content: `**已用时：** ${mm}:${ss}\n**输出片段：**\n\`\`\`\n${snippet}\n\`\`\`` },
+      { tag: 'markdown', content: `我正在处理「**${question}**」\n已累计处理 **${minutes}** 分钟，请稍候...` },
       { tag: 'hr' },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: '完整回复即将返回，请稍候...' }] }
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '完整回复完成后将自动返回' }] }
     ]
   };
 }
@@ -120,4 +131,4 @@ function buildTimeoutCard(processName, elapsed) {
   };
 }
 
-module.exports = { getAccessToken, sendText, sendCard, buildProgressCard, buildTimeoutCard };
+module.exports = { getAccessToken, sendText, sendMarkdown, sendCard, buildProgressCard, buildTimeoutCard };

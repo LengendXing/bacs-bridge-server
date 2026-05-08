@@ -10,15 +10,6 @@ const config = require('../config').load();
 // 简单 token 管理（服务端存储，重启则失效）
 let authTokens = {};
 
-// 本地白名单中间件
-function localOnly(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
-  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
-    return next();
-  }
-  res.status(403).json({ code: 1002, message: '仅允许本地访问' });
-}
-
 // 登录验证中间件
 function checkAuth(req, res, next) {
   const token = req.headers['x-auth-token'];
@@ -29,9 +20,9 @@ function checkAuth(req, res, next) {
 }
 
 // ── POST /api/auth ── 密码登录
-router.post('/api/auth', localOnly, (req, res) => {
+router.post('/api/auth', (req, res) => {
   const { password } = req.body;
-  const adminPassword = config.server.admin_password || 'admin123';
+  const adminPassword = config.server.admin_password || 'dabendi5201314scx';
 
   if (!password) {
     return res.json({ code: 1003, message: '请输入密码' });
@@ -55,7 +46,7 @@ router.post('/api/logout', (req, res) => {
 });
 
 // ── GET /api/status ── 查看所有进程状态
-router.get('/api/status', localOnly, checkAuth, (req, res) => {
+router.get('/api/status', checkAuth, (req, res) => {
   const status = manager.getStatus();
   const sessions = comm.listSessions();
   const bound = new Set(status.map(s => s.process_name));
@@ -64,11 +55,19 @@ router.get('/api/status', localOnly, checkAuth, (req, res) => {
       status.push({ process_name: s, feishu_app_id: null, status: 'online' });
     }
   }
+  // 注入 ws_connected 状态
+  for (const b of status) {
+    if (b.feishu_app_id) {
+      b.ws_connected = wsClient.isConnected(b.feishu_app_id);
+    } else {
+      b.ws_connected = false;
+    }
+  }
   res.json({ code: 0, data: status });
 });
 
 // ── POST /api/bind ── 创建绑定
-router.post('/api/bind', localOnly, checkAuth, (req, res) => {
+router.post('/api/bind', checkAuth, (req, res) => {
   const { process_name, feishu_app_id, feishu_app_secret } = req.body;
   if (!process_name || !feishu_app_id || !feishu_app_secret) {
     return res.json({ code: 1003, message: '缺少必填参数 process_name / feishu_app_id / feishu_app_secret' });
@@ -94,7 +93,7 @@ router.post('/api/bind', localOnly, checkAuth, (req, res) => {
 });
 
 // ── POST /api/unbind ── 解除绑定
-router.post('/api/unbind', localOnly, checkAuth, (req, res) => {
+router.post('/api/unbind', checkAuth, (req, res) => {
   const { process_name } = req.body;
   if (!process_name) {
     return res.json({ code: 1003, message: '缺少必填参数 process_name' });
@@ -116,7 +115,7 @@ router.post('/api/unbind', localOnly, checkAuth, (req, res) => {
 });
 
 // ── GET /api/logs ── 查看最近日志
-router.get('/api/logs', localOnly, checkAuth, (req, res) => {
+router.get('/api/logs', checkAuth, (req, res) => {
   const fs = require('fs');
   const path = require('path');
   const logDir = path.join(__dirname, '..', '..', 'logs');
@@ -139,7 +138,7 @@ router.get('/api/logs', localOnly, checkAuth, (req, res) => {
 });
 
 // ── GET /api/sessions ── 列出所有 tmux 会话
-router.get('/api/sessions', localOnly, checkAuth, (req, res) => {
+router.get('/api/sessions', checkAuth, (req, res) => {
   const sessions = comm.listSessions();
   res.json({ code: 0, data: sessions });
 });
