@@ -57,7 +57,7 @@ function getStatusFor(processName) {
     return { ...binding, status: online ? 'online' : 'offline' };
   }
   if (online) {
-    return { process_name: processName, feishu_target: null, feishu_type: null, status: 'online' };
+    return { process_name: processName, feishu_app_id: null, status: 'online' };
   }
   return { process_name: processName, status: 'offline' };
 }

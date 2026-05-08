@@ -6,11 +6,103 @@ function toggleTheme() {
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 }
 
-// 初始化主题
 (function initTheme() {
   const saved = localStorage.getItem('theme');
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     document.documentElement.classList.add('dark');
+  }
+})();
+
+// ── Auth ──
+function getToken() {
+  return sessionStorage.getItem('auth_token');
+}
+
+async function apiGet(path) {
+  const headers = {};
+  const token = getToken();
+  if (token) headers['X-Auth-Token'] = token;
+  const res = await fetch(`${API}${path}`, { headers });
+  if (res.status === 401) {
+    sessionStorage.removeItem('auth_token');
+    showLogin();
+    throw new Error('未登录');
+  }
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['X-Auth-Token'] = token;
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body)
+  });
+  if (res.status === 401) {
+    sessionStorage.removeItem('auth_token');
+    showLogin();
+    throw new Error('未登录');
+  }
+  return res.json();
+}
+
+// ── 登录 ──
+function showLogin() {
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('mainPanel').classList.add('hidden');
+}
+
+function hideLogin() {
+  document.getElementById('loginOverlay').classList.add('hidden');
+  document.getElementById('mainPanel').classList.remove('hidden');
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+
+  try {
+    const result = await fetch(`${API}/api/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    }).then(r => r.json());
+
+    if (result.code === 0 && result.data?.token) {
+      sessionStorage.setItem('auth_token', result.data.token);
+      hideLogin();
+      toast('登录成功', 'success');
+      refreshStatus();
+      loadSessions();
+    } else {
+      errEl.textContent = result.message || '密码错误';
+      errEl.classList.remove('hidden');
+    }
+  } catch (err) {
+    errEl.textContent = '网络错误，请重试';
+    errEl.classList.remove('hidden');
+  }
+});
+
+async function doLogout() {
+  await fetch(`${API}/api/logout`, {
+    method: 'POST',
+    headers: { 'X-Auth-Token': getToken() }
+  });
+  sessionStorage.removeItem('auth_token');
+  showLogin();
+  toast('已退出登录', 'info');
+}
+
+// 检查登录状态
+(function checkAuth() {
+  if (getToken()) {
+    hideLogin();
+  } else {
+    showLogin();
   }
 })();
 
@@ -28,24 +120,32 @@ function toast(message, type = 'info') {
   }, 2500);
 }
 
-// ── API 请求 ──
-async function apiGet(path) {
-  const res = await fetch(`${API}${path}`);
-  return res.json();
-}
-
-async function apiPost(path, body) {
-  const res = await fetch(`${API}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  return res.json();
+// ── 加载进程下拉列表 ──
+async function loadSessions() {
+  if (!getToken()) return;
+  try {
+    const result = await apiGet('/api/sessions');
+    const sessions = result.data || [];
+    const select = document.getElementById('bindProcess');
+    const currentValue = select.value;
+    select.innerHTML = '<option value="">-- 选择运行中的 CC 进程 --</option>';
+    if (sessions.length === 0) {
+      select.innerHTML += '<option value="" disabled>暂无运行中的 CC 进程</option>';
+    } else {
+      sessions.forEach(s => {
+        const sel = s === currentValue ? ' selected' : '';
+        select.innerHTML += `<option value="${esc(s)}"${sel}>${esc(s)}</option>`;
+      });
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // ── 刷新状态 ──
 async function refreshStatus() {
   const tbody = document.getElementById('statusTable');
+  if (!getToken()) return;
   try {
     const statusRes = await apiGet('/api/status');
     const sessionsRes = await apiGet('/api/sessions');
@@ -53,22 +153,21 @@ async function refreshStatus() {
     const bindings = statusRes.data || [];
     const sessions = sessionsRes.data || [];
 
-    // 更新统计
     document.getElementById('statTotal').textContent = bindings.length;
     document.getElementById('statOnline').textContent = bindings.filter(b => b.status === 'online').length;
     document.getElementById('statOffline').textContent = bindings.filter(b => b.status === 'offline').length;
     document.getElementById('statSessions').textContent = sessions.length;
 
     if (bindings.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="color: var(--text-secondary); text-align: center; padding: 32px;">暂无绑定。请在上方表单创建绑定。</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="color: var(--text-secondary); text-align: center; padding: 32px;">暂无绑定。请在上方表单选择进程并填写飞书 App 凭据，创建绑定。</td></tr>`;
       return;
     }
 
     tbody.innerHTML = bindings.map(b => `
       <tr>
         <td><span class="font-medium">${esc(b.process_name)}</span></td>
-        <td><code style="font-size: 12px">${esc(b.feishu_target || '-')}</code></td>
-        <td>${b.feishu_type === 'user' ? '👤 用户' : '👥 群聊'}</td>
+        <td><code style="font-size: 12px">${esc(b.feishu_app_id || '-')}</code></td>
+        <td><span class="badge ${b.ws_connected ? 'badge-online' : 'badge-offline'}">${b.ws_connected ? '已连接' : '未连接'}</span></td>
         <td><span class="badge ${b.status === 'online' ? 'badge-online' : 'badge-offline'}">${b.status === 'online' ? '在线' : '离线'}</span></td>
         <td style="color: var(--text-secondary); font-size: 13px">${b.created_at ? new Date(b.created_at).toLocaleString('zh-CN') : '-'}</td>
         <td>
@@ -84,20 +183,21 @@ async function refreshStatus() {
 // ── 绑定操作 ──
 document.getElementById('bindForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const process_name = document.getElementById('bindProcess').value.trim();
-  const feishu_target = document.getElementById('bindTarget').value.trim();
-  const feishu_type = document.getElementById('bindType').value;
+  const process_name = document.getElementById('bindProcess').value;
+  const feishu_app_id = document.getElementById('bindAppId').value.trim();
+  const feishu_app_secret = document.getElementById('bindAppSecret').value.trim();
 
-  if (!process_name || !feishu_target) {
-    toast('请填写进程名和飞书目标 ID', 'error');
+  if (!process_name || !feishu_app_id || !feishu_app_secret) {
+    toast('请选择进程并填写 App ID 和 App Secret', 'error');
     return;
   }
 
-  const result = await apiPost('/api/bind', { process_name, feishu_target, feishu_type });
+  const result = await apiPost('/api/bind', { process_name, feishu_app_id, feishu_app_secret });
   if (result.code === 0) {
-    toast(`绑定成功: ${process_name} → ${feishu_target}`, 'success');
+    toast(`绑定成功: ${process_name} → ${feishu_app_id}`, 'success');
     document.getElementById('bindForm').reset();
     refreshStatus();
+    loadSessions();
   } else {
     toast(result.message || '绑定失败', 'error');
   }
@@ -110,6 +210,7 @@ async function doUnbind(process_name) {
   if (result.code === 0) {
     toast(`已解绑: ${process_name}`, 'success');
     refreshStatus();
+    loadSessions();
   } else {
     toast(result.message || '解绑失败', 'error');
   }
@@ -118,6 +219,7 @@ async function doUnbind(process_name) {
 // ── 日志 ──
 async function refreshLogs() {
   const container = document.getElementById('logContainer');
+  if (!getToken()) return;
   try {
     const result = await apiGet('/api/logs');
     const logs = result.data || [];
@@ -138,11 +240,20 @@ async function refreshLogs() {
 
 // ── 工具 ──
 function esc(str) {
+  if (!str) return '';
   const div = document.createElement('div');
-  div.textContent = str;
+  div.textContent = String(str);
   return div.innerHTML;
 }
 
 // ── 自动轮询 ──
-refreshStatus();
-setInterval(refreshStatus, 3000);
+if (getToken()) {
+  refreshStatus();
+  loadSessions();
+}
+setInterval(() => {
+  if (getToken()) refreshStatus();
+}, 3000);
+setInterval(() => {
+  if (getToken()) loadSessions();
+}, 10000);

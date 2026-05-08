@@ -1,5 +1,31 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.2.0 - 2026-05-08
+### 变更内容
+- 管理面板增加密码登录保护（config.yaml admin_password）
+- 进程名输入改为下拉列表（自动查询 tmux claude-* 会话）
+- 飞书对接从 Webhook 回调改为 WebSocket 长连接
+- 绑定模型重构：feishu_target → feishu_app_id + feishu_app_secret
+- 飞书凭据改为 per-binding 级别（每个 CC 进程绑定独立飞书应用）
+- 管理面板嵌入飞书自建应用配置指引
+- cc.sh 参数更新（--bind → --app-id + --app-secret）
+- 新增 ws-client.js 模块（WebSocket 长连接管理）
+
+### 影响范围
+- 配置文件 config.yaml：移除全局 feishu 配置，新增 admin_password
+- 绑定存储 store.js：字段变更（feishu_target → feishu_app_id + feishu_app_secret）
+- 飞书模块：新增 ws-client.js，sender.js 改为接受 per-app 凭据
+- 路由层：feishu.js 移除 webhook 回调，admin.js 新增 /api/auth + 认证中间件
+- 管理面板：index.html 加登录遮罩，app.js 加认证逻辑
+- cc.sh：参数从 --bind 改为 --app-id + --app-secret
+
+### 功能列表
+- 密码保护的 Web 管理面板
+- CC 进程下拉列表（动态获取 tmux 会话）
+- 飞书 WebSocket 长连接事件接收
+- 每个 CC 进程绑定独立飞书应用
+- 飞书应用配置步骤指引
+
 ## v0.1.0 - 2026-05-08
 ### 变更内容
 - 项目初始化，目录结构和基础配置

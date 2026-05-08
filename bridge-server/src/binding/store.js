@@ -21,24 +21,24 @@ function getByProcess(processName) {
   return read().bindings.find(b => b.process_name === processName);
 }
 
-function getByTarget(feishuTarget) {
-  return read().bindings.find(b => b.feishu_target === feishuTarget);
+function getByAppId(appId) {
+  return read().bindings.find(b => b.feishu_app_id === appId);
 }
 
-function create({ process_name, feishu_target, feishu_type }) {
+function create({ process_name, feishu_app_id, feishu_app_secret }) {
   const data = read();
   const existing = data.bindings.find(
-    b => b.process_name === process_name || b.feishu_target === feishu_target
+    b => b.process_name === process_name || b.feishu_app_id === feishu_app_id
   );
   if (existing) {
-    return { error: '进程或飞书目标已绑定', existing };
+    return { error: '进程或飞书应用已绑定', existing };
   }
 
   const binding = {
     id: uuidv4(),
     process_name,
-    feishu_target,
-    feishu_type, // "chat" | "user"
+    feishu_app_id,
+    feishu_app_secret,
     created_at: new Date().toISOString(),
     status: 'online'
   };
@@ -68,4 +68,4 @@ function updateStatus(processName, status) {
   return { binding };
 }
 
-module.exports = { getAll, getByProcess, getByTarget, create, remove, updateStatus };
+module.exports = { getAll, getByProcess, getByAppId, create, remove, updateStatus };

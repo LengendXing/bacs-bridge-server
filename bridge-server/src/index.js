@@ -29,8 +29,13 @@ app.get('/health', (req, res) => {
 // ── 启动 ──
 const { port, host } = config.server;
 app.listen(port, host, () => {
-  logger.log('info', `Bridge Server 启动`, { host, port });
-  console.log(`🔗 Bridge Server 运行在 http://${host}:${port}`);
-  console.log(`📋 管理面板: http://${host}:${port}/admin/`);
-  console.log(`📡 飞书 Webhook: http://${host}:${port}/webhook/feishu`);
+  logger.log('info', 'Bridge Server 启动', { host, port });
+  console.log(`Bridge Server 运行在 http://${host}:${port}`);
+  console.log(`管理面板: http://${host}:${port}/admin/`);
+
+  // 恢复所有已绑定的 WebSocket 连接
+  const wsClient = require('./feishu/ws-client');
+  wsClient.startAll().catch(e =>
+    logger.log('error', '恢复 WebSocket 连接失败', e.message)
+  );
 });

@@ -1,17 +1,16 @@
 const https = require('https');
-const config = require('../config').load();
 
-// 获取 tenant_access_token
-let tokenCache = { token: null, expires: 0 };
+// 每个 app_id 独立缓存 token
+const tokenCaches = {};
 
-function getAccessToken() {
+function getAccessToken(appId, appSecret) {
   return new Promise((resolve, reject) => {
-    if (tokenCache.token && tokenCache.expires > Date.now()) {
-      return resolve(tokenCache.token);
+    const cache = tokenCaches[appId];
+    if (cache && cache.token && cache.expires > Date.now()) {
+      return resolve(cache.token);
     }
 
-    const conf = config.feishu;
-    const body = JSON.stringify({ app_id: conf.app_id, app_secret: conf.app_secret });
+    const body = JSON.stringify({ app_id: appId, app_secret: appSecret });
 
     const req = https.request({
       hostname: 'open.feishu.cn',
@@ -25,8 +24,8 @@ function getAccessToken() {
         try {
           const json = JSON.parse(data);
           if (json.code === 0) {
-            tokenCache = { token: json.tenant_access_token, expires: Date.now() + (json.expire - 60) * 1000 };
-            resolve(tokenCache.token);
+            tokenCaches[appId] = { token: json.tenant_access_token, expires: Date.now() + (json.expire - 60) * 1000 };
+            resolve(tokenCaches[appId].token);
           } else {
             reject(new Error(`Token 获取失败: ${json.msg}`));
           }
@@ -42,9 +41,9 @@ function getAccessToken() {
 }
 
 // 发送消息到指定目标
-function sendMessage(receiveIdType, receiveId, msgType, content) {
+function sendMessage(appId, appSecret, receiveIdType, receiveId, msgType, content) {
   return new Promise((resolve, reject) => {
-    getAccessToken().then(token => {
+    getAccessToken(appId, appSecret).then(token => {
       const body = JSON.stringify({
         receive_id: receiveId,
         msg_type: msgType,
@@ -79,13 +78,13 @@ function sendMessage(receiveIdType, receiveId, msgType, content) {
 }
 
 // 发送文本消息
-function sendText(receiveIdType, receiveId, text) {
-  return sendMessage(receiveIdType, receiveId, 'text', { text });
+function sendText(appId, appSecret, receiveIdType, receiveId, text) {
+  return sendMessage(appId, appSecret, receiveIdType, receiveId, 'text', { text });
 }
 
 // 发送交互式卡片
-function sendCard(receiveIdType, receiveId, card) {
-  return sendMessage(receiveIdType, receiveId, 'interactive', card);
+function sendCard(appId, appSecret, receiveIdType, receiveId, card) {
+  return sendMessage(appId, appSecret, receiveIdType, receiveId, 'interactive', card);
 }
 
 // 构建进度卡片

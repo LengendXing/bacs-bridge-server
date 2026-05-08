@@ -1,18 +1,16 @@
 #!/bin/bash
 # Claude Code 多实例守护进程启动脚本（飞书桥接扩展版）
 # 使用方式:
-#   ./cc.sh <名字>                         # 启动一个实例
-#   ./cc.sh <名字> --bind <飞书目标ID>      # 启动并绑定飞书目标
-#   ./cc.sh <名字> --bind <飞书目标ID> --type chat|user  # 指定绑定类型
-#   ./cc.sh <名字> stop                    # 停止指定实例
-#   ./cc.sh <名字> status                  # 查看指定实例状态
-#   ./cc.sh <名字> attach                  # 重新连接指定实例
-#   ./cc.sh list                           # 列出所有运行中的实例
+#   ./cc.sh <名字>                                                    # 启动一个实例
+#   ./cc.sh <名字> --app-id <飞书AppID> --app-secret <飞书AppSecret>   # 启动并绑定飞书应用
+#   ./cc.sh <名字> stop                                               # 停止指定实例
+#   ./cc.sh <名字> status                                             # 查看指定实例状态
+#   ./cc.sh <名字> attach                                             # 重新连接指定实例
+#   ./cc.sh list                                                      # 列出所有运行中的实例
 #
 # 示例:
-#   ./cc.sh work                           # 启动名为 work 的实例
-#   ./cc.sh work --bind oc_xxxxxx          # 启动 work 并绑定飞书群
-#   ./cc.sh work --bind ou_yyyyyy --type user  # 启动 work 并绑定飞书用户
+#   ./cc.sh work                                                      # 启动名为 work 的实例
+#   ./cc.sh work --app-id cli_xxx --app-secret SECRET                 # 启动 work 并绑定飞书应用
 
 CLAUDE_BIN="${CLAUDE_BIN:-$HOME/.local/bin/claude}"
 SESSION_PREFIX="claude"
@@ -20,15 +18,15 @@ BRIDGE_API="${BRIDGE_API:-http://127.0.0.1:3456}"
 
 # ── 参数处理 ──────────────────────────────────────────────
 if [ -z "$1" ]; then
-    echo "用法: $0 <实例名> [start|stop|status|attach] [--bind <ID>] [--type chat|user]"
+    echo "用法: $0 <实例名> [start|stop|status|attach] [--app-id <ID> --app-secret <SECRET>]"
     echo "      $0 list"
     echo ""
     echo "示例:"
-    echo "  $0 work                    # 启动 work 实例"
-    echo "  $0 work --bind oc_xxxxxx   # 启动 work 并绑定飞书群"
-    echo "  $0 work attach             # 连接 work 实例"
-    echo "  $0 work stop               # 停止 work 实例"
-    echo "  $0 list                    # 列出所有实例"
+    echo "  $0 work                                              # 启动 work 实例"
+    echo "  $0 work --app-id cli_xxx --app-secret SECRET         # 启动 work 并绑定飞书"
+    echo "  $0 work attach                                       # 连接 work 实例"
+    echo "  $0 work stop                                         # 停止 work 实例"
+    echo "  $0 list                                              # 列出所有实例"
     exit 1
 fi
 
@@ -50,24 +48,27 @@ if [ "$1" = "list" ]; then
 fi
 
 INSTANCE_NAME="$1"
-ACTION="${2:-start}"
-BIND_TARGET=""
-BIND_TYPE="chat"
+ACTION="start"
+APP_ID=""
+APP_SECRET=""
 
-# 解析 --bind 和 --type 参数
+# 解析参数
 shift
 while [ $# -gt 0 ]; do
     case "$1" in
-        --bind)
-            BIND_TARGET="$2"
+        --app-id)
+            APP_ID="$2"
             shift 2
             ;;
-        --type)
-            BIND_TYPE="$2"
+        --app-secret)
+            APP_SECRET="$2"
             shift 2
+            ;;
+        stop|status|attach|start)
+            ACTION="$1"
+            shift
             ;;
         *)
-            ACTION="$1"
             shift
             ;;
     esac
@@ -102,12 +103,12 @@ session_exists() {
     fi
 }
 
-# ── 向 Bridge Server 注册/注销绑定 ──
+# ── 向 Bridge Server 注册绑定 ──
 register_bind() {
-    if [ -n "$BIND_TARGET" ]; then
+    if [ -n "$APP_ID" ] && [ -n "$APP_SECRET" ]; then
         curl -s -X POST "${BRIDGE_API}/api/bind" \
             -H "Content-Type: application/json" \
-            -d "{\"process_name\":\"${INSTANCE_NAME}\",\"feishu_target\":\"${BIND_TARGET}\",\"feishu_type\":\"${BIND_TYPE}\"}" \
+            -d "{\"process_name\":\"${INSTANCE_NAME}\",\"feishu_app_id\":\"${APP_ID}\",\"feishu_app_secret\":\"${APP_SECRET}\"}" \
             > /dev/null 2>&1
     fi
 }
@@ -139,10 +140,6 @@ case "$ACTION" in
         if session_exists; then
             echo "✓ 实例 '$INSTANCE_NAME' 正在运行 (会话: $SESSION_NAME)"
             echo "  重新连接: $0 $INSTANCE_NAME attach"
-            # 查询 Bridge Server 绑定状态
-            if [ -n "$BIND_TARGET" ] || curl -s "${BRIDGE_API}/api/status" 2>/dev/null | grep -q "\"process_name\":\"$INSTANCE_NAME\""; then
-                echo "  Bridge API: ${BRIDGE_API}"
-            fi
         else
             echo "✗ 实例 '$INSTANCE_NAME' 未在运行"
         fi
@@ -164,9 +161,10 @@ case "$ACTION" in
     start|*)
         if session_exists; then
             echo "✓ 实例 '$INSTANCE_NAME' 已在运行"
-            if [ -n "$BIND_TARGET" ]; then
+            if [ -n "$APP_ID" ] && [ -n "$APP_SECRET" ]; then
+                echo "  正在注册绑定..."
                 register_bind
-                echo "  已更新绑定: $INSTANCE_NAME → $BIND_TARGET ($BIND_TYPE)"
+                echo "  已更新绑定: $INSTANCE_NAME → $APP_ID"
             fi
             echo "  重新连接: $0 $INSTANCE_NAME attach"
             echo "  停止:     $0 $INSTANCE_NAME stop"
@@ -190,9 +188,10 @@ case "$ACTION" in
         if session_exists; then
             echo "✓ 实例 '$INSTANCE_NAME' 已启动 (会话: $SESSION_NAME)"
             # 注册绑定
-            if [ -n "$BIND_TARGET" ]; then
+            if [ -n "$APP_ID" ] && [ -n "$APP_SECRET" ]; then
+                echo "  正在注册绑定..."
                 register_bind
-                echo "✓ 已绑定飞书: $INSTANCE_NAME → $BIND_TARGET ($BIND_TYPE)"
+                echo "✓ 已绑定飞书: $INSTANCE_NAME → AppID=$APP_ID"
             fi
             echo "  重新连接: $0 $INSTANCE_NAME attach"
             echo "  停止:     $0 $INSTANCE_NAME stop"
