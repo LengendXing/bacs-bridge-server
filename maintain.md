@@ -1,5 +1,38 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.3.0 - 2026-05-08
+### 变更内容
+- **CC 状态检测**: 新增 `isIdle()` / `isProcessing()` — 通过 ❯ 提示符检测空闲/处理中
+- **回复提取重构**: `extractReplyContent()` 完全重写，从 TUI 纯文本解析最终回复
+  - 过滤 TUI 框架边框（╭╰│）、工具调用（●ToolName）、工具结果（⎿）、提示符（❯）
+  - 保留 Unicode 表格边框（│ 开头但含中文/数据内容的行）
+  - 过滤 CC 头部/侧边栏英文字段（Welcome back、Claude Code v、API Usage 等）
+  - 过滤操作提示（ctrl+o、? for shortcuts、Listed N directory）
+- **完成检测**: ❯ 提示符 + 稳定性确认（poll_interval * 3 秒无输出变化）→ 自动回复
+- **进度通知**: `buildProgressCard()` / `buildTimeoutCard()`，每 60s 发送进度卡片
+- **Markdown 回复**: `sendMarkdown()` 通过飞书交互式卡片发送，支持表格/代码块/加粗
+- **并发保护**: `pendingRequests` 防止重复处理同进程消息
+- **输出基线**: `startPolling` 从当前 pane 长度开始，避免旧会话内容泄漏
+- **飞书 Webhook 通知**: 集成 CLAUDE.md SECTION 0 飞书实时通知（需求确认 + 进度汇报）
+
+### 影响范围
+- `communicator.js`: 新增 isIdle/isProcessing/extractReplyContent 重写/startPolling 基线修复
+- `sender.js`: 新增 sendMarkdown/buildProgressCard/buildTimeoutCard
+- `ws-client.js`: 重构 handleIncomingMessage，新增进度定时器/完成检测/并发保护
+- `config.yaml`: progress_interval=60, timeout=600, poll_interval=2
+
+### 功能列表
+- ❯ 提示符空闲检测
+- TUI 纯文本回复提取（含表格保留）
+- 稳定性确认自动回复
+- 60s 进度/10min 超时卡片通知
+- Markdown 格式回复（交互式卡片承载）
+
+### 待解决问题
+- ⚠️ WebSocket 事件接收不稳定：2026-05-08 13:33 成功接收一次后，多次重启均未收到事件
+- WS ping/pong 正常但无 event 帧到达：疑似飞书服务端事件路由因快速重连混乱
+- 临时方案：等待 30s+ 后重启（给飞书清理旧连接的时间）
+
 ## v0.2.0 - 2026-05-08
 ### 变更内容
 - 管理面板增加密码登录保护（config.yaml admin_password）
