@@ -126,7 +126,8 @@ async function loadSessions() {
   try {
     const result = await apiGet('/api/sessions');
     const sessions = result.data || [];
-    const select = document.getElementById('bindProcess');
+    const select = document.getElementById('modalBindProcess');
+    if (!select) return;
     const currentValue = select.value;
     select.innerHTML = '<option value="">-- 选择运行中的 CC 进程 --</option>';
     if (sessions.length === 0) {
@@ -159,7 +160,7 @@ async function refreshStatus() {
     document.getElementById('statSessions').textContent = sessions.length;
 
     if (bindings.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="color: var(--text-secondary); text-align: center; padding: 32px;">暂无绑定。请在上方表单选择进程并填写飞书 App 凭据，创建绑定。</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="color: var(--text-secondary); text-align: center; padding: 32px;">暂无绑定。点击上方「新建」按钮创建绑定。</td></tr>`;
       return;
     }
 
@@ -170,7 +171,8 @@ async function refreshStatus() {
         <td><span class="badge ${b.ws_connected ? 'badge-online' : 'badge-offline'}">${b.ws_connected ? '已连接' : '未连接'}</span></td>
         <td><span class="badge ${b.status === 'online' ? 'badge-online' : 'badge-offline'}">${b.status === 'online' ? '在线' : '离线'}</span></td>
         <td style="color: var(--text-secondary); font-size: 13px">${b.created_at ? new Date(b.created_at).toLocaleString('zh-CN') : '-'}</td>
-        <td>
+        <td style="white-space: nowrap;">
+          <button class="btn btn-sm" style="background: #6366f1; color: #fff; border: none; margin-right: 6px;" onclick="copyTermCmd('${esc(b.process_name)}', '${esc(b.session_id || '')}')">复制终端命令</button>
           <button class="btn btn-danger btn-sm" onclick="doUnbind('${esc(b.process_name)}')">解绑</button>
         </td>
       </tr>
@@ -180,12 +182,28 @@ async function refreshStatus() {
   }
 }
 
-// ── 绑定操作 ──
-document.getElementById('bindForm').addEventListener('submit', async (e) => {
+// ── Modal 新建绑定 ──
+function openBindModal() {
+  loadSessions();
+  document.getElementById('bindModal').classList.remove('hidden');
+}
+
+function closeBindModal() {
+  document.getElementById('bindModal').classList.add('hidden');
+  document.getElementById('bindModalForm').reset();
+}
+
+document.getElementById('btnNewBind').addEventListener('click', openBindModal);
+document.getElementById('btnCancelBind').addEventListener('click', closeBindModal);
+document.getElementById('bindModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBindModal();
+});
+
+document.getElementById('bindModalForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const process_name = document.getElementById('bindProcess').value;
-  const feishu_app_id = document.getElementById('bindAppId').value.trim();
-  const feishu_app_secret = document.getElementById('bindAppSecret').value.trim();
+  const process_name = document.getElementById('modalBindProcess').value;
+  const feishu_app_id = document.getElementById('modalBindAppId').value.trim();
+  const feishu_app_secret = document.getElementById('modalBindAppSecret').value.trim();
 
   if (!process_name || !feishu_app_id || !feishu_app_secret) {
     toast('请选择进程并填写 App ID 和 App Secret', 'error');
@@ -195,7 +213,7 @@ document.getElementById('bindForm').addEventListener('submit', async (e) => {
   const result = await apiPost('/api/bind', { process_name, feishu_app_id, feishu_app_secret });
   if (result.code === 0) {
     toast(`绑定成功: ${process_name} → ${feishu_app_id}`, 'success');
-    document.getElementById('bindForm').reset();
+    closeBindModal();
     refreshStatus();
     loadSessions();
   } else {
@@ -245,6 +263,26 @@ function esc(str) {
   div.textContent = String(str);
   return div.innerHTML;
 }
+
+function copyTermCmd(processName, sessionId) {
+  const cmd = sessionId ? `claude -r ${sessionId}` : `claude`;
+  navigator.clipboard.writeText(cmd).then(() => {
+    toast(`已复制终端命令: ${cmd}`, 'success');
+  }).catch(() => {
+    toast('复制失败，请手动复制', 'error');
+  });
+}
+
+// ── Tab 切换 ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const target = document.getElementById('tab-' + btn.dataset.tab);
+    if (target) target.classList.add('active');
+  });
+});
 
 // ── 自动轮询 ──
 if (getToken()) {
