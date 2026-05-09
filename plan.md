@@ -46,6 +46,10 @@
 - [x] 前端 JS 改造（openBindModal/openEditModal/openUnbindModal + loadUnboundSessions） ✅ 2026-05-09
 - [x] 版本号 0.4.0 → 0.5.0 + maintain.md + plan.md ✅ 2026-05-09
 
+## v0.5.2 · box-drawing 表格渲染修复（2026-05-09）
+
+- [x] P0-1 修复 box-drawing 表格在飞书无法对齐：sanitizeMarkdownForFeishu() 新增检测+代码块包裹 ✅ 2026-05-09
+
 ## v0.5.1 · isIdle 误判修复（2026-05-09）
 
 - [x] P0-1 修复 isIdle() 误判：新增 "esc to interrupt" 忙碌检测，扩大捕获行数 ✅ 2026-05-09

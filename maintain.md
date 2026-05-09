@@ -1,5 +1,19 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.5.2 - 2026-05-09
+### 变更内容
+- **修复 box-drawing 表格无法对齐显示**：`sender.js` `sanitizeMarkdownForFeishu()`
+  - 新增 box-drawing 字符表格检测（`┌┬┐/├┼┤/└┴┘/│` 风格）
+  - 检测到后自动包入 ` ``` ` 代码块，飞书以等宽字体渲染，列对齐正常
+  - 已有代码块（` ``` ` 包裹）内的内容不会二次处理
+  - GFM 表格（`| col |` + `| --- |`）逻辑保留不变
+
+### 影响范围
+- `bridge-server/src/feishu/sender.js`：`sanitizeMarkdownForFeishu()` 新增 box-drawing 检测与包裹
+
+### 功能列表
+- CC 回复中的 box-drawing 表格在飞书中等宽对齐显示
+
 ## v0.5.1 - 2026-05-09
 ### 变更内容
 - **修复 isIdle() 误判（核心 Bug）**：`communicator.js`
