@@ -1,5 +1,19 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.5.4 - 2026-05-09
+### 变更内容
+- **表格渲染彻底重做**：`sender.js` 改为将表格转为飞书原生 `table` 元素
+  - GFM 表格（`| col |` + `| --- |`）→ `parseGfmTable()` 解析为 `{ tag: 'table' }`
+  - box-drawing 表格（`┌─┐/│` 风格）→ `parseBoxDrawingTable()` 解析为 `{ tag: 'table' }`
+  - `replyToCardElements()` 统一处理回复文本：表格转 `table` 元素，普通文本转 `markdown` 元素
+  - 移除之前代码块包裹方案（等宽字体对齐但无真正表格结构）
+
+### 影响范围
+- `bridge-server/src/feishu/sender.js`：全面重写表格处理逻辑，新增 `parseGfmTable` / `parseBoxDrawingTable` / `replyToCardElements`
+
+### 功能列表
+- CC 回复中的表格在飞书以原生 table 组件渲染，支持列标题、行数据、分页
+
 ## v0.5.3 - 2026-05-09
 ### 变更内容
 - **修复 box-drawing 表格被截断/丢弃**：`communicator.js` `extractReplyContent()`

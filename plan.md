@@ -46,6 +46,10 @@
 - [x] 前端 JS 改造（openBindModal/openEditModal/openUnbindModal + loadUnboundSessions） ✅ 2026-05-09
 - [x] 版本号 0.4.0 → 0.5.0 + maintain.md + plan.md ✅ 2026-05-09
 
+## v0.5.4 · 表格转飞书原生 table 元素（2026-05-09）
+
+- [x] P0-1 GFM/box-drawing 表格解析为飞书原生 table 元素，移除代码块包裹方案 ✅ 2026-05-09
+
 ## v0.5.3 · box-drawing 表格提取修复（2026-05-09）
 
 - [x] P0-1 修复 extractReplyContent 丢弃 box-drawing 表格行：新增零缩进续行判断 + fallback 不剥 │ ✅ 2026-05-09
