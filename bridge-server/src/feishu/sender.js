@@ -172,8 +172,10 @@ function parseBoxDrawingTable(tblLines) {
 }
 
 // 将 markdown 文本转换为飞书卡片 elements 数组
-// 表格（GFM / box-drawing）→ 原生 { tag: 'table' } 元素
+// 表格（GFM / box-drawing）→ 原生 { tag: 'table' } 元素（每张卡片最多 4 个，超出转代码块）
 // 其余文本 → { tag: 'markdown' } 元素（超长自动分段）
+const FEISHU_TABLE_LIMIT = 4;
+
 function replyToCardElements(md) {
   if (!md) return [];
   const lines = md.split('\n');
@@ -181,6 +183,7 @@ function replyToCardElements(md) {
   let textBuf = [];
   let i = 0;
   let inCodeBlock = false;
+  let tableCount = 0;
 
   function flushText() {
     const text = textBuf.join('\n').trim();
@@ -189,6 +192,16 @@ function replyToCardElements(md) {
     chunkMarkdown(text, 4000).forEach(c =>
       elements.push({ tag: 'markdown', content: c })
     );
+  }
+
+  function pushTable(tblLines, el) {
+    if (el && tableCount < FEISHU_TABLE_LIMIT) {
+      elements.push(el);
+      tableCount++;
+    } else {
+      // 超出上限或解析失败：用代码块保持等宽对齐
+      elements.push({ tag: 'markdown', content: '```\n' + tblLines.join('\n') + '\n```' });
+    }
   }
 
   while (i < lines.length) {
@@ -210,14 +223,13 @@ function replyToCardElements(md) {
         flushText();
         const tbl = [line];
         i++;
-        tbl.push(lines[i]); // 分隔行
+        tbl.push(lines[i]);
         i++;
         while (i < lines.length && /\|/.test(lines[i])) {
           tbl.push(lines[i]);
           i++;
         }
-        const el = parseGfmTable(tbl);
-        if (el) elements.push(el);
+        pushTable(tbl, parseGfmTable(tbl));
         continue;
       }
 
@@ -237,8 +249,7 @@ function replyToCardElements(md) {
             break;
           }
         }
-        const el = parseBoxDrawingTable(tbl);
-        if (el) elements.push(el);
+        pushTable(tbl, parseBoxDrawingTable(tbl));
         continue;
       }
     }
