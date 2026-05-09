@@ -1,5 +1,18 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.5.3 - 2026-05-09
+### 变更内容
+- **修复 box-drawing 表格被截断/丢弃**：`communicator.js` `extractReplyContent()`
+  - 助手块续行检测新增 box-drawing 行判断（含 `┌┬┐/├┼┤` 等角/交叉字符，或同行 ≥2 个 `│`）
+  - 零缩进的表格行不再触发 `commit()` 打断助手块，整张表格完整保留
+  - fallback 分支：表格行跳过左边框 `│` 剥除逻辑，避免第一列被截掉
+
+### 影响范围
+- `bridge-server/src/process/communicator.js`：`extractReplyContent()` Step 2 续行判断 + fallback 剥框逻辑
+
+### 功能列表
+- CC 输出的 box-drawing 表格现在可完整提取，配合 v0.5.2 的代码块包裹在飞书正确对齐显示
+
 ## v0.5.2 - 2026-05-09
 ### 变更内容
 - **修复 box-drawing 表格无法对齐显示**：`sender.js` `sanitizeMarkdownForFeishu()`
