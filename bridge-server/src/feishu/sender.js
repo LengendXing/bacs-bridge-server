@@ -83,44 +83,75 @@ function sendText(appId, appSecret, receiveIdType, receiveId, text) {
 }
 
 // ── Markdown 预处理（适配飞书卡片 markdown tag 的有限语法） ──
-// 飞书卡片 markdown 不支持 GFM 表格 / 部分代码块 / 嵌套列表
+// 飞书卡片 markdown 不支持 GFM 表格 / box-drawing 表格直接渲染
+// 两类表格均自动包入代码块（等宽字体），保持对齐
 function sanitizeMarkdownForFeishu(md) {
   if (!md) return '';
-  let s = String(md);
-
-  // 删除/转义可能影响飞书 JSON 的字符
-  // 注意：飞书 markdown 会把 \n 当换行处理，无需特别处理
-  // 但 GFM 表格语法 | a | b | 在飞书 markdown 中渲染异常 → 转为代码块
-  const lines = s.split('\n');
+  const lines = String(md).split('\n');
   const out = [];
   let i = 0;
+  let inCodeBlock = false;
+
   while (i < lines.length) {
     const line = lines[i];
-    // 检测 GFM 表格：当前行含 |，下一行是 | --- | --- |
-    const isHeader = /\|/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*\|?\s*$/.test(lines[i + 1]);
-    if (isHeader) {
-      // 收集整张表格
-      const tbl = [line];
+
+    // 跟踪已有代码块，避免二次包裹
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      out.push(line);
       i++;
-      tbl.push(lines[i]); // 分隔行
-      i++;
-      while (i < lines.length && /\|/.test(lines[i])) {
-        tbl.push(lines[i]);
-        i++;
-      }
-      out.push('```');
-      out.push(...tbl);
-      out.push('```');
       continue;
     }
+
+    if (!inCodeBlock) {
+      // ── 检测 GFM 表格：当前行含 |，下一行是分隔行 | --- | ──
+      const isGfmHeader = /\|/.test(line) &&
+        i + 1 < lines.length &&
+        /^\s*\|?[\s:|-]+\|[\s:|-]*\|?\s*$/.test(lines[i + 1]);
+
+      if (isGfmHeader) {
+        const tbl = [line];
+        i++;
+        tbl.push(lines[i]); // 分隔行
+        i++;
+        while (i < lines.length && /\|/.test(lines[i])) {
+          tbl.push(lines[i]);
+          i++;
+        }
+        out.push('```');
+        out.push(...tbl);
+        out.push('```');
+        continue;
+      }
+
+      // ── 检测 box-drawing 表格（┌┬┐/├┼┤/└┴┘ 风格） ──
+      // 边框行：含角/交叉字符；内容行：含两个以上 │
+      const isBoxLine = /[┌┐└┘├┤┬┴┼╪╫]/.test(line) || /│[^│\n]*│/.test(line);
+
+      if (isBoxLine) {
+        const tbl = [line];
+        i++;
+        while (i < lines.length) {
+          const next = lines[i];
+          if (/[┌┐└┘├┤┬┴┼╪╫]/.test(next) || /│[^│\n]*│/.test(next)) {
+            tbl.push(next);
+            i++;
+          } else {
+            break;
+          }
+        }
+        out.push('```');
+        out.push(...tbl);
+        out.push('```');
+        continue;
+      }
+    }
+
     out.push(line);
     i++;
   }
-  s = out.join('\n');
 
-  // 飞书 markdown 不支持嵌套加粗内的下划线，简单转义不必要
-
-  return s;
+  return out.join('\n');
 }
 
 // 截断到飞书卡片单元素安全长度（飞书 elements 单 markdown ≈ 30000 字符以内）
