@@ -165,6 +165,13 @@ function tryFinish(session) {
     if (sessions[process_name] !== session) return;
     if (!comm.isIdle(process_name)) return;
 
+    // 最终发送前做一次全量抓取，确保 accumulated 是最新内容
+    // （应对 CC 极快响应、轮询还未触发的情况）
+    const fresh = comm.captureOutput(process_name);
+    if (!fresh.error && fresh.output.length > (session.accumulated || '').length) {
+      session.accumulated = fresh.output;
+    }
+
     const reply = comm.extractReplyContent(session.accumulated, session.ctx.msgText);
     if (!reply) {
       // 没拿到内容但已空闲，说明可能 pane 被截断或回复为空 — 兜底发个简短提示

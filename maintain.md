@@ -1,5 +1,23 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.5.1 - 2026-05-09
+### 变更内容
+- **修复 isIdle() 误判（核心 Bug）**：`communicator.js`
+  - 旧逻辑仅检测 `❯` 提示符，但 CC 处理中其输入框底部也常驻 `❯`，导致 7s 探测误判为空闲
+  - 新增"忙碌优先"检测：先判断 `Esc to interrupt` 是否存在，有则直接返回 `false`（忙碌）
+  - 捕获行数从 8 行扩展到 15 行，避免状态栏被截断
+- **修复回复内容为空（快速响应漏抓）**：`ws-client.js`
+  - `tryFinish()` 确认空闲后，在提取回复内容前额外做一次全量 pane 抓取
+  - 确保 CC 极快响应、轮询尚未触发时 `accumulated` 仍为最新内容
+
+### 影响范围
+- `bridge-server/src/process/communicator.js`：`isIdle()` 新增 `esc to interrupt` 忙碌检测
+- `bridge-server/src/feishu/ws-client.js`：`tryFinish()` 新增发送前全量 pane 刷新
+
+### 功能列表
+- isIdle() 不再误判处理中的 CC 为空闲
+- 快速响应场景下回复内容不再丢失
+
 ## v0.5.0 - 2026-05-09
 ### 变更内容
 - **管理面板「新建绑定」改造**：系统自动创建 CC 进程，用户无需再碰终端

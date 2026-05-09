@@ -46,6 +46,11 @@
 - [x] 前端 JS 改造（openBindModal/openEditModal/openUnbindModal + loadUnboundSessions） ✅ 2026-05-09
 - [x] 版本号 0.4.0 → 0.5.0 + maintain.md + plan.md ✅ 2026-05-09
 
+## v0.5.1 · isIdle 误判修复（2026-05-09）
+
+- [x] P0-1 修复 isIdle() 误判：新增 "esc to interrupt" 忙碌检测，扩大捕获行数 ✅ 2026-05-09
+- [x] P0-2 修复快速响应漏抓：tryFinish() 发送前额外全量 pane 刷新 ✅ 2026-05-09
+
 ## 待办（后续迭代）
 
 - [ ] 后台管理面板「新建绑定」流程改造（先填表 → 自动给 cc.sh 启动命令复制 → 检测在线状态）

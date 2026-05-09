@@ -69,11 +69,12 @@ function listSessions() {
 
 // 检查 CC 是否处于待命状态（❯ 提示符表示已完成，等待新输入）
 function isIdle(processName) {
-  const res = captureOutput(processName, 8);
+  const res = captureOutput(processName, 15);
   if (res.error) return false;
   const tail = res.output;
-  // 空闲：底部 prompt box 出现 ❯ 字符或 shortcuts 提示
-  // 注意：处理过程中也可能短暂出现 ❯（罕见），所以这里用最后 8 行整体匹配
+  // CC 处理中会在状态栏显示 "Esc to interrupt"，有此字样则必定处于忙碌状态
+  if (/esc to interrupt/i.test(tail)) return false;
+  // 空闲：底部出现 ❯ 提示符或 shortcuts 提示，且无"esc to interrupt"
   return /❯/.test(tail) || /\? for shortcuts/.test(tail);
 }
 
