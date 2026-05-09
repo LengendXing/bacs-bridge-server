@@ -166,11 +166,19 @@ function extractReplyContent(raw, userMessage) {
 
     // 助手块续行：保留缩进续行 + 段内空行
     if (!trimmed) {
-      // 段内空行允许（保留段落分隔）
       current.lines.push('');
       continue;
     }
     if (/^\s{2,}/.test(line)) {
+      current.lines.push(trimmed);
+      continue;
+    }
+
+    // box-drawing 表格行：不管缩进，视为块续行（避免零缩进行打断块结构）
+    // 检测：含表格边框字符，或同行有 2+ 个竖线
+    const isTableLine = /[┌┐└┘├┤┬┴┼╪╫]/.test(line) ||
+      (line.match(/│/g) || []).length >= 2;
+    if (isTableLine) {
       current.lines.push(trimmed);
       continue;
     }
@@ -190,7 +198,13 @@ function extractReplyContent(raw, userMessage) {
 
   // ── 兜底：返回去 TUI 装饰后的全部纯文本 ──
   const fallback = cleaned
-    .map(l => l.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, '').trimEnd())
+    .map(l => {
+      // box-drawing 表格行（含 ≥2 个 │ 或含角/交叉字符）保留原行，不剥边框
+      const isTableLine = /[┌┐└┘├┤┬┴┼╪╫]/.test(l) || (l.match(/│/g) || []).length >= 2;
+      if (isTableLine) return l.trimEnd();
+      // 普通 TUI 侧边框行剥掉单个 │
+      return l.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, '').trimEnd();
+    })
     .filter(l => l.trim())
     .join('\n')
     .trim();
