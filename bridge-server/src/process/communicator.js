@@ -88,7 +88,28 @@ function isProcessing(processName) {
 function extractReplyContent(raw, userMessage) {
   if (!raw) return '';
 
-  const rawLines = raw.split(/\r?\n/);
+  let rawLines = raw.split(/\r?\n/);
+
+  // ── Step 0: 截断到本轮对话起点 ──
+  // CC TUI 中用户消息会回显为 `│ > {userMessage} │`，找到最后一次出现的位置，
+  // 只对该位置之后的内容做提取，避免把历史回复也一并返回
+  if (userMessage && userMessage.trim()) {
+    const needle = userMessage.trim();
+    // 取需要匹配的前缀：避免超长消息正则失效，截前 60 字符
+    const probe = needle.slice(0, 60);
+    let cutIdx = -1;
+    for (let i = rawLines.length - 1; i >= 0; i--) {
+      const line = rawLines[i];
+      // 匹配 `│ > xxx ...`（CC 输入框回显），允许多行消息只对首行匹配
+      if (/^\s*│\s*>\s/.test(line) && line.includes(probe)) {
+        cutIdx = i;
+        break;
+      }
+    }
+    if (cutIdx >= 0) {
+      rawLines = rawLines.slice(cutIdx + 1);
+    }
+  }
 
   // ── Step 1: 去除 TUI 装饰行 ──
   const cleaned = [];
