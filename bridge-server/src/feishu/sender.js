@@ -1,4 +1,5 @@
 const https = require('https');
+const logger = require('../middleware/logger');
 
 // 每个 app_id 独立缓存 token
 const tokenCaches = {};
@@ -64,9 +65,15 @@ function sendMessage(appId, appSecret, receiveIdType, receiveId, msgType, conten
         res.on('end', () => {
           try {
             const json = JSON.parse(data);
-            resolve(json);
+            if (json.code !== 0) {
+              logger.log('error', `[sender] 飞书 API 错误 code=${json.code} msg=${json.msg}`, JSON.stringify(json).slice(0, 300));
+              reject(new Error(`飞书 API 错误 ${json.code}: ${json.msg}`));
+            } else {
+              resolve(json);
+            }
           } catch (e) {
-            resolve({ error: data });
+            logger.log('error', '[sender] 响应解析失败', data.slice(0, 200));
+            reject(e);
           }
         });
       });
