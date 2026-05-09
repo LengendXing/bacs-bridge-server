@@ -82,85 +82,12 @@ function sendText(appId, appSecret, receiveIdType, receiveId, text) {
   return sendMessage(appId, appSecret, receiveIdType, receiveId, 'text', { text });
 }
 
-// ── Markdown 预处理（适配飞书卡片 markdown tag 的有限语法） ──
-// 飞书卡片 markdown 不支持 GFM 表格 / box-drawing 表格直接渲染
-// 两类表格均自动包入代码块（等宽字体），保持对齐
-function sanitizeMarkdownForFeishu(md) {
-  if (!md) return '';
-  const lines = String(md).split('\n');
-  const out = [];
-  let i = 0;
-  let inCodeBlock = false;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // 跟踪已有代码块，避免二次包裹
-    if (/^\s*```/.test(line)) {
-      inCodeBlock = !inCodeBlock;
-      out.push(line);
-      i++;
-      continue;
-    }
-
-    if (!inCodeBlock) {
-      // ── 检测 GFM 表格：当前行含 |，下一行是分隔行 | --- | ──
-      const isGfmHeader = /\|/.test(line) &&
-        i + 1 < lines.length &&
-        /^\s*\|?[\s:|-]+\|[\s:|-]*\|?\s*$/.test(lines[i + 1]);
-
-      if (isGfmHeader) {
-        const tbl = [line];
-        i++;
-        tbl.push(lines[i]); // 分隔行
-        i++;
-        while (i < lines.length && /\|/.test(lines[i])) {
-          tbl.push(lines[i]);
-          i++;
-        }
-        out.push('```');
-        out.push(...tbl);
-        out.push('```');
-        continue;
-      }
-
-      // ── 检测 box-drawing 表格（┌┬┐/├┼┤/└┴┘ 风格） ──
-      // 边框行：含角/交叉字符；内容行：含两个以上 │
-      const isBoxLine = /[┌┐└┘├┤┬┴┼╪╫]/.test(line) || /│[^│\n]*│/.test(line);
-
-      if (isBoxLine) {
-        const tbl = [line];
-        i++;
-        while (i < lines.length) {
-          const next = lines[i];
-          if (/[┌┐└┘├┤┬┴┼╪╫]/.test(next) || /│[^│\n]*│/.test(next)) {
-            tbl.push(next);
-            i++;
-          } else {
-            break;
-          }
-        }
-        out.push('```');
-        out.push(...tbl);
-        out.push('```');
-        continue;
-      }
-    }
-
-    out.push(line);
-    i++;
-  }
-
-  return out.join('\n');
-}
-
-// 截断到飞书卡片单元素安全长度（飞书 elements 单 markdown ≈ 30000 字符以内）
+// 超长文本分段（飞书单 markdown element ≈ 4000 字符以内）
 function chunkMarkdown(md, maxLen = 4000) {
   if (md.length <= maxLen) return [md];
   const chunks = [];
   let rest = md;
   while (rest.length > maxLen) {
-    // 尽量在换行处切
     let cut = rest.lastIndexOf('\n', maxLen);
     if (cut < maxLen / 2) cut = maxLen;
     chunks.push(rest.slice(0, cut));
@@ -170,21 +97,164 @@ function chunkMarkdown(md, maxLen = 4000) {
   return chunks;
 }
 
-// 发送 Markdown 消息（用 interactive 卡片承载）
+// ── 表格解析：将 GFM / box-drawing 表格转为飞书原生 table 元素 ──
+
+// 解析 GFM 表格行（| col | col | + | --- | --- |）
+function parseGfmTable(tblLines) {
+  const parseRow = line =>
+    line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+
+  const headers = parseRow(tblLines[0]);
+  const dataRows = tblLines.slice(2).map(parseRow); // 跳过 | --- | 分隔行
+
+  if (!headers.length) return null;
+
+  const columns = headers.map((h, idx) => ({
+    name: `c${idx}`,
+    display_name: h || `列${idx + 1}`,
+    data_type: 'text'
+  }));
+
+  const rows = dataRows
+    .filter(r => r.some(c => c))
+    .map(row => {
+      const obj = {};
+      headers.forEach((_, idx) => { obj[`c${idx}`] = row[idx] || ''; });
+      return obj;
+    });
+
+  if (!rows.length) return null;
+  return { tag: 'table', columns, rows, row_height: 'middle' };
+}
+
+// 解析 box-drawing 表格（┌─┐/├─┤/└─┘ 分隔，│ 行为数据）
+function parseBoxDrawingTable(tblLines) {
+  // 只取数据行（以 │ 开头且不是分隔行 ┌├└）
+  const dataLines = tblLines.filter(l => {
+    const t = l.trim();
+    return t.startsWith('│') && !/^[┌├└]/.test(t);
+  });
+
+  if (!dataLines.length) return null;
+
+  const parseRow = line =>
+    line.split('│').slice(1, -1).map(cell => cell.trim());
+
+  const allRows = dataLines.map(parseRow);
+  const headers = allRows[0];
+  const dataRows = allRows.slice(1);
+
+  if (!headers || !headers.length) return null;
+
+  const columns = headers.map((h, idx) => ({
+    name: `c${idx}`,
+    display_name: h || `列${idx + 1}`,
+    data_type: 'text'
+  }));
+
+  const rows = dataRows
+    .filter(r => r.some(c => c))
+    .map(row => {
+      const obj = {};
+      headers.forEach((_, idx) => { obj[`c${idx}`] = row[idx] || ''; });
+      return obj;
+    });
+
+  if (!rows.length) return null;
+  return { tag: 'table', columns, rows, row_height: 'middle' };
+}
+
+// 将 markdown 文本转换为飞书卡片 elements 数组
+// 表格（GFM / box-drawing）→ 原生 { tag: 'table' } 元素
+// 其余文本 → { tag: 'markdown' } 元素（超长自动分段）
+function replyToCardElements(md) {
+  if (!md) return [];
+  const lines = md.split('\n');
+  const elements = [];
+  let textBuf = [];
+  let i = 0;
+  let inCodeBlock = false;
+
+  function flushText() {
+    const text = textBuf.join('\n').trim();
+    textBuf = [];
+    if (!text) return;
+    chunkMarkdown(text, 4000).forEach(c =>
+      elements.push({ tag: 'markdown', content: c })
+    );
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // 跟踪已有代码块，不对代码块内容做表格检测
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      textBuf.push(line);
+      i++;
+      continue;
+    }
+
+    if (!inCodeBlock) {
+      // GFM 表格：当前行含 |，下一行是 | --- | --- |
+      if (/\|/.test(line) &&
+          i + 1 < lines.length &&
+          /^\s*\|?[\s:|-]+\|[\s:|-]*\|?\s*$/.test(lines[i + 1])) {
+        flushText();
+        const tbl = [line];
+        i++;
+        tbl.push(lines[i]); // 分隔行
+        i++;
+        while (i < lines.length && /\|/.test(lines[i])) {
+          tbl.push(lines[i]);
+          i++;
+        }
+        const el = parseGfmTable(tbl);
+        if (el) elements.push(el);
+        continue;
+      }
+
+      // box-drawing 表格：含角/交叉字符，或同行 ≥2 个 │
+      const isBox = /[┌┐└┘├┤┬┴┼╪╫]/.test(line) ||
+        (line.match(/│/g) || []).length >= 2;
+      if (isBox) {
+        flushText();
+        const tbl = [line];
+        i++;
+        while (i < lines.length) {
+          const next = lines[i];
+          if (/[┌┐└┘├┤┬┴┼╪╫]/.test(next) || (next.match(/│/g) || []).length >= 2) {
+            tbl.push(next);
+            i++;
+          } else {
+            break;
+          }
+        }
+        const el = parseBoxDrawingTable(tbl);
+        if (el) elements.push(el);
+        continue;
+      }
+    }
+
+    textBuf.push(line);
+    i++;
+  }
+
+  flushText();
+  return elements;
+}
+
+// 发送 Markdown 消息（用 interactive 卡片承载，表格自动转原生元素）
 function sendMarkdown(appId, appSecret, receiveIdType, receiveId, md) {
   return sendCard(appId, appSecret, receiveIdType, receiveId, {
     header: { title: { tag: 'plain_text', content: 'Claude Code 回复' }, template: 'blue' },
-    elements: [
-      { tag: 'markdown', content: sanitizeMarkdownForFeishu(md) }
-    ]
+    elements: replyToCardElements(md)
   });
 }
 
 // ── 完整回复卡片（带头部信息 + 用户问题 + 回复正文 + 耗时） ──
 function sendReplyCard(appId, appSecret, receiveIdType, receiveId, opts) {
   const { processName, userQuestion, reply, elapsed, isTimeout } = opts;
-  const safeReply = sanitizeMarkdownForFeishu(reply || '');
-  const chunks = chunkMarkdown(safeReply, 4500);
 
   const elapsedStr = elapsed != null
     ? (elapsed >= 60 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : `${elapsed}s`)
@@ -199,9 +269,8 @@ function sendReplyCard(appId, appSecret, receiveIdType, receiveId, opts) {
     { tag: 'hr' }
   ];
 
-  for (const c of chunks) {
-    elements.push({ tag: 'markdown', content: c });
-  }
+  // 回复正文：表格转原生 table 元素，文字转 markdown 元素
+  elements.push(...replyToCardElements(reply || ''));
 
   elements.push({ tag: 'hr' });
   elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: `Claude Code · ${new Date().toLocaleString('zh-CN')}` }] });
@@ -262,6 +331,6 @@ module.exports = {
   sendReplyCard,
   buildProgressCard,
   buildTimeoutCard,
-  sanitizeMarkdownForFeishu,
-  chunkMarkdown
+  chunkMarkdown,
+  replyToCardElements
 };
