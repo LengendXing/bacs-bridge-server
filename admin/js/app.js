@@ -172,7 +172,7 @@ async function refreshStatus() {
         <td><span class="badge ${b.status === 'online' ? 'badge-online' : 'badge-offline'}">${b.status === 'online' ? '在线' : '离线'}</span></td>
         <td style="color: var(--text-secondary); font-size: 13px">${b.created_at ? new Date(b.created_at).toLocaleString('zh-CN') : '-'}</td>
         <td style="white-space: nowrap;">
-          <button class="btn btn-sm" style="background: #6366f1; color: #fff; border: none; margin-right: 6px;" onclick="copyTermCmd('${esc(b.process_name)}', '${esc(b.session_id || '')}')">复制终端命令</button>
+          <button class="btn btn-sm" style="background: #6366f1; color: #fff; border: none; margin-right: 6px;" onclick="copyTermCmd('${esc(b.process_name)}')" title="复制 tmux attach 命令">复制 attach 命令</button>
           <button class="btn btn-danger btn-sm" onclick="doUnbind('${esc(b.process_name)}')">解绑</button>
         </td>
       </tr>
@@ -264,12 +264,51 @@ function esc(str) {
   return div.innerHTML;
 }
 
-function copyTermCmd(processName, sessionId) {
-  const cmd = sessionId ? `claude -r ${sessionId}` : `claude`;
-  navigator.clipboard.writeText(cmd).then(() => {
-    toast(`已复制终端命令: ${cmd}`, 'success');
+// http 环境下 navigator.clipboard 不可用，需要 fallback 到 execCommand('copy')
+function copyToClipboard(text) {
+  return new Promise((resolve, reject) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(resolve).catch(reject);
+      return;
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      ta.style.left = '-1000px';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('execCommand copy failed'));
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+// 复制 attach 命令 — 切换到对应 tmux 实例
+function copyTermCmd(processName) {
+  const cmd = `tmux attach -t claude-${processName}`;
+  copyToClipboard(cmd).then(() => {
+    toast(`已复制：${cmd}`, 'success');
   }).catch(() => {
-    toast('复制失败，请手动复制', 'error');
+    // 最后兜底：弹个 prompt 让用户手动复制
+    window.prompt('自动复制失败，请手动复制以下命令：', cmd);
+  });
+}
+
+// 复制 cc.sh 启动命令（带飞书绑定参数）
+function copyStartCmd(processName, appId, appSecret) {
+  const cmd = `./cc.sh ${processName} --app-id ${appId} --app-secret ${appSecret}`;
+  copyToClipboard(cmd).then(() => {
+    toast(`已复制启动命令`, 'success');
+  }).catch(() => {
+    window.prompt('自动复制失败，请手动复制以下命令：', cmd);
   });
 }
 
