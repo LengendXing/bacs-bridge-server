@@ -37,6 +37,15 @@
 - [x] 并发保护 + 输出基线修复 ✅ 2026-05-08
 - [x] 飞书 Webhook 需求确认通知集成 ✅ 2026-05-08
 
+## v0.5.0 · 管理面板重构（2026-05-09）
+
+- [x] 后端数据模型扩展（store.js：edit() + claude_mode/base_url/api_key + ensureDataFile） ✅ 2026-05-09
+- [x] 进程管理改造（manager.js：start() 支持 custom 模式环境变量子进程注入） ✅ 2026-05-09
+- [x] 后端接口改造（/api/bind 重名校验+原子回滚 + /api/bind/mount + /api/edit + /api/sessions/unbound） ✅ 2026-05-09
+- [x] 前端 HTML 改造（编辑 modal + 解绑 modal + Claude 接入配置 radio + 表格新列） ✅ 2026-05-09
+- [x] 前端 JS 改造（openBindModal/openEditModal/openUnbindModal + loadUnboundSessions） ✅ 2026-05-09
+- [x] 版本号 0.4.0 → 0.5.0 + maintain.md + plan.md ✅ 2026-05-09
+
 ## 待办（后续迭代）
 
 - [ ] 后台管理面板「新建绑定」流程改造（先填表 → 自动给 cc.sh 启动命令复制 → 检测在线状态）

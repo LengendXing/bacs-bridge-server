@@ -1,6 +1,6 @@
 {
   "name": "feishu-claudecode-bridge",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "飞书机器人 × Claude Code 消息桥接系统",
   "main": "src/index.js",
   "scripts": {

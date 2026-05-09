@@ -1,10 +1,32 @@
 const { execSync } = require('child_process');
 const comm = require('./communicator');
 const store = require('../binding/store');
+const config = require('../config').load();
 
-const MAX_CONCURRENT = require('../config').load().bridge.max_concurrent;
+const MAX_CONCURRENT = config.bridge.max_concurrent;
 
-function start(processName) {
+// 构建 tmux new-session 命令
+// 自定义模式：在命令字符串里前缀注入 ANTHROPIC_* 环境变量，仅作用于该子进程
+// 系统模式：不注入，CC 子进程继承 bridge-server 的环境变量
+function buildTmuxStartCmd(sessionName, claudeMode, claudeBaseUrl, claudeApiKey) {
+  const claudeBin = process.env.CLAUDE_BIN || `${process.env.HOME}/.local/bin/claude`;
+
+  let innerCmd;
+  if (claudeMode === 'custom' && claudeBaseUrl && claudeApiKey) {
+    // 安全：通过 shell env 临时变量注入，不写入任何文件，不影响系统环境
+    const safeBaseUrl = claudeBaseUrl.replace(/'/g, "'\\''");
+    const safeApiKey = claudeApiKey.replace(/'/g, "'\\''");
+    innerCmd = `env ANTHROPIC_BASE_URL='${safeBaseUrl}' ANTHROPIC_API_KEY='${safeApiKey}' ANTHROPIC_AUTH_TOKEN='' ${claudeBin}`;
+  } else {
+    innerCmd = claudeBin;
+  }
+
+  return `tmux new-session -d -s ${sessionName} "${innerCmd.replace(/"/g, '\\"')}"`;
+}
+
+function start(processName, opts = {}) {
+  const { claude_mode, claude_base_url, claude_api_key } = opts;
+
   const sessions = comm.listSessions();
   if (sessions.includes(processName)) {
     return { error: `进程 ${processName} 已在运行` };
@@ -14,9 +36,9 @@ function start(processName) {
   }
 
   try {
-    const claudeBin = process.env.CLAUDE_BIN || `${process.env.HOME}/.local/bin/claude`;
     const sessionName = comm.sessionName(processName);
-    execSync(`tmux new-session -d -s ${sessionName} ${claudeBin}`, { stdio: 'ignore' });
+    const cmd = buildTmuxStartCmd(sessionName, claude_mode, claude_base_url, claude_api_key);
+    execSync(cmd, { stdio: 'ignore', shell: '/bin/bash' });
     return { ok: true, process_name: processName };
   } catch (e) {
     return { error: `启动失败: ${e.message}` };
@@ -42,7 +64,6 @@ function getStatus() {
   const sessions = comm.listSessions();
   return bindings.map(b => {
     const online = sessions.includes(b.process_name);
-    // 同步实际在线状态
     if (b.status !== (online ? 'online' : 'offline')) {
       store.updateStatus(b.process_name, online ? 'online' : 'offline');
     }

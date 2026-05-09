@@ -1,5 +1,48 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v0.5.0 - 2026-05-09
+### 变更内容
+- **管理面板「新建绑定」改造**：系统自动创建 CC 进程，用户无需再碰终端
+  - 表单新增进程名（用户填）+ 飞书 App ID/Secret + Claude 接入配置（系统环境变量 / 自定义）
+  - 自定义模式展开 Base URL + API Key 输入框
+  - 后端 4 步原子流程：重名校验 → tmux new-session 起 CC → 写 bindings.json → 启 WebSocket
+  - 失败原子回滚：起进程失败不写 binding；写 binding 后 WS 失败则回滚 binding + kill tmux
+  - 重名校验：tmux 同名会话 / bindings.json 同名进程 / 同 App ID 三重校验
+- **管理面板「编辑绑定」新增**：
+  - 「修改当前绑定」标签：可改 App ID / Secret / Claude 接入配置（进程名只读）
+  - 「挂载已有进程」标签：从未绑定的 tmux 会话中挑选，填 App ID/Secret + Claude 接入配置
+  - 旧 WS 连接在 edit 前先停，edit 后重启（用旧 app_id 停，用新 binding 起）
+- **管理面板「解绑」改造（闭环）**：
+  - 原生 `confirm()` 改为自定义模态弹窗
+  - 复选框「同时停止 CC 进程」（默认勾选）
+  - 勾选 → 解绑 + kill tmux + 关 WebSocket；不勾选 → 仅解绑
+- **Claude 接入配置（per-process）**：
+  - 每个绑定可独立选择：系统环境变量 / 自定义 Base URL + API Key
+  - 自定义值仅作为 tmux new-session 命令前缀注入，不写入系统环境变量 / shell rc / process.env
+  - bindings.json 新增字段：claude_mode / claude_base_url / claude_api_key
+- **新增 API 端点**：
+  - `POST /api/bind/mount`：挂载已有 tmux 进程（不创建新进程）
+  - `POST /api/edit`：编辑绑定（进程名不可改）
+  - `GET /api/sessions/unbound`：列出未绑定的 tmux 会话
+- **store.js 增强**：新增 `edit()` 方法；`create()` 支持新字段；`ensureDataFile()` 自动创建 data 目录
+- **manager.js 增强**：`start()` 接收 claude_mode/base_url/api_key，仅 custom 模式时用 `env` 前缀注入子进程
+
+### 影响范围
+- `admin/index.html`：新增编辑 modal / 解绑 modal / Claude 接入配置 radio group / 表格新增「Claude 接入」列
+- `admin/js/app.js`：openBindModal / openEditModal / openUnbindModal 全部重写，新增 loadUnboundSessions
+- `bridge-server/src/binding/store.js`：新增 edit() / ensureDataFile() / 新字段
+- `bridge-server/src/process/manager.js`：start() 支持 claude 模式注入
+- `bridge-server/src/routes/admin.js`：/api/bind 重写（重名校验+原子回滚）+ /api/bind/mount + /api/edit + /api/unbind 扩展 + /api/sessions/unbound
+- `bridge-server/package.json`：版本 0.4.0 → 0.5.0
+
+### 功能列表
+- 后台一键新建绑定（自动创建 CC 进程，无需终端操作）
+- 编辑绑定：修改凭据 / 挂载已有进程
+- 解绑闭环：可选 kill tmux（默认勾选）
+- per-process Claude 接入配置（系统环境变量 / 自定义，不污染全局环境）
+- 未绑定进程列表接口（支持挂载场景）
+- store.js 自动创建 data 目录（首次启动不再报错）
+
 ## v0.4.0 - 2026-05-09
 ### 变更内容
 - **回复内容缺失修复**: `extractReplyContent()` 重写为「● 块分组提取」策略
