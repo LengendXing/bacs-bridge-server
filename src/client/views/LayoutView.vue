@@ -22,11 +22,6 @@
           <LogOut class="sidebar-icon" :size="18" :stroke-width="1.5" />
           <span class="sidebar-label">退出</span>
         </button>
-        <div class="flex items-center gap-1 px-3 mt-2">
-          <Moon class="text-xs" :size="14" :stroke-width="1.5" />
-          <div class="theme-toggle-sm" @click="toggleTheme"></div>
-          <Sun class="text-xs" :size="14" :stroke-width="1.5" />
-        </div>
       </div>
     </aside>
 
@@ -59,7 +54,8 @@
             :class="{ active: isTabActive(tab) }"
             @click="router.push(tab.path)"
           >
-            {{ tab.label }}
+            <component :is="tab.icon" :size="16" :stroke-width="1.5" />
+            <span>{{ tab.label }}</span>
           </button>
         </div>
       </template>
@@ -69,7 +65,14 @@
         <div class="flex items-center gap-2">
           <BacsLogo :size="24" />
         </div>
-        <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
+        <div class="flex items-center gap-4">
+          <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
+          <div class="flex items-center gap-2">
+            <Moon :size="16" :stroke-width="1.5" />
+            <div class="theme-toggle" @click="toggleTheme"></div>
+            <Sun :size="16" :stroke-width="1.5" />
+          </div>
+        </div>
       </header>
 
       <div class="px-6 pb-6">
@@ -92,12 +95,12 @@ const route = useRoute();
 const auth = useAuth();
 
 const tabs = [
-  { path: '/', label: '首页', icon: 'Home' },
-  { path: '/bindings', label: '绑定', icon: 'Link' },
-  { path: '/machines', label: '机器', icon: 'Server' },
-  { path: '/providers', label: '服务商', icon: 'Cloud' },
-  { path: '/logs', label: '日志', icon: 'FileText' },
-  { path: '/settings', label: '设置', icon: 'Settings' },
+  { path: '/', label: '首页', icon: Home },
+  { path: '/bindings', label: '绑定', icon: Link },
+  { path: '/machines', label: '机器', icon: Server },
+  { path: '/providers', label: '服务商', icon: Cloud },
+  { path: '/logs', label: '日志', icon: FileText },
+  { path: '/settings', label: '设置', icon: Settings },
 ];
 
 // ── 菜单布局：直接用响应式 ref，跟 localStorage 同步 ──
@@ -195,12 +198,16 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   font-weight: 600;
 }
 .sidebar-icon {
-  font-size: 16px;
   width: 20px;
-  text-align: center;
+  height: 20px;
+  flex-shrink: 0;
+}
+.sidebar-icon :deep(svg) {
+  display: block;
 }
 .sidebar-label {
   flex: 1;
+  line-height: 1;
 }
 .sidebar-footer {
   padding: 8px;
@@ -224,15 +231,23 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   margin-bottom: 24px;
 }
 .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 20px;
   border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
+  line-height: 1;
   cursor: pointer;
   border: none;
   background: transparent;
   color: var(--text-secondary);
   transition: all 0.2s ease;
+}
+.tab-btn :deep(svg) {
+  flex-shrink: 0;
+  display: block;
 }
 .tab-btn:hover {
   color: var(--text);

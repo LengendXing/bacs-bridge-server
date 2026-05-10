@@ -14,60 +14,77 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/api/status', async (_req, res) => {
-  const db = getDb();
-  const allBindings = db.select().from(bindings).all();
+  try {
+    const db = getDb();
+    const allBindings = db.select().from(bindings).all();
 
-  const result = await Promise.all(allBindings.map(async (b) => {
-    const adapter = getAdapter(b.cliKind);
-    const executor = await getExecutor(b.machineId);
-    const isOnline = await adapter.sessionExists(b.processName, executor);
-    let wsConnected = false;
-    if (b.feishuAppId) {
-      const channel = getChannel('feishu');
-      wsConnected = channel?.isConnected(b.feishuAppId) ?? false;
-    }
-
-    let provider = null;
-    if (b.providerId) {
-      provider = db.select().from(providers).where(eq(providers.id, b.providerId)).get() ?? null;
-      if (provider?.apiKey) {
-        provider = { ...provider, apiKey: `${provider.apiKey.slice(0, 6)}...${provider.apiKey.slice(-4)}` };
+    const result = await Promise.all(allBindings.map(async (b) => {
+      const adapter = getAdapter(b.cliKind);
+      let isOnline = false;
+      try {
+        const executor = await getExecutor(b.machineId);
+        isOnline = await adapter.sessionExists(b.processName, executor);
+      } catch {
+        // machines 表不存在或 executor 获取失败，降级用本地
+        try {
+          const executor = await getExecutor(null);
+          isOnline = await adapter.sessionExists(b.processName, executor);
+        } catch { /* ignore */ }
       }
-    }
 
-    let model = null;
-    if (b.modelId) {
-      model = db.select().from(models).where(eq(models.id, b.modelId)).get() ?? null;
-    }
+      let wsConnected = false;
+      if (b.feishuAppId) {
+        const channel = getChannel('feishu');
+        wsConnected = channel?.isConnected(b.feishuAppId) ?? false;
+      }
 
-    let machineName: string | null = null;
-    if (b.machineId) {
-      const m = db.select().from(machines).where(eq(machines.id, b.machineId)).get();
-      machineName = m?.name ?? null;
-    }
+      let provider = null;
+      if (b.providerId) {
+        provider = db.select().from(providers).where(eq(providers.id, b.providerId)).get() ?? null;
+        if (provider?.apiKey) {
+          provider = { ...provider, apiKey: `${provider.apiKey.slice(0, 6)}...${provider.apiKey.slice(-4)}` };
+        }
+      }
 
-    return {
-      id: b.id,
-      processName: b.processName,
-      cliKind: b.cliKind,
-      providerId: b.providerId,
-      modelId: b.modelId,
-      machineId: b.machineId,
-      machineName,
-      feishuAppId: b.feishuAppId,
-      feishuAppSecret: b.feishuAppSecret
-        ? `${b.feishuAppSecret.slice(0, 4)}****`
-        : null,
-      status: isOnline ? 'online' : 'offline',
-      wsConnected,
-      provider,
-      model,
-      createdAt: b.createdAt,
-      updatedAt: b.updatedAt,
-    };
-  }));
+      let model = null;
+      if (b.modelId) {
+        model = db.select().from(models).where(eq(models.id, b.modelId)).get() ?? null;
+      }
 
-  res.json({ code: 0, data: result });
+      let machineName: string | null = null;
+      if (b.machineId) {
+        try {
+          const m = db.select().from(machines).where(eq(machines.id, b.machineId)).get();
+          machineName = m?.name ?? null;
+        } catch { /* machines 表不存在 */ }
+      }
+
+      return {
+        id: b.id,
+        processName: b.processName,
+        cliKind: b.cliKind,
+        providerId: b.providerId,
+        modelId: b.modelId,
+        machineId: b.machineId ?? null,
+        machineName,
+        feishuAppId: b.feishuAppId,
+        feishuAppSecret: b.feishuAppSecret
+          ? `${b.feishuAppSecret.slice(0, 4)}****`
+          : null,
+        status: isOnline ? 'online' : 'offline',
+        wsConnected,
+        provider,
+        model,
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+      };
+    }));
+
+    res.json({ code: 0, data: result });
+  } catch (e: any) {
+    logger.log('error', '获取绑定状态失败', e.message);
+    res.json({ code: 1001, message: '获取状态失败: ' + e.message });
+  }
 });
 
 router.post('/api/bind', async (req, res) => {
