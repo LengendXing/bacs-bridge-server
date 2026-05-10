@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
-import type { ApiResponse } from '@shared/types.js';
-import { ErrorCode } from '@shared/constants.js';
+import type { ApiResponse } from '../../shared/types.js';
+import { ErrorCode } from '../../shared/constants.js';
 
 // ── ESM-safe __dirname ────────────────────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);

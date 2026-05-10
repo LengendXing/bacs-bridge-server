@@ -10,11 +10,7 @@
     "lib": ["ES2022"],
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
-    "paths": {
-      "@server/*": ["./src/server/*"],
-      "@shared/*": ["./src/shared/*"]
-    }
+    "rootDir": "src"
   },
   "include": ["src/server/**/*.ts", "src/shared/**/*.ts"],
   "exclude": ["node_modules", "dist"]

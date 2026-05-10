@@ -12,7 +12,7 @@
 
 import https from 'node:https';
 import logger from '../../middleware/logger.js';
-import { FEISHU_TABLE_LIMIT } from '@shared/constants.js';
+import { FEISHU_TABLE_LIMIT } from '../../../shared/constants.js';
 
 // ── 类型定义 ────────────────────────────────────────────────────────────
 
