@@ -88,13 +88,36 @@ app.use(cookieParser());
  */
 app.use(logger.middleware);
 
-// ── API routes ─────────────────────────────────────────────────────────
+// ── Public routes (no auth required) ───────────────────────────────────
 
-/** Health check (always available, no auth required) */
+/** Health check */
 app.use(healthRoutes);
 
-/** Authentication (login / logout / 2FA) — Phase 2 */
+/** Authentication (login / logout / 2FA) */
 app.use(authRoutes);
+
+// ── Static files + SPA fallback (always served when built) ─────────────
+
+const clientDir = path.resolve(__dirname, '../../dist/client');
+const hasClient = fs.existsSync(clientDir);
+
+if (hasClient) {
+  app.use(express.static(clientDir));
+
+  app.get('*', (req, _res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/health') {
+      return next();
+    }
+    const indexPath = path.join(clientDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      _res.sendFile(indexPath);
+    } else {
+      _res.status(503).send('管理面板未构建，请先运行 npm run build:client');
+    }
+  });
+}
+
+// ── Protected API routes (require auth) ────────────────────────────────
 
 /** Binding CRUD + status — Phase 2-3 */
 app.use(bindingRoutes);
@@ -111,44 +134,6 @@ app.use(sessionRoutes);
 /** Log viewer — Phase 2 */
 app.use(logRoutes);
 
-// ── Production: static files + SPA fallback ────────────────────────────
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-if (isProduction) {
-  /**
-   * Absolute path to the Vite-built client assets.
-   * `dist/client` is the default output directory when `vite build`
-   * is configured with `build.outDir: 'dist/client'`.
-   */
-  const clientDir = path.resolve(__dirname, '../../dist/client');
-
-  // Serve static assets (JS, CSS, images, fonts, etc.)
-  if (fs.existsSync(clientDir)) {
-    app.use(express.static(clientDir));
-  } else {
-    logger.log('warn', `前端构建产物不存在: ${clientDir}，管理面板不可用`);
-  }
-
-  /**
-   * SPA fallback — for any request that does NOT start with `/api/`
-   * or match `/health`, return `index.html` so that Vue Router can
-   * handle the route client-side.
-   */
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/') || req.path === '/health') {
-      return next();
-    }
-    const indexPath = path.join(clientDir, 'index.html');
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      // 前端未构建，返回提示
-      res.status(503).send('管理面板未构建，请先运行 npm run build:client');
-    }
-  });
-}
-
 // ── Start server ───────────────────────────────────────────────────────
 
 const { port, host } = config.server;
@@ -157,10 +142,8 @@ app.listen(port, host, () => {
   logger.log('info', 'Bridge Server 启动', { host, port, version });
   console.log(`Bridge Server v${version} 运行在 http://${host}:${port}`);
 
-  if (isProduction) {
+  if (hasClient) {
     console.log(`管理面板: http://${host}:${port}/`);
-  } else {
-    console.log(`管理面板（开发）: http://localhost:5173/`);
   }
 
   // ── Restore WebSocket connections ────────────────────────────────
