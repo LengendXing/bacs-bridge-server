@@ -288,11 +288,28 @@ function copyAttach(b: Binding) {
     cmd = `tmux attach -t ${sessionName}`;
   }
 
-  navigator.clipboard.writeText(cmd).then(() => {
-    alert(`已复制命令:\n${cmd}`);
-  }).catch(() => {
-    prompt('复制以下命令并在终端执行:', cmd);
-  });
+  let copied = false;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(cmd).then(() => {
+      alert(`已复制命令:\n${cmd}`);
+    }).catch(() => {
+      prompt('复制以下命令并在终端执行:', cmd);
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = cmd;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { copied = document.execCommand('copy'); } catch { /* */ }
+    document.body.removeChild(ta);
+    if (copied) {
+      alert(`已复制命令:\n${cmd}`);
+    } else {
+      prompt('复制以下命令并在终端执行:', cmd);
+    }
+  }
 }
 
 onMounted(() => { refresh(); loadMachines(); });
