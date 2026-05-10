@@ -13,19 +13,19 @@
           :class="{ active: isTabActive(tab) }"
           @click="router.push(tab.path)"
         >
-          <span class="sidebar-icon">{{ tab.icon }}</span>
+          <component :is="tab.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
           <span class="sidebar-label">{{ tab.label }}</span>
         </button>
       </nav>
       <div class="sidebar-footer">
         <button class="sidebar-btn" @click="auth.logout(); router.push('/login')">
-          <span class="sidebar-icon">↩</span>
+          <LogOut class="sidebar-icon" :size="18" :stroke-width="1.5" />
           <span class="sidebar-label">退出</span>
         </button>
         <div class="flex items-center gap-1 px-3 mt-2">
-          <span class="text-xs">🌙</span>
+          <Moon class="text-xs" :size="14" :stroke-width="1.5" />
           <div class="theme-toggle-sm" @click="toggleTheme"></div>
-          <span class="text-xs">☀️</span>
+          <Sun class="text-xs" :size="14" :stroke-width="1.5" />
         </div>
       </div>
     </aside>
@@ -44,9 +44,9 @@
           <div class="flex items-center gap-4">
             <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
             <div class="flex items-center gap-2">
-              <span class="text-sm">🌙</span>
+              <Moon :size="16" :stroke-width="1.5" />
               <div class="theme-toggle" @click="toggleTheme"></div>
-              <span class="text-sm">☀️</span>
+              <Sun :size="16" :stroke-width="1.5" />
             </div>
           </div>
         </header>
@@ -85,18 +85,19 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
 import BacsLogo from '../components/BacsLogo.vue';
+import { Home, Link, Server, Cloud, FileText, Settings, LogOut, Moon, Sun } from 'lucide-vue-next';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
 
 const tabs = [
-  { path: '/', label: '首页', icon: '◉' },
-  { path: '/bindings', label: '绑定', icon: '⚡' },
-  { path: '/machines', label: '机器', icon: '⬡' },
-  { path: '/providers', label: '服务商', icon: '☁' },
-  { path: '/logs', label: '日志', icon: '▤' },
-  { path: '/settings', label: '设置', icon: '⚙' },
+  { path: '/', label: '首页', icon: 'Home' },
+  { path: '/bindings', label: '绑定', icon: 'Link' },
+  { path: '/machines', label: '机器', icon: 'Server' },
+  { path: '/providers', label: '服务商', icon: 'Cloud' },
+  { path: '/logs', label: '日志', icon: 'FileText' },
+  { path: '/settings', label: '设置', icon: 'Settings' },
 ];
 
 // ── 菜单布局：直接用响应式 ref，跟 localStorage 同步 ──

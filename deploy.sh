@@ -139,12 +139,13 @@ elif [[ -f "${SOURCE_DIR}/.env" ]]; then
   log_info "已加载 .env 配置"
 fi
 
-# 数据库迁移（在源码目录执行）
+# 数据库迁移（指向 deploy/ 目录的数据库）
+DEPLOY_DB="${DEPLOY_DIR}/data/bridge.db"
 if [[ -d "src/server/db/migrations" ]]; then
-  npx drizzle-kit migrate 2>&1 || {
-    log_warn "数据库迁移失败（可能已是最新），继续..."
+  DB_PATH="${DEPLOY_DB}" npx tsx scripts/migrate-db.ts 2>&1 || {
+    log_warn "数据库迁移失败，尝试继续..."
   }
-  log_info "数据库迁移完成"
+  log_info "数据库迁移完成 (DB: ${DEPLOY_DB})"
 fi
 
 # 构建

@@ -1,6 +1,6 @@
 {
   "name": "feishu-claudecode-bridge",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "飞书机器人 × AI CLI 消息桥接系统（支持 Claude Code / Codex）",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate-db.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed-admin.ts",
     "migrate:bindings": "tsx scripts/migrate-bindings.ts",
