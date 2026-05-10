@@ -1,6 +1,6 @@
 {
   "name": "feishu-claudecode-bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "飞书机器人 × AI CLI 消息桥接系统（支持 Claude Code / Codex）",
   "type": "module",
   "scripts": {
@@ -22,8 +22,8 @@
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.63.0",
-    "better-sqlite3": "^11.7.0",
     "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.7.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.38.0",
@@ -33,14 +33,15 @@
     "otplib": "^12.0.1",
     "pinia": "^2.2.0",
     "qrcode": "^1.5.4",
+    "ssh2": "^1.17.0",
     "uuid": "^9.0.1",
     "vue": "^3.5.0",
     "vue-router": "^4.4.0",
     "ws": "^8.20.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.0",
     "@types/bcrypt": "^5.0.2",
+    "@types/better-sqlite3": "^7.6.0",
     "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
@@ -48,24 +49,25 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.0.0",
     "@types/qrcode": "^1.5.5",
+    "@types/ssh2": "^1.15.5",
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.5.0",
     "@vitejs/plugin-vue": "^5.2.0",
     "autoprefixer": "^10.4.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
     "concurrently": "^9.0.0",
     "drizzle-kit": "^0.30.0",
     "eslint": "^9.0.0",
+    "lucide-vue-next": "^0.460.0",
     "postcss": "^8.4.0",
     "radix-vue": "^1.9.0",
+    "tailwind-merge": "^2.5.0",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^2.1.0",
-    "vue-tsc": "^2.1.0",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.5.0",
-    "lucide-vue-next": "^0.460.0"
+    "vue-tsc": "^2.1.0"
   }
 }

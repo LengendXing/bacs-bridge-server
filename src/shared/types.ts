@@ -53,6 +53,8 @@ export interface Binding {
   cliKind: CliKind;
   providerId: number | null;
   modelId: number | null;
+  machineId: number | null;
+  machineName: string | null;
   feishuAppId: string | null;
   feishuAppSecret: string | null;
   status: 'online' | 'offline';
@@ -62,6 +64,49 @@ export interface Binding {
   /** 关联查询结果 */
   provider?: Provider;
   model?: Model;
+}
+
+/** 机器信息 */
+export interface Machine {
+  id: number;
+  name: string;
+  host: string;
+  port: number;
+  osType: 'linux' | 'mac' | 'windows';
+  authType: 'password' | 'key';
+  username: string;
+  hasPassword: boolean;
+  hasPrivateKey: boolean;
+  hasPassphrase: boolean;
+  notes: string | null;
+  status: 'online' | 'offline' | 'unknown';
+  lastHeartbeat: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 机器创建请求 */
+export interface CreateMachineRequest {
+  name: string;
+  host: string;
+  port?: number;
+  osType?: 'linux' | 'mac';
+  authType: 'password' | 'key';
+  username: string;
+  password?: string;
+  privateKey?: string;
+  passphrase?: string;
+  notes?: string;
+}
+
+/** 机器连接测试响应 */
+export interface MachineTestResult {
+  ok: boolean;
+  hostname?: string;
+  os?: string;
+  tmuxVersion?: string;
+  latencyMs?: number;
+  error?: string;
 }
 
 /** 登录请求 */
@@ -96,6 +141,7 @@ export interface CreateBindingRequest {
   cliKind: CliKind;
   providerId: number | null;
   modelId: number | null;
+  machineId?: number | null;
   feishuAppId: string;
   feishuAppSecret: string;
 }

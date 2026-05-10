@@ -9,14 +9,24 @@
     <rect width="32" height="32" rx="6" class="logo-bg" />
     <text
       x="16"
-      y="22"
+      y="13.5"
       text-anchor="middle"
       font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif"
-      font-weight="700"
-      font-size="13"
-      letter-spacing="1.5"
+      font-weight="800"
+      font-size="9"
+      letter-spacing="2.5"
       class="logo-text"
-    >BACS</text>
+    >BA</text>
+    <text
+      x="16"
+      y="25"
+      text-anchor="middle"
+      font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif"
+      font-weight="800"
+      font-size="9"
+      letter-spacing="2.5"
+      class="logo-text"
+    >CS</text>
   </svg>
 </template>
 

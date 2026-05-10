@@ -1,5 +1,37 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.1 - 2026-05-10
+### 变更内容
+- **远程机器管理模块**：新增 RemoteExecutor 抽象层 + SshExecutor + LocalExecutor
+- **凭据加密**：AES-256-GCM + HKDF(JWT_SECRET) 加密存储 SSH 密码/私钥
+- **数据库新增 machines 表** + bindings 增加 machineId 列
+- **7 个机器管理 API**：CRUD + SSH 连接测试 + 心跳检查
+- **后端全面 async 化**：CliAdapter 接口改为 async + executor 参数
+- **前端 MachinesView**：机器管理页面 + 绑定页增加机器选择器
+- **Logo 修复**：BACS 字母 2×2 布局（BA/CS），黑白明暗主题切换
+- **Favicon 修复**：同步更新为 2×2 布局 + prefers-color-scheme
+
+### 影响范围
+- 新增 src/server/executor/（types/local/ssh/factory/ssh-factory）
+- 新增 src/server/crypto/credentials.ts
+- 新增 src/server/routes/machines.ts
+- 新增 src/client/views/MachinesView.vue
+- 改造 src/server/cli/（types/cc-adapter/codex-adapter）
+- 改造 src/server/session/（manager/state）
+- 改造 src/server/routes/（bindings/sessions）
+- 改造 src/server/channel/feishu/ws-client.ts
+- 改造 src/client/views/BindingsView.vue + LayoutView.vue + router
+
+### 功能列表
+- 注册远程 Linux/Mac 服务器（SSH 密码/密钥认证）
+- SSH 连接池（自动重连/空闲断开/心跳检测）
+- 绑定支持选择运行机器（本机/远程）
+- 机器 CRUD + 连接测试 + 心跳
+- Logo 2×2 BA/CS 黑白主题
+- 完全向后兼容（machineId=null 走本地路径）
+
+---
+
 ## v1.0.0 - 2026-05-10
 ### 变更内容
 - **V1.0 全面重构**：从纯 JS + 静态 HTML 原型升级为 Vite + Vue 3 + TypeScript 全栈项目

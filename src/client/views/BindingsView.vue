@@ -20,6 +20,7 @@
             <th>WS 状态</th>
             <th>状态</th>
             <th>CLI 类型</th>
+            <th>运行机器</th>
             <th>服务商</th>
             <th>模型</th>
             <th>操作</th>
@@ -27,10 +28,10 @@
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="8" class="text-center" style="color: var(--text-secondary)">加载中...</td>
+            <td colspan="9" class="text-center" style="color: var(--text-secondary)">加载中...</td>
           </tr>
           <tr v-else-if="bindings.length === 0">
-            <td colspan="8" class="text-center" style="color: var(--text-secondary)">暂无绑定数据</td>
+            <td colspan="9" class="text-center" style="color: var(--text-secondary)">暂无绑定数据</td>
           </tr>
           <tr v-for="b in bindings" :key="b.id">
             <td style="font-weight: 500">{{ b.processName }}</td>
@@ -46,6 +47,7 @@
               </span>
             </td>
             <td>{{ b.cliKind }}</td>
+            <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : '本机' }}</td>
             <td style="color: var(--text-secondary)">{{ b.provider?.name || '-' }}</td>
             <td style="color: var(--text-secondary)">{{ b.model?.modelId || '-' }}</td>
             <td>
@@ -92,6 +94,12 @@
             <option v-for="p in providerList" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
 
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">运行机器</label>
+          <select v-model="form.machineId" class="input-mac mb-3" @change="onMachineChange">
+            <option :value="null">本机（默认）</option>
+            <option v-for="m in machineList" :key="m.id" :value="m.id">{{ m.name }} ({{ m.host }}:{{ m.port }})</option>
+          </select>
+
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书 App ID</label>
           <input v-model="form.feishuAppId" type="text" class="input-mac mb-3" placeholder="cli_xxx" required />
 
@@ -114,16 +122,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useApi } from '../composables/useApi';
-import type { Binding, Provider } from '@shared/types';
+import type { Binding, Provider, Machine } from '@shared/types';
 
 const { get, post, del } = useApi();
 
 const bindings = ref<Binding[]>([]);
 const loading = ref(false);
 const providerList = ref<Provider[]>([]);
+const machineList = ref<Machine[]>([]);
 const unboundSessions = ref<string[]>([]);
 
-// 弹窗
 const showModal = ref(false);
 const modalMode = ref<'create' | 'mount' | 'edit'>('create');
 const editId = ref('');
@@ -131,6 +139,7 @@ const form = ref({
   processName: '',
   cliKind: 'cc',
   providerId: null as number | null,
+  machineId: null as number | null,
   feishuAppId: '',
   feishuAppSecret: '',
 });
@@ -162,28 +171,45 @@ async function loadProviders() {
   } catch { /* */ }
 }
 
+async function loadMachines() {
+  try {
+    const res = await get<Machine[]>('/api/machines');
+    if (res.code === 0) machineList.value = res.data || [];
+  } catch { /* */ }
+}
+
 async function loadUnboundSessions() {
   try {
-    const res = await get<string[]>('/api/sessions/unbound');
+    const query = form.value.machineId ? `?machineId=${form.value.machineId}` : '';
+    const res = await get<string[]>(`/api/sessions/unbound${query}`);
     if (res.code === 0) unboundSessions.value = res.data || [];
   } catch { /* */ }
+}
+
+function onMachineChange() {
+  if (modalMode.value === 'mount') {
+    unboundSessions.value = [];
+    loadUnboundSessions();
+  }
 }
 
 function openCreate() {
   modalMode.value = 'create';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
   formError.value = '';
   loadProviders();
+  loadMachines();
   showModal.value = true;
 }
 
 function openMount() {
   modalMode.value = 'mount';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
   formError.value = '';
   loadProviders();
+  loadMachines();
   loadUnboundSessions();
   showModal.value = true;
 }
@@ -195,11 +221,13 @@ function openEdit(b: Binding) {
     processName: b.processName,
     cliKind: b.cliKind,
     providerId: b.providerId,
+    machineId: b.machineId,
     feishuAppId: b.feishuAppId || '',
     feishuAppSecret: '',
   };
   formError.value = '';
   loadProviders();
+  loadMachines();
   showModal.value = true;
 }
 
@@ -218,6 +246,7 @@ async function handleSubmit() {
         feishuAppId: form.value.feishuAppId,
         feishuAppSecret: form.value.feishuAppSecret,
         providerId: form.value.providerId,
+        machineId: form.value.machineId,
       });
     }
     if (res && res.code === 0) {
