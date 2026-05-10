@@ -40,6 +40,23 @@ export function useApi() {
     return res.json();
   }
 
+  /** PUT 请求 */
+  async function put<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth.token) headers['X-Auth-Token'] = auth.token;
+
+    const res = await fetch(path, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+    if (res.status === 401) {
+      auth.clearToken();
+      throw new Error('未登录');
+    }
+    return res.json();
+  }
+
   /** DELETE 请求 */
   async function del<T>(path: string): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {};
@@ -56,5 +73,5 @@ export function useApi() {
     return res.json();
   }
 
-  return { get, post, del };
+  return { get, post, put, del };
 }
