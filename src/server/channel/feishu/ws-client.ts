@@ -218,6 +218,7 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
 
   // All adapter calls now require executor — wrap in async
   (async () => {
+    try {
     const executor = await getExecutor(machineId);
 
     if (!await adapter.sessionExists(processName, executor)) {
@@ -325,6 +326,10 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
       s.replied = true;
       sendReply(s, reply, false);
     });
+    } catch (e: any) {
+      logger.log('error', '消息处理异常', e.message || e);
+      endSession(processName);
+    }
   })();
 }
 
