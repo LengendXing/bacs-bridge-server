@@ -124,22 +124,28 @@ if (isProduction) {
   const clientDir = path.resolve(__dirname, '../../dist/client');
 
   // Serve static assets (JS, CSS, images, fonts, etc.)
-  app.use(express.static(clientDir));
+  if (fs.existsSync(clientDir)) {
+    app.use(express.static(clientDir));
+  } else {
+    logger.log('warn', `前端构建产物不存在: ${clientDir}，管理面板不可用`);
+  }
 
   /**
    * SPA fallback — for any request that does NOT start with `/api/`
    * or match `/health`, return `index.html` so that Vue Router can
    * handle the route client-side.
-   *
-   * @param req  - Express request.
-   * @param res  - Express response.
-   * @param next - Express next callback (passed through for API routes).
    */
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health') {
       return next();
     }
-    res.sendFile(path.join(clientDir, 'index.html'));
+    const indexPath = path.join(clientDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      // 前端未构建，返回提示
+      res.status(503).send('管理面板未构建，请先运行 npm run build:client');
+    }
   });
 }
 
