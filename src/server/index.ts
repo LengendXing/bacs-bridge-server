@@ -25,6 +25,7 @@ import cookieParser from 'cookie-parser';
 
 import config from './config.js';
 import * as logger from './middleware/logger.js';
+import { restoreAllChannels } from './channel/router.js';
 
 // ── Route modules ──────────────────────────────────────────────────────
 import authRoutes from './routes/auth.js';
@@ -157,24 +158,9 @@ app.listen(port, host, () => {
   }
 
   // ── Restore WebSocket connections ────────────────────────────────
-  // TODO: restore WS connections after Phase 4
-  // The following block will be enabled once the Feishu WebSocket
-  // channel module (`src/server/channel/feishu`) is implemented.
-  try {
-    // Dynamic import wrapped in try/catch — the module does not
-    // exist yet, so we intentionally catch and log a debug message.
-    //
-    // import('../channel/feishu/index.js').then(mod => {
-    //   mod.restoreAll().catch((err: Error) =>
-    //     logger.log('error', '恢复 WebSocket 连接失败', err.message),
-    //   );
-    // }).catch(() => {
-    //   logger.log('debug', 'WebSocket channel module not available yet');
-    // });
-  } catch {
-    // Intentionally silent — WS restoration is deferred to Phase 4.
-    logger.log('debug', 'WebSocket channel module not available yet');
-  }
+  restoreAllChannels()
+    .then(() => logger.log('info', '所有渠道连接已恢复'))
+    .catch((err: Error) => logger.log('error', '恢复渠道连接失败', err.message));
 });
 
 // ── Export version for other modules ────────────────────────────────────

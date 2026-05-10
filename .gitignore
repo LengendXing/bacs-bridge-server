@@ -7,3 +7,12 @@ logs/
 *.log
 data/
 *.db
+# PM2
+.pm2/
+# OS
+.DS_Store
+# IDE
+.vscode/
+.idea/
+# Old project files (kept in git history for reference)
+# bridge-server/ and admin/ are deprecated by V1.0

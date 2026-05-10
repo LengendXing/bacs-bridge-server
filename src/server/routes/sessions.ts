@@ -1,53 +1,39 @@
 /**
  * @module routes/sessions
- * @description Session management route stubs (Phase 2 implementation target).
+ * @description tmux 会话查询
  *
- * Provides skeleton endpoints for listing tmux sessions and finding
- * unbound sessions that are available for mounting.  Full implementation
- * will arrive in Phase 2 alongside the binding management module.
+ * 提供两个端点：
+ * 1. GET /api/sessions         — 列出所有 CLI 类型的 tmux 会话
+ * 2. GET /api/sessions/unbound — 列出未绑定的 tmux 会话（可供挂载）
  */
 
 import { Router } from 'express';
-import type { ApiResponse } from '@shared/types.js';
-import { ErrorCode } from '@shared/constants.js';
+import { requireAuth } from '../middleware/auth.js';
+import { listAllSessions, listUnboundSessions } from '../session/manager.js';
 
 const router = Router();
 
+// ── 所有会话接口均需认证 ──
+router.use(requireAuth);
+
 /**
- * `GET /api/sessions`
+ * GET /api/sessions
  *
- * Stub — will be implemented in Phase 2.
- * Future behaviour: return a list of all tmux session names currently
- * visible to the bridge process.
- *
- * @returns `ApiResponse` with an empty data array.
+ * 列出所有 CLI 类型的 tmux 会话名（cc-xxx / codex-xxx）
  */
 router.get('/api/sessions', (_req, res) => {
-  const body: ApiResponse<string[]> = {
-    code: ErrorCode.SUCCESS,
-    message: 'ok',
-    data: [],
-  };
-  res.json(body);
+  const sessions = listAllSessions();
+  res.json({ code: 0, data: sessions });
 });
 
 /**
- * `GET /api/sessions/unbound`
+ * GET /api/sessions/unbound
  *
- * Stub — will be implemented in Phase 2.
- * Future behaviour: return tmux session names that are NOT currently
- * associated with a binding, useful for the "mount existing process"
- * UI flow.
- *
- * @returns `ApiResponse` with an empty data array.
+ * 列出未绑定的 tmux 会话名，用于前端「挂载已有进程」下拉选项
  */
 router.get('/api/sessions/unbound', (_req, res) => {
-  const body: ApiResponse<string[]> = {
-    code: ErrorCode.SUCCESS,
-    message: 'ok',
-    data: [],
-  };
-  res.json(body);
+  const unbound = listUnboundSessions();
+  res.json({ code: 0, data: unbound });
 });
 
 export default router;
