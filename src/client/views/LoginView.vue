@@ -12,7 +12,8 @@
           v-model="username"
           type="text"
           class="input-mac mb-4"
-          placeholder="admin"
+          placeholder="请输入账号"
+          autocomplete="username"
           required
           autofocus
         />

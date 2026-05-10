@@ -44,13 +44,13 @@ async function main() {
   // 创建管理员
   const hash = await hashPassword(password);
   db.insert(users).values({
-    username: 'admin',
+    username: 'nimasile',
     passwordHash: hash,
     totpEnabled: false,
   }).run();
 
   console.log('✅ 管理员账户创建成功');
-  console.log(`   用户名: admin`);
+  console.log(`   用户名: nimasile`);
   console.log(`   密码: ${'*'.repeat(password.length)}`);
   console.log('');
   console.log('请登录管理面板后立即修改默认密码！');
