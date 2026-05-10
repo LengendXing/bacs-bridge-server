@@ -10,7 +10,8 @@ module.exports = {
   apps: [
     {
       name: 'feishu-bridge',
-      script: 'dist/server/index.js',
+      script: 'src/server/index.ts',
+      interpreter: 'node_modules/.bin/tsx',
       instances: 1,
       autorestart: true,
       max_memory_restart: '512M',
