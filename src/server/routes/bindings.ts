@@ -19,7 +19,7 @@ import { getDb } from '../db/index.js';
 import { bindings, providers, models, auditLogs } from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
-import { buildCliConfig, startCliProcess, listAllSessions } from '../session/manager.js';
+import { buildCliConfig, startCliProcess } from '../session/manager.js';
 import { getAdapter } from '../cli/factory.js';
 import { killSession } from '../cli/base.js';
 import { getChannel } from '../channel/router.js';
@@ -41,12 +41,10 @@ router.use(requireAuth);
 router.get('/api/status', (_req, res) => {
   const db = getDb();
   const allBindings = db.select().from(bindings).all();
-  const allSessions = listAllSessions();
 
   const result = allBindings.map((b) => {
     const adapter = getAdapter(b.cliKind);
-    const sessionName = `${adapter.sessionPrefix}-${b.processName}`;
-    const isOnline = allSessions.includes(sessionName);
+    const isOnline = adapter.sessionExists(b.processName);
     let wsConnected = false;
     if (b.feishuAppId) {
       const channel = getChannel('feishu');
