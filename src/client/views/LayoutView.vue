@@ -3,7 +3,7 @@
     <!-- 左侧菜单模式：侧边栏 -->
     <aside v-if="menuLayout === 'left'" class="sidebar">
       <div class="sidebar-header">
-        <span class="text-sm font-semibold" style="color: var(--text)">Bridge</span>
+        <BacsLogo :size="28" />
       </div>
       <nav class="sidebar-nav">
         <button
@@ -36,8 +36,10 @@
       <template v-if="menuLayout === 'top'">
         <header class="flex items-center justify-between mb-8 px-6 pt-6">
           <div>
-            <h1 class="text-2xl font-bold tracking-tight">飞书 × AI CLI 桥接管理</h1>
-            <p class="text-sm mt-1" style="color: var(--text-secondary)">进程绑定状态监控与管理</p>
+            <div class="flex items-center gap-3">
+              <BacsLogo :size="32" />
+            </div>
+            <p class="text-sm mt-1" style="color: var(--text-secondary)">Bridge Admin Control System</p>
           </div>
           <div class="flex items-center gap-4">
             <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
@@ -64,7 +66,9 @@
 
       <!-- 左侧模式：简化顶栏 -->
       <header v-if="menuLayout === 'left'" class="flex items-center justify-between mb-6 px-6 pt-6">
-        <h1 class="text-lg font-bold tracking-tight" style="color: var(--text)">飞书 × AI CLI 桥接管理</h1>
+        <div class="flex items-center gap-2">
+          <BacsLogo :size="24" />
+        </div>
         <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
       </header>
 
@@ -80,6 +84,7 @@ import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
+import BacsLogo from '../components/BacsLogo.vue';
 
 const router = useRouter();
 const route = useRoute();
