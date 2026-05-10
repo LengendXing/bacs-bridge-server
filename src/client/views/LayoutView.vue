@@ -1,27 +1,21 @@
 <template>
-  <div class="layout-root" :class="{ 'layout-left': isLeftLayout }">
+  <div class="layout-root" :class="{ 'layout-left': menuLayout === 'left' }">
     <!-- 左侧菜单模式：侧边栏 -->
-    <aside v-if="isLeftLayout" class="sidebar">
+    <aside v-if="menuLayout === 'left'" class="sidebar">
       <div class="sidebar-header">
         <span class="text-sm font-semibold" style="color: var(--text)">Bridge</span>
       </div>
       <nav class="sidebar-nav">
-        <router-link
+        <button
           v-for="tab in tabs"
           :key="tab.path"
-          :to="tab.path"
-          custom
-          v-slot="{ isExactActive, navigate }"
+          class="sidebar-btn"
+          :class="{ active: isTabActive(tab) }"
+          @click="router.push(tab.path)"
         >
-          <button
-            class="sidebar-btn"
-            :class="{ active: tab.path === '/' ? isExactActive : isExactActive || $route.path.startsWith(tab.path + '/') }"
-            @click="navigate"
-          >
-            <span class="sidebar-icon">{{ tab.icon }}</span>
-            <span class="sidebar-label">{{ tab.label }}</span>
-          </button>
-        </router-link>
+          <span class="sidebar-icon">{{ tab.icon }}</span>
+          <span class="sidebar-label">{{ tab.label }}</span>
+        </button>
       </nav>
       <div class="sidebar-footer">
         <button class="sidebar-btn" @click="auth.logout(); router.push('/login')">
@@ -38,8 +32,8 @@
 
     <!-- 主内容区 -->
     <div class="main-area">
-      <!-- 顶部标签模式：Header + Tab -->
-      <template v-if="!isLeftLayout">
+      <!-- 顶部标签模式 -->
+      <template v-if="menuLayout === 'top'">
         <header class="flex items-center justify-between mb-8 px-6 pt-6">
           <div>
             <h1 class="text-2xl font-bold tracking-tight">飞书 × AI CLI 桥接管理</h1>
@@ -56,34 +50,22 @@
         </header>
 
         <div class="tab-bar mx-6">
-          <router-link
+          <button
             v-for="tab in tabs"
             :key="tab.path"
-            :to="tab.path"
-            custom
-            v-slot="{ isExactActive, navigate }"
+            class="tab-btn"
+            :class="{ active: isTabActive(tab) }"
+            @click="router.push(tab.path)"
           >
-            <button
-              class="tab-btn"
-              :class="{ active: tab.path === '/' ? isExactActive : isExactActive || $route.path.startsWith(tab.path + '/') }"
-              @click="navigate"
-            >
-              {{ tab.label }}
-            </button>
-          </router-link>
+            {{ tab.label }}
+          </button>
         </div>
       </template>
 
-      <!-- 左侧模式：顶栏只有标题 -->
-      <header v-if="isLeftLayout" class="flex items-center justify-between mb-6 px-6 pt-6">
+      <!-- 左侧模式：简化顶栏 -->
+      <header v-if="menuLayout === 'left'" class="flex items-center justify-between mb-6 px-6 pt-6">
         <h1 class="text-lg font-bold tracking-tight" style="color: var(--text)">飞书 × AI CLI 桥接管理</h1>
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-1">
-            <span class="text-sm">🌙</span>
-            <div class="theme-toggle" @click="toggleTheme"></div>
-            <span class="text-sm">☀️</span>
-          </div>
-        </div>
+        <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
       </header>
 
       <div class="px-6 pb-6">
@@ -94,14 +76,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuth();
-const authStore = useAuthStore();
 
 const tabs = [
   { path: '/', label: '首页', icon: '◉' },
@@ -111,15 +93,32 @@ const tabs = [
   { path: '/settings', label: '设置', icon: '⚙' },
 ];
 
-const isLeftLayout = computed(() =>
-  document.documentElement.getAttribute('data-layout') === 'left'
+// ── 菜单布局：直接用响应式 ref，跟 localStorage 同步 ──
+const menuLayout = ref<'top' | 'left'>(
+  (localStorage.getItem('menuLayout') as 'top' | 'left') || 'top'
 );
 
-// 监听 layout 变化
-const observer = new MutationObserver(() => {
-  // 触发响应式更新
+// 监听 storage 事件（设置页修改时触发跨组件更新）
+window.addEventListener('storage', (e) => {
+  if (e.key === 'menuLayout' && e.newValue) {
+    menuLayout.value = e.newValue as 'top' | 'left';
+  }
 });
-observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-layout'] });
+
+// 定时检查（同页面修改 localStorage 不会触发 storage 事件）
+let lastLayout = menuLayout.value;
+setInterval(() => {
+  const current = localStorage.getItem('menuLayout') as 'top' | 'left' || 'top';
+  if (current !== lastLayout) {
+    lastLayout = current;
+    menuLayout.value = current;
+  }
+}, 300);
+
+function isTabActive(tab: { path: string }): boolean {
+  if (tab.path === '/') return route.path === '/';
+  return route.path === tab.path || route.path.startsWith(tab.path + '/');
+}
 
 function toggleTheme() {
   document.documentElement.classList.toggle('dark');
@@ -135,12 +134,12 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
 
 <style scoped>
 .layout-root {
-  display: flex;
   min-height: 100vh;
-  flex-direction: column;
 }
-.layout-left .layout-root,
+
+/* 左侧模式：flex 横排 */
 .layout-left {
+  display: flex;
   flex-direction: row;
 }
 

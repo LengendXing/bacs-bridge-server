@@ -175,11 +175,7 @@ const menuLayout = ref<'top' | 'left'>(localStorage.getItem('menuLayout') as 'to
 function setLayout(layout: 'top' | 'left') {
   menuLayout.value = layout;
   localStorage.setItem('menuLayout', layout);
-  document.documentElement.setAttribute('data-layout', layout);
 }
-
-// 初始化布局属性
-document.documentElement.setAttribute('data-layout', menuLayout.value);
 
 // ── 修改密码 ──
 const oldPassword = ref('');
