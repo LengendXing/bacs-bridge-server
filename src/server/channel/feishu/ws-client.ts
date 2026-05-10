@@ -17,6 +17,7 @@ import {
   LoggerLevel,
 } from '@larksuiteoapi/node-sdk';
 import { getAdapter } from '../../cli/factory.js';
+import { getExecutor } from '../../executor/factory.js';
 import {
   createSession,
   startProgressTimer,
@@ -193,148 +194,138 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
   const feishuAppId = binding.feishuAppId;
   const feishuAppSecret = binding.feishuAppSecret;
   const cliKind = binding.cliKind;
+  const machineId = binding.machineId ?? null;
   const message = event?.message;
   if (!message || message.message_type !== 'text') return;
 
-  // 飞书凭据和 CLI 类型为必要字段，缺失则忽略此消息
   if (!feishuAppId || !feishuAppSecret || !cliKind) return;
 
-  // 解析消息文本
   let msgText = '';
   try {
     msgText = JSON.parse(message.content || '{}').text || '';
   } catch {
     msgText = '';
   }
-  // 去除 @机器人 前缀（飞书群里 @ 机器人会带 @_user_1 之类的占位）
   msgText = msgText.replace(/@_user_\d+\s*/g, '').trim();
   if (!msgText) return;
 
-  // 确定消息目标
   const chatId = message.chat_id;
   const targetId = chatId || event?.sender?.sender_id?.open_id;
   const targetType = chatId ? 'chat_id' : 'open_id';
   if (!targetId) return;
 
-  // 检查 CLI 进程是否在线
   const adapter = getAdapter(cliKind);
-  if (!adapter.sessionExists(processName)) {
-    sender
-      .sendText(
-        feishuAppId,
-        feishuAppSecret,
-        targetType,
-        targetId,
-        `进程 [${processName}] 已离线，请先在终端启动 CC 进程`,
-      )
-      .catch((e: Error) => logger.log('error', '发送离线提示失败', e.message));
-    return;
-  }
 
-  // 并发保护：上一条还在处理则提示忙
-  if (hasActiveSession(processName)) {
-    sender
-      .sendText(
-        feishuAppId,
-        feishuAppSecret,
-        targetType,
-        targetId,
-        `进程 [${processName}] 正在处理上一条消息，请稍后再试`,
-      )
-      .catch((e: Error) => logger.log('error', '发送忙提示失败', e.message));
-    return;
-  }
+  // All adapter calls now require executor — wrap in async
+  (async () => {
+    const executor = await getExecutor(machineId);
 
-  // 创建会话上下文
-  const ctx: SessionContext = {
-    feishuAppId,
-    feishuAppSecret,
-    targetType,
-    targetId,
-    msgText,
-    processName,
-    cliKind,
-  };
-
-  // 创建新会话
-  const session = createSession(ctx);
-
-  // 构建 CLI 启动配置（用于后续环境变量注入等场景）
-  buildCliConfig(binding);
-
-  // 发送消息到 CLI 进程
-  const result = adapter.sendInput(
-    `${adapter.sessionPrefix}-${processName}`,
-    msgText,
-  );
-  if (!result.ok) {
-    logger.log('error', '发送消息到进程失败', result.error);
-    sender
-      .sendText(
-        feishuAppId,
-        feishuAppSecret,
-        targetType,
-        targetId,
-        `发送到 CC 进程失败: ${result.error}`,
-      )
-      .catch((e: Error) => logger.log('error', '发送错误提示失败', e.message));
-    endSession(processName);
-    return;
-  }
-  logger.log('info', `消息已路由到进程 ${processName}: ${msgText.slice(0, 60)}`);
-
-  // 启动进度通知定时器
-  startProgressTimer(session, (s: SessionState) => {
-    const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
-    const card = sender.buildProgressCard(s.processName, elapsed, s.ctx.msgText);
-    sender
-      .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
-      .catch((e: Error) => logger.log('error', '发送进度卡片失败', e.message));
-  });
-
-  // 启动硬超时定时器
-  startHardDeadline(session, (s: SessionState) => {
-    if (s.replied) return;
-    const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
-
-    // 超时也尝试一次提取，能拿到就发，否则发超时卡片
-    const reply = adapter.extractReply(s.accumulated, s.ctx.msgText);
-    if (reply && reply.length > 5) {
-      s.replied = true;
-      sendReply(s, reply, true);
-    } else {
-      const card = sender.buildTimeoutCard(s.processName, elapsed);
-      sender
-        .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
-        .catch((e: Error) => logger.log('error', '发送超时卡片失败', e.message));
-      s.replied = true;
-      endSession(s.processName);
-    }
-  });
-
-  // 启动输出轮询
-  startOutputPolling(session, (s: SessionState, reply: string) => {
-    if (s.replied) return;
-
-    if (!reply) {
-      // 没拿到内容但已空闲 — 兜底通知
+    if (!await adapter.sessionExists(processName, executor)) {
       sender
         .sendText(
-          s.ctx.feishuAppId,
-          s.ctx.feishuAppSecret,
-          s.ctx.targetType,
-          s.ctx.targetId,
-          '[CC 已完成处理，但未能提取到回复内容。请检查 tmux 会话或重试]',
+          feishuAppId,
+          feishuAppSecret,
+          targetType,
+          targetId,
+          `进程 [${processName}] 已离线，请先在终端启动 CC 进程`,
         )
-        .catch((e: Error) => logger.log('error', '发送空回复提示失败', e.message));
-      s.replied = true;
-      endSession(s.processName);
+        .catch((e: Error) => logger.log('error', '发送离线提示失败', e.message));
       return;
     }
 
-    s.replied = true;
-    sendReply(s, reply, false);
-  });
+    if (hasActiveSession(processName)) {
+      sender
+        .sendText(
+          feishuAppId,
+          feishuAppSecret,
+          targetType,
+          targetId,
+          `进程 [${processName}] 正在处理上一条消息，请稍后再试`,
+        )
+        .catch((e: Error) => logger.log('error', '发送忙提示失败', e.message));
+      return;
+    }
+
+    const ctx: SessionContext = {
+      feishuAppId,
+      feishuAppSecret,
+      targetType,
+      targetId,
+      msgText,
+      processName,
+      cliKind,
+      machineId,
+    };
+
+    const session = createSession(ctx);
+    buildCliConfig(binding);
+
+    const result = await adapter.sendInput(
+      `${adapter.sessionPrefix}-${processName}`,
+      msgText,
+      executor,
+    );
+    if (!result.ok) {
+      logger.log('error', '发送消息到进程失败', result.error);
+      sender
+        .sendText(
+          feishuAppId,
+          feishuAppSecret,
+          targetType,
+          targetId,
+          `发送到 CC 进程失败: ${result.error}`,
+        )
+        .catch((e: Error) => logger.log('error', '发送错误提示失败', e.message));
+      endSession(processName);
+      return;
+    }
+    logger.log('info', `消息已路由到进程 ${processName}: ${msgText.slice(0, 60)}`);
+
+    startProgressTimer(session, (s: SessionState) => {
+      const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
+      const card = sender.buildProgressCard(s.processName, elapsed, s.ctx.msgText);
+      sender
+        .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+        .catch((e: Error) => logger.log('error', '发送进度卡片失败', e.message));
+    });
+
+    startHardDeadline(session, (s: SessionState) => {
+      if (s.replied) return;
+      const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
+      const reply = adapter.extractReply(s.accumulated, s.ctx.msgText);
+      if (reply && reply.length > 5) {
+        s.replied = true;
+        sendReply(s, reply, true);
+      } else {
+        const card = sender.buildTimeoutCard(s.processName, elapsed);
+        sender
+          .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+          .catch((e: Error) => logger.log('error', '发送超时卡片失败', e.message));
+        s.replied = true;
+        endSession(s.processName);
+      }
+    });
+
+    startOutputPolling(session, (s: SessionState, reply: string) => {
+      if (s.replied) return;
+      if (!reply) {
+        sender
+          .sendText(
+            s.ctx.feishuAppId,
+            s.ctx.feishuAppSecret,
+            s.ctx.targetType,
+            s.ctx.targetId,
+            '[CC 已完成处理，但未能提取到回复内容。请检查 tmux 会话或重试]',
+          )
+          .catch((e: Error) => logger.log('error', '发送空回复提示失败', e.message));
+        s.replied = true;
+        endSession(s.processName);
+        return;
+      }
+      s.replied = true;
+      sendReply(s, reply, false);
+    });
+  })();
 }
 
 // ── 公开 API ────────────────────────────────────────────────────────────

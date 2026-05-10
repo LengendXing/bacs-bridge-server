@@ -6,6 +6,8 @@
  * bridge 主流程只跟 CliAdapter 打交道，不感知具体 CLI 的输入输出细节。
  */
 
+import type { RemoteExecutor } from '../executor/types.js';
+
 /** CLI 启动所需的环境变量映射 */
 export interface CliEnvVars {
   [key: string]: string | undefined;
@@ -35,14 +37,16 @@ export interface CliAdapter {
   /** 发送 prompt 到 tmux 会话（安全：base64 + load-buffer）
    *  @param sessionName - tmux 会话名
    *  @param text - 用户输入的 prompt 文本
+   *  @param executor - 远程执行器
    */
-  sendInput(sessionName: string, text: string): { ok: boolean; error?: string };
+  sendInput(sessionName: string, text: string, executor: RemoteExecutor): Promise<{ ok: boolean; error?: string }>;
 
   /** 抓取 pane 当前内容
    *  @param sessionName - tmux 会话名
    *  @param lines - 抓取行数（从底部往上）
+   *  @param executor - 远程执行器
    */
-  capturePane(sessionName: string, lines?: number): { output: string; error?: string };
+  capturePane(sessionName: string, lines: number | undefined, executor: RemoteExecutor): Promise<{ output: string; error?: string }>;
 
   /** 从 pane 原始文本提取本轮回复纯文本
    *  @param raw - capturePane 返回的原始输出
@@ -52,16 +56,20 @@ export interface CliAdapter {
 
   /** 判断 CLI 是否空闲（等待新输入）
    *  @param processName - 进程名（不含前缀）
+   *  @param executor - 远程执行器
    */
-  isIdle(processName: string): boolean;
+  isIdle(processName: string, executor: RemoteExecutor): Promise<boolean>;
 
-  /** 列出该类 CLI 的 tmux 会话（返回进程名，不含前缀） */
-  listSessions(): string[];
+  /** 列出该类 CLI 的 tmux 会话（返回进程名，不含前缀）
+   *  @param executor - 远程执行器
+   */
+  listSessions(executor: RemoteExecutor): Promise<string[]>;
 
   /** 检查 tmux 会话是否存在
    *  @param processName - 进程名
+   *  @param executor - 远程执行器
    */
-  sessionExists(processName: string): boolean;
+  sessionExists(processName: string, executor: RemoteExecutor): Promise<boolean>;
 
   /** tmux 会话名前缀（如 'cc' / 'codex'） */
   sessionPrefix: string;

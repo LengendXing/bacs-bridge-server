@@ -2,13 +2,14 @@
  * @module db/schema
  * @description Drizzle ORM 表定义
  *
- * 定义全部 6 张数据表：
+ * 定义全部 7 张数据表：
  * 1. users         — 管理员账户
  * 2. trusted_devices — 2FA 信任设备
  * 3. providers     — 服务商（API 网关）
  * 4. models        — 模型列表（从服务商 API 拉取）
- * 5. bindings      — 绑定关系（进程 ↔ 飞书应用 ↔ 服务商/模型）
- * 6. audit_logs    — 审计日志
+ * 5. machines      — 远程机器
+ * 6. bindings      — 绑定关系（进程 ↔ 飞书应用 ↔ 服务商/模型）
+ * 7. audit_logs    — 审计日志
  */
 
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
@@ -151,7 +152,29 @@ export const models = sqliteTable('models', {
 }));
 
 // ════════════════════════════════════════════════════════════════════
-// 5. bindings — 绑定关系
+// 5. machines — 远程机器
+// ════════════════════════════════════════════════════════════════════
+
+export const machines = sqliteTable('machines', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  host: text('host').notNull(),
+  port: integer('port').notNull().default(22),
+  osType: text('os_type').notNull().default('linux'),
+  authType: text('auth_type').notNull().default('password'),
+  username: text('username').notNull(),
+  password: text('password'),
+  privateKey: text('private_key'),
+  passphrase: text('passphrase'),
+  notes: text('notes'),
+  status: text('status').notNull().default('unknown'),
+  lastHeartbeat: text('last_heartbeat'),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 6. bindings — 绑定关系
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -179,6 +202,9 @@ export const bindings = sqliteTable('bindings', {
   /** 关联模型 ID（可为空，使用默认模型） */
   modelId: integer('model_id').references(() => models.id),
 
+  /** 关联机器 ID（null = 本地执行，向后兼容） */
+  machineId: integer('machine_id').references(() => machines.id),
+
   /** 飞书应用 App ID */
   feishuAppId: text('feishu_app_id'),
 
@@ -196,7 +222,7 @@ export const bindings = sqliteTable('bindings', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 6. audit_logs — 审计日志
+// 7. audit_logs — 审计日志
 // ════════════════════════════════════════════════════════════════════
 
 /**

@@ -33,6 +33,7 @@ import bindingRoutes from './routes/bindings.js';
 import providerRoutes from './routes/providers.js';
 import modelRoutes from './routes/models.js';
 import sessionRoutes from './routes/sessions.js';
+import machineRoutes from './routes/machines.js';
 import logRoutes from './routes/logs.js';
 import healthRoutes from './routes/health.js';
 
@@ -130,6 +131,9 @@ app.use(modelRoutes);
 
 /** Tmux session listing — Phase 2 */
 app.use(sessionRoutes);
+
+/** Machine management — Phase remote-machine */
+app.use(machineRoutes);
 
 /** Log viewer — Phase 2 */
 app.use(logRoutes);

@@ -93,6 +93,7 @@ const auth = useAuth();
 const tabs = [
   { path: '/', label: '首页', icon: '◉' },
   { path: '/bindings', label: '绑定', icon: '⚡' },
+  { path: '/machines', label: '机器', icon: '⬡' },
   { path: '/providers', label: '服务商', icon: '☁' },
   { path: '/logs', label: '日志', icon: '▤' },
   { path: '/settings', label: '设置', icon: '⚙' },
