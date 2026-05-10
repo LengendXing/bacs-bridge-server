@@ -119,7 +119,14 @@ if [[ ! -f "package.json" ]]; then
   exit 1
 fi
 
-npm ci --production=false 2>&1 | tail -3
+# npm install 跳过已安装的依赖，比 npm ci 快很多
+if [[ ! -d "node_modules" ]]; then
+  log_info "首次安装依赖..."
+  npm install 2>&1 | tail -3
+else
+  log_info "检查依赖更新..."
+  npm install --prefer-offline 2>&1 | tail -3
+fi
 log_info "依赖安装完成"
 
 # ═══════════════════════════════════════════════════════════════
