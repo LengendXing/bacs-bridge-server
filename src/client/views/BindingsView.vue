@@ -52,6 +52,7 @@
             <td style="color: var(--text-secondary)">{{ b.model?.modelId || '-' }}</td>
             <td>
               <div class="flex items-center gap-1">
+                <button class="btn-mac btn-mac-sm" @click="copyAttach(b)" title="复制 tmux attach 命令">Attach</button>
                 <button class="btn-mac btn-mac-sm" @click="openEdit(b)">编辑</button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">解绑</button>
               </div>
@@ -270,7 +271,31 @@ async function confirmUnbind(b: Binding) {
   } catch { /* */ }
 }
 
-onMounted(refresh);
+function copyAttach(b: Binding) {
+  const prefix = b.cliKind === 'codex' ? 'codex' : 'cc';
+  const sessionName = `${prefix}-${b.processName}`;
+
+  let cmd: string;
+  if (b.machineId && b.machineName) {
+    const m = machineList.value.find(m => m.id === b.machineId);
+    if (m) {
+      const portFlag = m.port && m.port !== 22 ? ` -p ${m.port}` : '';
+      cmd = `ssh ${m.username}@${m.host}${portFlag} -t "tmux attach -t ${sessionName}"`;
+    } else {
+      cmd = `tmux attach -t ${sessionName}`;
+    }
+  } else {
+    cmd = `tmux attach -t ${sessionName}`;
+  }
+
+  navigator.clipboard.writeText(cmd).then(() => {
+    alert(`已复制命令:\n${cmd}`);
+  }).catch(() => {
+    prompt('复制以下命令并在终端执行:', cmd);
+  });
+}
+
+onMounted(() => { refresh(); loadMachines(); });
 </script>
 
 <style scoped>
