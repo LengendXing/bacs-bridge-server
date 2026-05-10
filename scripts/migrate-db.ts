@@ -76,6 +76,12 @@ for (const file of sqlFiles) {
     appliedCount++;
     console.log(`[migrate] 成功: ${file}`);
   } catch (e: any) {
+    // If error is "already exists", mark it as applied and continue
+    if (e.message.includes('already exists') || e.message.includes('duplicate column')) {
+      console.warn(`[migrate] 跳过（已存在）: ${file} — ${e.message}`);
+      insertMeta.run(file);
+      continue;
+    }
     console.error(`[migrate] 失败: ${file} — ${e.message}`);
     db.close();
     process.exit(1);
