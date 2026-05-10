@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { eq, and, gt } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { trustedDevices } from '../db/schema.js';
-import { TRUSTED_DEVICE_DAYS } from '@shared/constants.js';
+import { TRUSTED_DEVICE_DAYS } from '../../shared/constants.js';
 
 /**
  * 生成信任设备令牌并存入数据库
