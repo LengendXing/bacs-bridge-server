@@ -2,18 +2,17 @@
 # cll.sh — 一键部署飞书 × AI CLI 桥接系统
 #
 # 用法:
-#   bash cll.sh                     # 部署到当前目录
-#   bash cll.sh /opt/feishu-bridge  # 部署到指定目录
+#   bash cll.sh                        # 部署到 ~/feishu-claudecode-bridge
+#   bash cll.sh /opt/feishu-bridge     # 部署到指定目录
 #
 # 做两件事:
-#   1. 拉取项目代码（git clone 或 git pull）
-#   2. 执行 deploy.sh 部署脚本
+#   1. 拉取项目代码到 sourceCode/
+#   2. 执行 deploy.sh 部署到 deploy/
 
 set -euo pipefail
 
 REPO="https://github.com/LengendXing/feishu-claudecode-bridge.git"
 BRANCH="main"
-PROJECT_NAME="feishu-claudecode-bridge"
 
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -24,26 +23,26 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $*"; }
 log_step() { echo -e "${CYAN}[STEP]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
-# 目标目录
-TARGET_DIR="${1:-$(pwd)/${PROJECT_NAME}}"
+# 根目录（sourceCode/ 和 deploy/ 的父目录）
+ROOT_DIR="${1:-$HOME/feishu-claudecode-bridge}"
+SOURCE_DIR="${ROOT_DIR}/sourceCode"
 
 # ═══════════════════════════════════════════════════════════════
-# Step 1: 拉取代码
+# Step 1: 拉取代码到 sourceCode/
 # ═══════════════════════════════════════════════════════════════
 log_step "Step 1: 拉取项目代码"
 
-if [[ -d "${TARGET_DIR}/.git" ]]; then
-  # 已有仓库，拉取最新
-  log_info "项目已存在: ${TARGET_DIR}，正在拉取最新代码..."
-  cd "${TARGET_DIR}"
+mkdir -p "${ROOT_DIR}"
+
+if [[ -d "${SOURCE_DIR}/.git" ]]; then
+  log_info "源码已存在，正在更新..."
+  cd "${SOURCE_DIR}"
   git fetch origin "${BRANCH}"
   git reset --hard "origin/${BRANCH}"
   log_info "代码已更新到 ${BRANCH} 最新"
 else
-  # 首次部署，克隆仓库
-  log_info "正在克隆项目到: ${TARGET_DIR}"
-  git clone -b "${BRANCH}" "${REPO}" "${TARGET_DIR}"
-  cd "${TARGET_DIR}"
+  log_info "正在克隆项目到: ${SOURCE_DIR}"
+  git clone -b "${BRANCH}" "${REPO}" "${SOURCE_DIR}"
   log_info "代码克隆完成"
 fi
 
@@ -51,6 +50,8 @@ fi
 # Step 2: 执行部署脚本
 # ═══════════════════════════════════════════════════════════════
 log_step "Step 2: 执行部署脚本"
+
+cd "${SOURCE_DIR}"
 
 if [[ ! -f "deploy.sh" ]]; then
   log_error "deploy.sh 不存在，部署终止"
