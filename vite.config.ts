@@ -15,6 +15,7 @@ export default defineConfig({
     outDir: '../../dist/client',
     emptyOutDir: true,
   },
+  publicDir: path.resolve(__dirname, 'public'),
   server: {
     port: 5173,
     proxy: {

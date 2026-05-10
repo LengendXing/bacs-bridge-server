@@ -1,5 +1,21 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.2 - 2026-05-10
+### 变更内容
+- **菜单图标 macOS 线性风格**：用 lucide-vue-next 线性图标替换 emoji
+- **Favicon 不显示修复**：vite.config.ts 指定 publicDir，确保 favicon.svg 复制到 dist
+- **数据库迁移脚本**：新增 scripts/migrate-db.ts，支持增量迁移 + 迁移记录
+- **deploy.sh 迁移集成**：构建前自动执行迁移，指向 deploy/ 目录的数据库
+
+### 影响范围
+- src/client/views/LayoutView.vue
+- vite.config.ts
+- scripts/migrate-db.ts（新增）
+- deploy.sh
+- package.json
+
+---
+
 ## v1.0.1 - 2026-05-10
 ### 变更内容
 - **远程机器管理模块**：新增 RemoteExecutor 抽象层 + SshExecutor + LocalExecutor
