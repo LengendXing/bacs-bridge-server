@@ -2,7 +2,9 @@
   <div class="min-h-screen flex items-center justify-center" style="background: var(--bg)">
     <!-- 登录卡片 - macOS 风格 -->
     <div class="glass-card" style="width: 380px; max-width: 90vw">
-      <h2 class="text-xl font-bold mb-1" style="color: var(--text)">管理面板登录</h2>
+      <div class="flex items-center gap-3 mb-4">
+        <BacsLogo :size="36" />
+      </div>
       <p class="text-sm mb-6" style="color: var(--text-secondary)">请输入账号和密码</p>
 
       <!-- 账号密码表单 -->
@@ -80,6 +82,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '../composables/useAuth';
+import BacsLogo from '../components/BacsLogo.vue';
 
 const router = useRouter();
 const { login, verify2fa } = useAuth();
