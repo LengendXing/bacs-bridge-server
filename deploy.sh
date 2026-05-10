@@ -70,15 +70,41 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 log_info "PM2: $(pm2 -v)"
 
-# native 模块编译工具链（better-sqlite3 需要）
-if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
-  log_warn "Python 未安装，better-sqlite3 等原生模块可能编译失败"
-  log_warn "建议安装: sudo apt install python3 build-essential"
-fi
-if ! command -v cc >/dev/null 2>&1; then
-  log_warn "C 编译器未找到，better-sqlite3 等原生模块可能编译失败"
-  log_warn "建议安装: sudo apt install build-essential"
-fi
+# native 模块编译工具链（better-sqlite3 需要 python3 + make + g++）
+install_build_tools() {
+  local need_install=false
+
+  # 检测是否缺少编译工具
+  if ! command -v make >/dev/null 2>&1; then need_install=true; fi
+  if ! command -v cc >/dev/null 2>&1; then need_install=true; fi
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then need_install=true; fi
+
+  if [[ "$need_install" == "false" ]]; then
+    log_info "编译工具链已就绪"
+    return
+  fi
+
+  log_warn "缺少编译工具链，正在自动安装..."
+
+  # 检测包管理器
+  if command -v apt >/dev/null 2>&1; then
+    sudo apt update -qq
+    sudo apt install -y build-essential python3
+  elif command -v yum >/dev/null 2>&1; then
+    sudo yum install -y gcc gcc-c++ make python3
+  elif command -v dnf >/dev/null 2>&1; then
+    sudo dnf install -y gcc gcc-c++ make python3
+  elif command -v apk >/dev/null 2>&1; then
+    sudo apk add build-base python3
+  else
+    log_error "无法自动安装编译工具，请手动安装 build-essential + python3"
+    exit 1
+  fi
+
+  log_info "编译工具链安装完成"
+}
+
+install_build_tools
 
 # ═══════════════════════════════════════════════════════════════
 # Step 2: 安装依赖
