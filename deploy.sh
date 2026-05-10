@@ -140,9 +140,54 @@ if [[ "$IS_UPDATE" == "false" ]]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# Step 6: PM2 启动
+# Step 6: 防火墙放行端口
 # ═══════════════════════════════════════════════════════════════
-log_step "Step 6: PM2 启动"
+log_step "Step 6: 防火墙放行端口"
+
+BRIDGE_PORT="${BRIDGE_PORT:-3456}"
+
+open_firewall() {
+  # iptables
+  if command -v iptables >/dev/null 2>&1; then
+    if iptables -L INPUT -n 2>/dev/null | grep -q "$BRIDGE_PORT"; then
+      log_info "iptables: 端口 $BRIDGE_PORT 已放行"
+    else
+      sudo iptables -I INPUT -p tcp --dport "$BRIDGE_PORT" -j ACCEPT 2>/dev/null && \
+        log_info "iptables: 已放行端口 $BRIDGE_PORT" || \
+        log_warn "iptables 放行失败（可能需要 sudo 权限）"
+    fi
+  fi
+
+  # ufw (Ubuntu/Debian)
+  if command -v ufw >/dev/null 2>&1; then
+    if sudo ufw status 2>/dev/null | grep -q "$BRIDGE_PORT"; then
+      log_info "ufw: 端口 $BRIDGE_PORT 已放行"
+    else
+      sudo ufw allow "$BRIDGE_PORT"/tcp 2>/dev/null && \
+        log_info "ufw: 已放行端口 $BRIDGE_PORT/tcp" || \
+        log_warn "ufw 放行失败（可能需要 sudo 权限）"
+    fi
+  fi
+
+  # firewalld (CentOS/RHEL)
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    if sudo firewall-cmd --list-ports 2>/dev/null | grep -q "$BRIDGE_PORT"; then
+      log_info "firewalld: 端口 $BRIDGE_PORT 已放行"
+    else
+      sudo firewall-cmd --permanent --add-port="$BRIDGE_PORT"/tcp 2>/dev/null && \
+        sudo firewall-cmd --reload 2>/dev/null && \
+        log_info "firewalld: 已放行端口 $BRIDGE_PORT/tcp" || \
+        log_warn "firewalld 放行失败（可能需要 sudo 权限）"
+    fi
+  fi
+}
+
+open_firewall
+
+# ═══════════════════════════════════════════════════════════════
+# Step 7: PM2 启动
+# ═══════════════════════════════════════════════════════════════
+log_step "Step 7: PM2 启动"
 
 # 如果已在运行，先停止
 pm2 delete feishu-bridge 2>/dev/null || true
