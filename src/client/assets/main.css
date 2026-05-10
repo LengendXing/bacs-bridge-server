@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Apple macOS 全局基础样式 ── */
+
+@layer base {
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --text: #1d1d1f;
+    --text-secondary: #86868b;
+    --border: #e5e7eb;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --danger: #ef4444;
+    --success: #16a34a;
+  }
+
+  .dark {
+    --bg: #1d1d1f;
+    --card: #2a2a2e;
+    --text: #f5f5f7;
+    --text-secondary: #86868b;
+    --border: #3a3a3e;
+    --accent: #818cf8;
+    --accent-hover: #6366f1;
+    --danger: #f87171;
+    --success: #4ade80;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+      'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer components {
+  /* ── 毛玻璃卡片 ── */
+  .glass-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  @supports (backdrop-filter: blur(20px)) {
+    .glass-card {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+    .dark .glass-card {
+      background: rgba(42, 42, 46, 0.72);
+    }
+  }
+
+  /* ── macOS 风格按钮 ── */
+  .btn-mac {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+  }
+  .btn-mac:hover {
+    opacity: 0.85;
+  }
+  .btn-mac-primary {
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+  }
+  .btn-mac-primary:hover {
+    background: var(--accent-hover);
+  }
+  .btn-mac-danger {
+    background: var(--danger);
+    color: #ffffff;
+    border: none;
+  }
+  .btn-mac-danger:hover {
+    opacity: 0.9;
+  }
+  .btn-mac-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* ── macOS 风格输入框 ── */
+  .input-mac {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .input-mac:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  }
+  .input-mac:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--bg);
+  }
+
+  /* ── macOS 风格表格 ── */
+  .table-mac {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .table-mac th {
+    text-align: left;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+  .table-mac td {
+    padding: 12px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── 状态徽章 ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .badge-online {
+    background: rgba(22, 163, 74, 0.12);
+    color: var(--success);
+  }
+  .badge-offline {
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+  }
+  .badge-info {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent);
+  }
+
+  /* ── Toast 通知 ── */
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(20px);
+  }
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  .toast-success { background: rgba(22, 163, 74, 0.9); }
+  .toast-error { background: rgba(239, 68, 68, 0.9); }
+  .toast-info { background: rgba(99, 102, 241, 0.9); }
+}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(134, 134, 139, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(134, 134, 139, 0.5);
+}

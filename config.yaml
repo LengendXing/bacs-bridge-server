@@ -1,0 +1,20 @@
+server:
+  port: 3456
+  host: "0.0.0.0"
+
+bridge:
+  progress_interval: 60
+  timeout: 600
+  poll_interval: 2
+  max_concurrent: 4
+
+logging:
+  level: "info"
+  dir: "./logs"
+
+database:
+  path: "./data/bridge.db"
+
+jwt:
+  secret: "change_me_in_production"
+  expires_in: "24h"
