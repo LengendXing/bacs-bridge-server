@@ -70,6 +70,16 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 log_info "PM2: $(pm2 -v)"
 
+# native 模块编译工具链（better-sqlite3 需要）
+if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+  log_warn "Python 未安装，better-sqlite3 等原生模块可能编译失败"
+  log_warn "建议安装: sudo apt install python3 build-essential"
+fi
+if ! command -v cc >/dev/null 2>&1; then
+  log_warn "C 编译器未找到，better-sqlite3 等原生模块可能编译失败"
+  log_warn "建议安装: sudo apt install build-essential"
+fi
+
 # ═══════════════════════════════════════════════════════════════
 # Step 2: 安装依赖
 # ═══════════════════════════════════════════════════════════════
@@ -115,8 +125,19 @@ fi
 # ═══════════════════════════════════════════════════════════════
 log_step "Step 4: 构建"
 
-npm run build 2>&1 | tail -5
-log_info "构建完成"
+USE_TSX=false
+if npm run build 2>&1; then
+  log_info "构建完成"
+else
+  log_warn "构建失败，将使用 tsx 直接运行 TypeScript 源码"
+  USE_TSX=true
+  # 构建前端（后端用 tsx 兜底，前端仍需构建）
+  if npm run build:client 2>&1; then
+    log_info "前端构建完成"
+  else
+    log_warn "前端构建也失败，管理面板可能不可用"
+  fi
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # Step 5: 创建初始管理员（仅首次部署）
@@ -192,7 +213,12 @@ log_step "Step 7: PM2 启动"
 # 如果已在运行，先停止
 pm2 delete feishu-bridge 2>/dev/null || true
 
-pm2 start ecosystem.config.cjs
+if [[ "$USE_TSX" == "true" ]]; then
+  log_info "使用 tsx 模式启动（构建失败兜底）"
+  pm2 start src/server/index.ts --interpreter node_modules/.bin/tsx --name feishu-bridge
+else
+  pm2 start ecosystem.config.cjs
+fi
 pm2 save
 
 # 注册开机自启
