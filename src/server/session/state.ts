@@ -197,7 +197,6 @@ function tryFinish(
                   return;
                 }
 
-                session.replied = true;
                 onReply(session, reply);
               });
           })
