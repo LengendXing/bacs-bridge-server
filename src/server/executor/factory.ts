@@ -17,6 +17,14 @@ export async function getExecutor(machineId: number | null | undefined): Promise
     return getLocalExecutor();
   }
 
+  // 内置本机记录走 LocalExecutor（不通过 SSH 自连接）
+  const { getDb } = await import('../db/index.js');
+  const { machines } = await import('../db/schema.js');
+  const { eq } = await import('drizzle-orm');
+  const db = getDb();
+  const m = db.select().from(machines).where(eq(machines.id, machineId)).get();
+  if (m?.builtin) return getLocalExecutor();
+
   let ex = executorCache.get(machineId);
   if (ex) return ex;
 
