@@ -64,6 +64,8 @@ router.get('/api/status', requireAuth, async (_req, res) => {
         cliKind: b.cliKind,
         providerId: b.providerId,
         modelId: b.modelId,
+        modelOverride: b.modelOverride,
+        effort: b.effort,
         machineId: b.machineId ?? null,
         machineName,
         feishuAppId: b.feishuAppId,
@@ -87,7 +89,7 @@ router.get('/api/status', requireAuth, async (_req, res) => {
 });
 
 router.post('/api/bind', requireAuth, async (req, res) => {
-  const { processName, cliKind, providerId, modelId, feishuAppId, feishuAppSecret, machineId } = req.body;
+  const { processName, cliKind, providerId, modelId, modelOverride, effort, feishuAppId, feishuAppSecret, machineId } = req.body;
 
   if (!processName) {
     return res.json({ code: 1003, message: '请填写进程名' });
@@ -113,6 +115,8 @@ router.post('/api/bind', requireAuth, async (req, res) => {
       cliKind: kind,
       providerId: providerId || null,
       modelId: modelId || null,
+      modelOverride: modelOverride || null,
+      effort: effort || null,
       feishuAppId,
       feishuAppSecret,
       machineId: resolvedMachineId,
@@ -160,7 +164,7 @@ router.post('/api/bind', requireAuth, async (req, res) => {
 });
 
 router.post('/api/bind/mount', requireAuth, async (req, res) => {
-  const { processName, cliKind, providerId, modelId, feishuAppId, feishuAppSecret, machineId } = req.body;
+  const { processName, cliKind, providerId, modelId, modelOverride, effort, feishuAppId, feishuAppSecret, machineId } = req.body;
 
   if (!processName) {
     return res.json({ code: 1003, message: '请填写进程名' });
@@ -193,6 +197,8 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
       cliKind: kind,
       providerId: providerId || null,
       modelId: modelId || null,
+      modelOverride: modelOverride || null,
+      effort: effort || null,
       feishuAppId,
       feishuAppSecret,
       machineId: resolvedMachineId,
@@ -228,7 +234,7 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
 });
 
 router.post('/api/edit', requireAuth, async (req, res) => {
-  const { id, feishuAppId, feishuAppSecret, providerId, modelId, machineId } = req.body;
+  const { id, feishuAppId, feishuAppSecret, providerId, modelId, modelOverride, effort, machineId } = req.body;
 
   if (!id) {
     return res.json({ code: 1003, message: '请提供绑定 ID' });
@@ -246,6 +252,8 @@ router.post('/api/edit', requireAuth, async (req, res) => {
   if (feishuAppSecret !== undefined && feishuAppSecret !== '') updates.feishuAppSecret = feishuAppSecret;
   if (providerId !== undefined) updates.providerId = providerId || null;
   if (modelId !== undefined) updates.modelId = modelId || null;
+  if (modelOverride !== undefined) updates.modelOverride = modelOverride || null;
+  if (effort !== undefined) updates.effort = effort || null;
   if (machineId !== undefined) updates.machineId = machineId || null;
 
   db.update(bindings).set(updates).where(eq(bindings.id, id)).run();
