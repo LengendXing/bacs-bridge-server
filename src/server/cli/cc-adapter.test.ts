@@ -1,5 +1,99 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import adapter from './cc-adapter.js';
+
+describe('cc-adapter.buildStartCmd', () => {
+  const session = 'cc-test';
+
+  it('local provider 不注入任何 env，直接调用 claude', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'local',
+      envVars: {},
+    });
+    expect(cmd).toMatch(/^tmux new-session -d -s cc-test "/);
+    expect(cmd).not.toContain('ANTHROPIC_BASE_URL');
+    expect(cmd).not.toContain('ANTHROPIC_API_KEY');
+    expect(cmd).not.toContain('ANTHROPIC_AUTH_TOKEN');
+    expect(cmd).not.toContain('-u CLAUDE_CODE_OAUTH_TOKEN');
+  });
+
+  it('custom provider 同时注入 API_KEY 和 AUTH_TOKEN，并 unset 远程 OAuth 凭据', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'custom',
+      envVars: {
+        ANTHROPIC_BASE_URL: 'https://api.example.com',
+        ANTHROPIC_API_KEY: 'sk-test-123',
+        ANTHROPIC_AUTH_TOKEN: 'sk-test-123',
+      },
+    });
+    expect(cmd).toContain("ANTHROPIC_BASE_URL='https://api.example.com'");
+    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-123'");
+    expect(cmd).toContain("ANTHROPIC_AUTH_TOKEN='sk-test-123'");
+    expect(cmd).toContain('-u CLAUDE_CODE_OAUTH_TOKEN');
+  });
+
+  it('custom provider 不再产生 ANTHROPIC_AUTH_TOKEN= 这种把 token 清空的语句', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'custom',
+      envVars: {
+        ANTHROPIC_BASE_URL: 'https://api.example.com',
+        ANTHROPIC_API_KEY: 'sk-test-123',
+      },
+    });
+    // 不允许出现把 AUTH_TOKEN 显式清空的形式 `ANTHROPIC_AUTH_TOKEN=' '` 或 `ANTHROPIC_AUTH_TOKEN= claude`
+    expect(cmd).not.toMatch(/ANTHROPIC_AUTH_TOKEN=(?:\s|"|$)/);
+  });
+
+  it('custom provider 仅给 API_KEY 时，fallback 把它同时注入到 AUTH_TOKEN', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'custom',
+      envVars: {
+        ANTHROPIC_BASE_URL: 'https://api.example.com',
+        ANTHROPIC_API_KEY: 'sk-only-api-key',
+      },
+    });
+    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-only-api-key'");
+    expect(cmd).toContain("ANTHROPIC_AUTH_TOKEN='sk-only-api-key'");
+  });
+
+  it('包含单引号的 baseUrl/key 被安全转义', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'custom',
+      envVars: {
+        ANTHROPIC_BASE_URL: "https://a'b.com",
+        ANTHROPIC_API_KEY: "key'with'quote",
+      },
+    });
+    expect(cmd).toContain(`ANTHROPIC_BASE_URL='https://a'\\''b.com'`);
+    expect(cmd).toContain(`ANTHROPIC_API_KEY='key'\\''with'\\''quote'`);
+  });
+
+  it('指定 modelId 会注入 ANTHROPIC_MODEL 并加 --model 参数', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'local',
+      envVars: {},
+      modelId: 'claude-sonnet-4-20250514',
+    });
+    expect(cmd).toContain("ANTHROPIC_MODEL='claude-sonnet-4-20250514'");
+    expect(cmd).toContain("--model 'claude-sonnet-4-20250514'");
+  });
+
+  describe('CLAUDE_BIN 解析', () => {
+    let originalBin: string | undefined;
+    beforeEach(() => { originalBin = process.env.CLAUDE_BIN; });
+    afterEach(() => {
+      if (originalBin === undefined) delete process.env.CLAUDE_BIN;
+      else process.env.CLAUDE_BIN = originalBin;
+    });
+
+    it('未设置 CLAUDE_BIN 时使用裸 `claude`，不拼接本地 HOME 路径', async () => {
+      // 由于 CLAUDE_BIN 在模块顶层求值，这里只能间接断言：当前模块下的输出
+      // 包含 `claude` 命令名，且不应包含 `/Users/` 或 `.local/bin/claude` 这种本地路径片段
+      const cmd = adapter.buildStartCmd('cc-bin', { providerKind: 'local', envVars: {} });
+      expect(cmd).toContain('claude');
+      expect(cmd).not.toMatch(/\/Users\/[^/]+\/\.local\/bin\/claude/);
+    });
+  });
+});
 
 describe('cc-adapter.extractReply', () => {
   it('保留本轮回复——空闲光标 + ? for shortcuts 不应丢失内容', () => {
