@@ -30,6 +30,7 @@ export function buildCliConfig(binding: typeof bindings.$inferSelect): CliStartC
     cfg.envVars = {
       ANTHROPIC_BASE_URL: provider.baseUrl || undefined,
       ANTHROPIC_API_KEY: provider.apiKey || undefined,
+      ANTHROPIC_AUTH_TOKEN: provider.apiKey || undefined,
     };
   } else if (binding.cliKind === 'codex') {
     cfg.envVars = {
