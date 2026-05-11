@@ -1,0 +1,46 @@
+/**
+ * @module auth/jwt
+ * @description JWT 令牌签发与验证
+ *
+ * 使用 jsonwebtoken 库签发 HS256 JWT。
+ * secret 从环境变量 JWT_SECRET 读取，不硬编码。
+ */
+import jwt from 'jsonwebtoken';
+import config from '../config.js';
+/**
+ * 签发 JWT 令牌
+ *
+ * @param payload - 用户信息（id + username）
+ * @returns 签名后的 JWT 字符串
+ *
+ * @example
+ * ```ts
+ * const token = signToken({ sub: 1, username: 'admin' });
+ * ```
+ */
+export function signToken(payload) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const opts = { expiresIn: config.jwt.expiresIn };
+    return jwt.sign(payload, config.jwt.secret, opts);
+}
+/**
+ * 验证 JWT 令牌
+ *
+ * @param token - 待验证的 JWT 字符串
+ * @returns 解码后的 payload，或 null（令牌无效/过期）
+ *
+ * @example
+ * ```ts
+ * const payload = verifyToken(token);
+ * if (payload) { console.log(payload.username); }
+ * ```
+ */
+export function verifyToken(token) {
+    try {
+        const decoded = jwt.verify(token, config.jwt.secret);
+        return decoded;
+    }
+    catch {
+        return null;
+    }
+}
