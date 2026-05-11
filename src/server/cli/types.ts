@@ -21,6 +21,12 @@ export interface CliStartConfig {
   envVars: CliEnvVars;
   /** 使用的模型 ID（如 'claude-sonnet-4-20250514'） */
   modelId?: string;
+  /** 推理 effort 档位
+   *  - cc：low|medium|high|xhigh|max（注入为 `--effort <level>`）
+   *  - codex：minimal|low|medium|high|xhigh（注入为 `-c model_reasoning_effort=<level>`）
+   *  不支持 effort 的模型（如 haiku）应在前端就不让用户选；此处仅保留字段不做硬校验
+   */
+  effort?: string;
 }
 
 /** CliAdapter 统一接口 */

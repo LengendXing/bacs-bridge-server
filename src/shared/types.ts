@@ -53,6 +53,8 @@ export interface Binding {
   cliKind: CliKind;
   providerId: number | null;
   modelId: number | null;
+  modelOverride: string | null;
+  effort: string | null;
   machineId: number | null;
   machineName: string | null;
   feishuAppId: string | null;
@@ -145,6 +147,8 @@ export interface CreateBindingRequest {
   cliKind: CliKind;
   providerId: number | null;
   modelId: number | null;
+  modelOverride: string | null;
+  effort: string | null;
   machineId?: number | null;
   feishuAppId: string;
   feishuAppSecret: string;

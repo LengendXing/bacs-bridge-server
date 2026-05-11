@@ -11,6 +11,8 @@ import { eq } from 'drizzle-orm';
 import https from 'https';
 import { getDb } from '../db/index.js';
 import { providers, models } from '../db/schema.js';
+import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '../../shared/defaultModels.js';
+import type { CliKind } from '../../shared/defaultModels.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
 
@@ -35,6 +37,29 @@ router.get('/api/models', requireAuth, (req, res) => {
   }
 
   res.json({ code: 0, data: result });
+});
+
+/** GET /api/models/defaults?cliKind=cc|codex
+ *  返回内置默认模型列表（服务商不支持探查时的回退），以及 effort 选项
+ */
+router.get('/api/models/defaults', requireAuth, (req, res) => {
+  const cliKind = (req.query.cliKind as string) || 'cc';
+  const list = DEFAULT_MODELS[cliKind as CliKind] ?? DEFAULT_MODELS.cc;
+  const withEffort = list.map(m => ({
+    ...m,
+    effortOptions: getEffortOptions(cliKind as CliKind, m.id),
+  }));
+  res.json({ code: 0, data: withEffort });
+});
+
+/** GET /api/models/effort-options?cliKind=cc|codex&modelId=xxx
+ *  返回某个模型可选的 effort 列表
+ */
+router.get('/api/models/effort-options', requireAuth, (req, res) => {
+  const cliKind = (req.query.cliKind as string) || 'cc';
+  const modelId = req.query.modelId as string | undefined;
+  const options = getEffortOptions(cliKind as CliKind, modelId);
+  res.json({ code: 0, data: options });
 });
 
 /**

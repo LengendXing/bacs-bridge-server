@@ -12,7 +12,17 @@ export function buildCliConfig(binding: typeof bindings.$inferSelect): CliStartC
     providerKind: 'local',
     envVars: {},
     modelId: undefined,
+    effort: binding.effort || undefined,
   };
+
+  // modelOverride 优先于 modelId FK：覆盖了"探查失败选默认模型"和"用户手输自定义ID"两种场景；
+  // local provider 也可能想直接指定模型，所以放在 provider 判断前
+  if (binding.modelOverride) {
+    cfg.modelId = binding.modelOverride;
+  } else if (binding.modelId) {
+    const model = db.select().from(models).where(eq(models.id, binding.modelId)).get();
+    if (model) cfg.modelId = model.modelId;
+  }
 
   if (!binding.providerId) return cfg;
 
@@ -20,11 +30,6 @@ export function buildCliConfig(binding: typeof bindings.$inferSelect): CliStartC
   if (!provider || provider.kind === 'local') return cfg;
 
   cfg.providerKind = 'custom';
-
-  if (binding.modelId) {
-    const model = db.select().from(models).where(eq(models.id, binding.modelId)).get();
-    if (model) cfg.modelId = model.modelId;
-  }
 
   if (binding.cliKind === 'cc') {
     // 仅注入 ANTHROPIC_AUTH_TOKEN：CLI 检测到 ANTHROPIC_API_KEY 时会弹出

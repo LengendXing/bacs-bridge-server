@@ -1,5 +1,47 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.9 - 2026-05-11
+### 变更内容
+- **绑定表单：模型 + effort 启动注入**。v1.0.8 的 `--model` 注入已写对，但用户无法在 UI 上单独选 effort，只能把模型+effort 拼成字符串（如 `claude-opus-4-7 - max`）当 modelId 填 → CLI 忽略非法值回退默认 → 看起来"模型没生效"。本次从根上解决：
+  - `bindings` 表新增 `effort`（text, nullable）和 `modelOverride`（text, nullable，优先于 modelId FK）两个字段
+  - cc-adapter 注入 `--effort <level>`（取值 low/medium/high/xhigh/max，v2.1.138 实测）
+  - codex-adapter 注入 `-c model_reasoning_effort=<level>`（取值 minimal/low/medium/high/xhigh，本地 codex v0.128.0 实测 `reasoning effort: high` 输出确认生效）
+  - manager.buildCliConfig：modelOverride 优先于 modelId FK + effort 透传
+  - BindingForm 前端：选模型后按 `modelSupportsEffort()` 动态显示 effort 下拉，取值按 `getEffortOptions()` 按 maxEffort 截断（如 mini 截到 high）
+- **服务商探查失败时默认模型回退**。不支持 `/v1/models` 的中转站/兼容服务商，模型下拉为空 → 用户无法绑定。
+  - 新增 `src/shared/defaultModels.ts`：内置 Claude 5 个 + OpenAI 5 个默认模型清单，含 supportsEffort/maxEffort 元数据
+  - 新增 API `GET /api/models/defaults?cliKind=cc|codex` 和 `GET /api/models/effort-options`
+  - BindingForm：服务商切换时尝试探查，失败后 catch → 加载默认清单 + 显示 banner "服务商不支持模型探查"
+  - 支持"手输自定义模型 ID"：模型下拉旁加"手输"按钮，切换后 modelOverride 字段直接存字符串，绕过 FK
+- **远程实测验证**（root@49.12.243.33）：
+  - `bash -ilc 'export ...; exec claude --model claude-opus-4-7 --effort max'`
+  - pane 显示 "Opus 4.7 with max effort · ◈ max · /effort" ✅ 模型+effort 双注入生效
+
+### 默认模型清单
+**Claude（cc）**：claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5-20251001 / claude-opus-4-6 / claude-sonnet-4-5
+**OpenAI（codex）**：gpt-5.5 / gpt-5.4-codex / gpt-5.3-codex / gpt-5.4-mini / gpt-5.2
+
+### 测试
+- cc-adapter.test.ts 新增 effort 用例（`--effort` 存在/不存在断言）
+- codex-adapter.test.ts 新建（6 个用例含 `-c model_reasoning_effort=` 断言）
+- 23/23 全部通过，`npm run build` 通过
+
+### 影响范围
+- `src/shared/defaultModels.ts`（新增）
+- `src/shared/types.ts`（Binding/CreateBindingRequest 加 modelOverride/effort）
+- `src/server/db/schema.ts`（bindings 加 modelOverride/effort + 迁移 0002）
+- `src/server/cli/types.ts`（CliStartConfig 加 effort）
+- `src/server/cli/cc-adapter.ts`（buildStartCmd 加 --effort）
+- `src/server/cli/codex-adapter.ts`（buildStartCmd 加 -c model_reasoning_effort）
+- `src/server/session/manager.ts`（modelOverride 优先 + effort 透传）
+- `src/server/routes/bindings.ts`（create/mount/edit/status 加新字段）
+- `src/server/routes/models.ts`（加 defaults + effort-options API）
+- `src/client/views/BindingsView.vue`（探查失败回退 + 手输 + effort 下拉）
+- `src/server/cli/cc-adapter.test.ts` / `src/server/cli/codex-adapter.test.ts`（新增/扩展）
+- `package.json`（1.0.8 → 1.0.9）
+
+---
+
 ## v1.0.8 - 2026-05-11
 ### 变更内容
 - **彻底修复远程绑定 "Not logged in" 问题**。v1.0.7 只改了 env 字段名，没解决根因。本次基于真实远程主机（root@49.12.243.33，Ubuntu）抓到根因并验证修复有效。
