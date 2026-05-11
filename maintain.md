@@ -1,5 +1,33 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.8 - 2026-05-11
+### 变更内容
+- **彻底修复远程绑定 "Not logged in" 问题**。v1.0.7 只改了 env 字段名，没解决根因。本次基于真实远程主机（root@49.12.243.33，Ubuntu）抓到根因并验证修复有效。
+- **真因**：bridge 通过 ssh2 `client.exec()` 启动 tmux，是**非交互非登录 shell**，Ubuntu/Debian `~/.bashrc` 顶部的 `[ -z "$PS1" ] && return` 守卫让整个 rc 文件被跳过 → 远程主机 export 在 `~/.bashrc` 里的 `ANTHROPIC_*` 完全读不到 → claude 子进程判定"未登录"。`bash -lc` 也没用（远程没有 `~/.bash_profile`，且仍被守卫拦截）；`bash -ilc` 才能加 `$PS1` 绕过守卫。
+- **改动**：
+  - `src/server/cli/cc-adapter.ts:buildStartCmd` 重写：把 `tmux new-session -d "claude"` 改为 `tmux new-session -d "bash -ilc 'export...; exec claude'"`。`-i` 设置 `$PS1` 绕过 rc 守卫，`-l` 兼容 `.bash_profile`/`.profile` 系发行版，`exec` 让 claude 替换 bash 进程不留壳。
+  - `src/server/cli/codex-adapter.ts:buildStartCmd` 同步改造（codex 同样跑非交互 shell）。
+  - **去掉 `ANTHROPIC_API_KEY` 注入**：远程实测发现，claude CLI 检测到 `ANTHROPIC_API_KEY` 时会弹出 *"Do you want to use this API key? 1.Yes 2.No(recommended)"* 交互确认页，导致 tmux 会话卡死、机器人"没响应"。仅保留 `ANTHROPIC_AUTH_TOKEN`（第三方中转站和官方 OAuth 都识别此字段，且不触发确认页）。
+  - `src/server/session/manager.ts:buildCliConfig` cc 分支 envVars 同步去除 `ANTHROPIC_API_KEY`。
+  - 仍保持原则：**绝不修改远程主机 `~/.claude/` 与 rc 文件**，所有 ENV 注入只作用于 tmux 子进程。
+- **真实远程验证**（root@49.12.243.33 上抓 tmux pane）：
+  - `local` 模式：`bash -ilc 'exec claude'` → Opus 4.6 主界面 ✅（远程 rc 中 ANTHROPIC_MODEL 生效）
+  - `custom` 模式：`bash -ilc 'unset CLAUDE_CODE_OAUTH_TOKEN; export ANTHROPIC_BASE_URL=...; export ANTHROPIC_AUTH_TOKEN=...; export ANTHROPIC_MODEL=...; exec claude --model ...'` → Opus 4.7 主界面 ✅（绑定模型生效）
+
+### 测试
+- `cc-adapter.test.ts:buildStartCmd describe` 全部用例改写，新增"必须不注入 ANTHROPIC_API_KEY"、"bash -ilc 包裹"、"exec 替换 bash 进程"等断言
+- 15 个测试用例（7 个 extractReply + 8 个 buildStartCmd）全部通过
+- `npm run build` 通过
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts`（buildStartCmd 重写）
+- `src/server/cli/codex-adapter.ts`（buildStartCmd 重写）
+- `src/server/session/manager.ts`（envVars 去除 ANTHROPIC_API_KEY）
+- `src/server/cli/cc-adapter.test.ts`（buildStartCmd 用例重写）
+- `package.json`（1.0.7 → 1.0.8）
+
+---
+
 ## v1.0.7 - 2026-05-11
 ### 变更内容
 - **修复远程绑定的 ENV 注入语义**：SSH 绑定到远程机后，飞书收到 `Not logged in · Please run /login`。三处根因：
