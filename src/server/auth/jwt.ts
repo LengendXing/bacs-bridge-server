@@ -28,9 +28,9 @@ export interface JwtPayload {
  * const token = signToken({ sub: 1, username: 'admin' });
  * ```
  */
-export function signToken(payload: JwtPayload): string {
+export function signToken(payload: JwtPayload, expiresIn?: string | number): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const opts: any = { expiresIn: config.jwt.expiresIn };
+  const opts: any = { expiresIn: expiresIn ?? config.jwt.expiresIn };
   return jwt.sign(payload as object, config.jwt.secret, opts);
 }
 

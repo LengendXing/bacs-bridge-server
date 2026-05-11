@@ -2,7 +2,7 @@
  * @module db/schema
  * @description Drizzle ORM 表定义
  *
- * 定义全部 7 张数据表：
+ * 定义全部 8 张数据表：
  * 1. users         — 管理员账户
  * 2. trusted_devices — 2FA 信任设备
  * 3. providers     — 服务商（API 网关）
@@ -10,6 +10,7 @@
  * 5. machines      — 远程机器
  * 6. bindings      — 绑定关系（进程 ↔ 飞书应用 ↔ 服务商/模型）
  * 7. audit_logs    — 审计日志
+ * 8. app_settings  — 应用级 KV 设置（如对外服务地址）
  */
 
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
@@ -255,4 +256,24 @@ export const auditLogs = sqliteTable('audit_logs', {
 
   /** 创建时间 */
   createdAt: text('created_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 8. app_settings — 应用级 KV 设置
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * 应用级设置表（key-value）
+ * 已知 key：
+ * - external_url：对外服务地址（含协议与端口，无尾斜杠），用于生成快捷登录二维码的 server 字段
+ */
+export const appSettings = sqliteTable('app_settings', {
+  /** 配置键（主键） */
+  key: text('key').primaryKey(),
+
+  /** 配置值 */
+  value: text('value'),
+
+  /** 更新时间 */
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 });
