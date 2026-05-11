@@ -3,33 +3,44 @@ import type { RemoteExecutor } from '../executor/types.js';
 import config from '../config.js';
 
 const SESSION_PREFIX = 'cc';
-const CLAUDE_BIN = process.env.CLAUDE_BIN || `${process.env.HOME}/.local/bin/claude`;
+// 远端机器的 claude 路径默认走 PATH 查找，避免把本地 bridge 进程的 HOME 路径误带到远程
+const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude';
+
+function shellSingleQuote(v: string): string {
+  return `'${v.replace(/'/g, "'\\''")}'`;
+}
 
 function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
   let innerCmd = CLAUDE_BIN;
   const envParts: string[] = [];
+  // env 的 -u 选项可在不写文件的前提下，临时清除被 `claude login` 写入的 OAuth 凭据
+  // 仅对本次 tmux 子进程生效，远程主机 ~/.claude/ 与 rc 文件完全不动
+  const unsets: string[] = [];
 
   if (cfg.providerKind === 'custom') {
     if (cfg.envVars.ANTHROPIC_BASE_URL) {
-      const safeUrl = cfg.envVars.ANTHROPIC_BASE_URL.replace(/'/g, "'\\''");
-      envParts.push(`ANTHROPIC_BASE_URL='${safeUrl}'`);
+      envParts.push(`ANTHROPIC_BASE_URL=${shellSingleQuote(cfg.envVars.ANTHROPIC_BASE_URL)}`);
     }
-    if (cfg.envVars.ANTHROPIC_API_KEY) {
-      const safeKey = cfg.envVars.ANTHROPIC_API_KEY.replace(/'/g, "'\\''");
-      envParts.push(`ANTHROPIC_API_KEY='${safeKey}'`);
+    const token = cfg.envVars.ANTHROPIC_AUTH_TOKEN ?? cfg.envVars.ANTHROPIC_API_KEY;
+    if (token) {
+      // 同名注入两个变量：第三方中转站常用 AUTH_TOKEN，官方 SDK 常用 API_KEY
+      envParts.push(`ANTHROPIC_API_KEY=${shellSingleQuote(token)}`);
+      envParts.push(`ANTHROPIC_AUTH_TOKEN=${shellSingleQuote(token)}`);
     }
-    envParts.push('ANTHROPIC_AUTH_TOKEN=');
+    // 屏蔽远程主机已有的 OAuth/登录态，避免它优先于绑定配置生效
+    unsets.push('CLAUDE_CODE_OAUTH_TOKEN');
   }
 
   // 模型注入（无论 providerKind，只要 binding 指定了模型就生效）
   if (cfg.modelId) {
-    const safeModel = cfg.modelId.replace(/'/g, "'\\''");
-    envParts.push(`ANTHROPIC_MODEL='${safeModel}'`);
-    innerCmd = `${CLAUDE_BIN} --model '${safeModel}'`;
+    envParts.push(`ANTHROPIC_MODEL=${shellSingleQuote(cfg.modelId)}`);
+    innerCmd = `${CLAUDE_BIN} --model ${shellSingleQuote(cfg.modelId)}`;
   }
 
-  if (envParts.length) {
-    innerCmd = `env ${envParts.join(' ')} ${innerCmd}`;
+  if (envParts.length || unsets.length) {
+    const unsetFlags = unsets.map(k => `-u ${k}`).join(' ');
+    const envAssigns = envParts.join(' ');
+    innerCmd = `env ${[unsetFlags, envAssigns].filter(Boolean).join(' ')} ${innerCmd}`;
   }
 
   const escaped = innerCmd.replace(/"/g, '\\"');
