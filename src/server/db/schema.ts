@@ -161,6 +161,8 @@ export const machines = sqliteTable('machines', {
   host: text('host').notNull(),
   port: integer('port').notNull().default(22),
   osType: text('os_type').notNull().default('linux'),
+  /** 系统版本号，如 "Darwin 22.6.0"。本机在启动时自动填充 */
+  osVersion: text('os_version'),
   authType: text('auth_type').notNull().default('password'),
   username: text('username').notNull(),
   password: text('password'),
@@ -168,6 +170,8 @@ export const machines = sqliteTable('machines', {
   passphrase: text('passphrase'),
   notes: text('notes'),
   status: text('status').notNull().default('unknown'),
+  /** 内置记录标记：1=系统内置（如本机），不允许修改/删除 */
+  builtin: integer('builtin', { mode: 'boolean' }).notNull().default(false),
   lastHeartbeat: text('last_heartbeat'),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),

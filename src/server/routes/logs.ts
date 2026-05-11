@@ -16,9 +16,23 @@ import { auditLogs } from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import { verifyToken } from '../auth/jwt.js';
 import logger from '../middleware/logger.js';
+import config from '../config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// ── ESM-safe __dirname ──
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/** 日志文件目录（与 middleware/logger.ts 保持一致） */
+const logDir = path.resolve(__dirname, '../../..', config.logging.dir);
+
+/** 当天日志文件路径（文件名与 logger 模块保持一致：YYYY-MM-DD.log） */
+function todayLogFile(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return path.join(logDir, `${today}.log`);
+}
 
 const router = Router();
 
@@ -42,15 +56,26 @@ router.get('/api/logs/stream', (req, res) => {
   });
   res.write(':\n\n'); // 初始 heartbeat
 
-  const today = new Date().toISOString().slice(0, 10);
-  const logFile = path.join(logDir, `bridge-${today}.log`);
+  const logFile = todayLogFile();
 
-  if (!fs.existsSync(logFile)) {
-    fs.mkdirSync(logDir, { recursive: true });
-    fs.writeFileSync(logFile, '');
-  }
+  if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  if (!fs.existsSync(logFile)) fs.writeFileSync(logFile, '');
 
-  const tail = spawn('tail', ['-f', '-n', '0', logFile], { stdio: ['ignore', 'pipe', 'ignore'] });
+  // 先回放最近 200 行历史日志
+  try {
+    const content = fs.readFileSync(logFile, 'utf-8');
+    const recent = content.trim().split('\n').filter(Boolean).slice(-200);
+    for (const line of recent) {
+      let data: any;
+      try { data = JSON.parse(line); } catch { data = { raw: line }; }
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+  } catch { /* ignore replay errors */ }
+
+  // 心跳保活：每 25s 发送注释行（避免 nginx/cdn 超时）
+  const heartbeat = setInterval(() => res.write(':hb\n\n'), 25000);
+
+  const tail = spawn('tail', ['-F', '-n', '0', logFile], { stdio: ['ignore', 'pipe', 'ignore'] });
 
   tail.stdout.on('data', (chunk: Buffer) => {
     const lines = chunk.toString().split('\n').filter(Boolean);
@@ -65,18 +90,18 @@ router.get('/api/logs/stream', (req, res) => {
     }
   });
 
-  req.on('close', () => { tail.kill(); });
+  tail.on('error', (e) => {
+    logger.log('error', 'tail 启动失败', e.message);
+  });
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    tail.kill();
+  });
 });
 
 // ── 其他日志接口均需认证 ──
 router.use(requireAuth);
-
-// ── ESM-safe __dirname ──
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-/** 日志文件目录 */
-const logDir = path.resolve(__dirname, '../../../logs');
 
 /**
  * GET /api/logs
@@ -117,8 +142,7 @@ router.get('/api/logs', (req, res) => {
 router.get('/api/logs/system', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string, 10) || 200, 1000);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const logFile = path.join(logDir, `bridge-${today}.log`);
+  const logFile = todayLogFile();
 
   if (!fs.existsSync(logFile)) {
     return res.json({ code: 0, data: [] });

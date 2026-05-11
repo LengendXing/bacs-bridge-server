@@ -242,8 +242,9 @@ router.post('/api/edit', async (req, res) => {
   }
 
   const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
-  if (feishuAppId !== undefined) updates.feishuAppId = feishuAppId;
-  if (feishuAppSecret !== undefined) updates.feishuAppSecret = feishuAppSecret;
+  if (feishuAppId !== undefined && feishuAppId !== '') updates.feishuAppId = feishuAppId;
+  // 空字符串 = 不修改密钥（避免编辑表单留空覆盖原值）；显式 null = 清空
+  if (feishuAppSecret !== undefined && feishuAppSecret !== '') updates.feishuAppSecret = feishuAppSecret;
   if (providerId !== undefined) updates.providerId = providerId || null;
   if (modelId !== undefined) updates.modelId = modelId || null;
   if (machineId !== undefined) updates.machineId = machineId || null;

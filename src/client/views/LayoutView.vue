@@ -96,9 +96,9 @@ const auth = useAuth();
 
 const tabs = [
   { path: '/', label: '首页', icon: Home },
-  { path: '/bindings', label: '绑定', icon: Link },
   { path: '/machines', label: '机器', icon: Server },
   { path: '/providers', label: '服务商', icon: Cloud },
+  { path: '/bindings', label: '绑定', icon: Link },
   { path: '/logs', label: '日志', icon: FileText },
   { path: '/settings', label: '设置', icon: Settings },
 ];
