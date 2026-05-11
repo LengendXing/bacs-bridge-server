@@ -11,40 +11,41 @@ function shellSingleQuote(v: string): string {
 }
 
 function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
-  let innerCmd = CLAUDE_BIN;
-  const envParts: string[] = [];
-  // env 的 -u 选项可在不写文件的前提下，临时清除被 `claude login` 写入的 OAuth 凭据
-  // 仅对本次 tmux 子进程生效，远程主机 ~/.claude/ 与 rc 文件完全不动
-  const unsets: string[] = [];
+  // 远程主机的登录态通常 export 在 ~/.bashrc（如 ANTHROPIC_AUTH_TOKEN / BASE_URL），
+  // 但 ssh2 的非交互非登录 shell 受 Debian/Ubuntu `[ -z "$PS1" ] && return` 守卫拦截，
+  // 导致 rc 被跳过、claude 报 "Not logged in"。
+  // 通过 `bash -ilc` 强制交互+登录，绕过守卫并加载 .bash_profile/.bashrc；
+  // custom 模式的 env 注入改写为 export ... ; exec claude，保证绑定值覆盖 rc 同名变量。
+  const lines: string[] = [];
 
   if (cfg.providerKind === 'custom') {
+    // 屏蔽远程 `claude login` 写入的 OAuth 凭据，确保绑定配置生效；不动远程文件
+    lines.push('unset CLAUDE_CODE_OAUTH_TOKEN');
     if (cfg.envVars.ANTHROPIC_BASE_URL) {
-      envParts.push(`ANTHROPIC_BASE_URL=${shellSingleQuote(cfg.envVars.ANTHROPIC_BASE_URL)}`);
+      lines.push(`export ANTHROPIC_BASE_URL=${shellSingleQuote(cfg.envVars.ANTHROPIC_BASE_URL)}`);
     }
     const token = cfg.envVars.ANTHROPIC_AUTH_TOKEN ?? cfg.envVars.ANTHROPIC_API_KEY;
     if (token) {
-      // 同名注入两个变量：第三方中转站常用 AUTH_TOKEN，官方 SDK 常用 API_KEY
-      envParts.push(`ANTHROPIC_API_KEY=${shellSingleQuote(token)}`);
-      envParts.push(`ANTHROPIC_AUTH_TOKEN=${shellSingleQuote(token)}`);
+      // 只设 ANTHROPIC_AUTH_TOKEN：claude CLI 检测到 ANTHROPIC_API_KEY 时会
+      // 弹出 "Do you want to use this API key? 1/Yes 2/No" 交互确认，导致 tmux 阻塞。
+      // AUTH_TOKEN 不触发该交互，且第三方中转站和官方 OAuth 都识别此字段。
+      lines.push(`export ANTHROPIC_AUTH_TOKEN=${shellSingleQuote(token)}`);
     }
-    // 屏蔽远程主机已有的 OAuth/登录态，避免它优先于绑定配置生效
-    unsets.push('CLAUDE_CODE_OAUTH_TOKEN');
   }
-
-  // 模型注入（无论 providerKind，只要 binding 指定了模型就生效）
   if (cfg.modelId) {
-    envParts.push(`ANTHROPIC_MODEL=${shellSingleQuote(cfg.modelId)}`);
-    innerCmd = `${CLAUDE_BIN} --model ${shellSingleQuote(cfg.modelId)}`;
+    lines.push(`export ANTHROPIC_MODEL=${shellSingleQuote(cfg.modelId)}`);
   }
 
-  if (envParts.length || unsets.length) {
-    const unsetFlags = unsets.map(k => `-u ${k}`).join(' ');
-    const envAssigns = envParts.join(' ');
-    innerCmd = `env ${[unsetFlags, envAssigns].filter(Boolean).join(' ')} ${innerCmd}`;
-  }
+  const modelArg = cfg.modelId ? ` --model ${shellSingleQuote(cfg.modelId)}` : '';
+  lines.push(`exec ${CLAUDE_BIN}${modelArg}`);
 
-  const escaped = innerCmd.replace(/"/g, '\\"');
-  return `tmux new-session -d -s ${sessionName} "${escaped}"`;
+  // bash 脚本整体用单引号包裹给 bash -ilc，对内部单引号做 `'\''` 闭合-转义-再开闭合
+  const bashScript = lines.join('; ');
+  const escapedScript = bashScript.replace(/'/g, `'\\''`);
+  const innerCmd = `bash -ilc '${escapedScript}'`;
+  // tmux 命令最外层用双引号包，需对内部双引号转义（bashScript 里目前不会出现双引号，但保留以防扩展）
+  const escapedForTmux = innerCmd.replace(/"/g, '\\"');
+  return `tmux new-session -d -s ${sessionName} "${escapedForTmux}"`;
 }
 
 function isIdle(processName: string, executor: RemoteExecutor): Promise<boolean> {

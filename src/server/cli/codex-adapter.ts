@@ -4,38 +4,28 @@ import type { RemoteExecutor } from '../executor/types.js';
 const SESSION_PREFIX = 'codex';
 const CODEX_BIN = process.env.CODEX_BIN || 'codex';
 
+function shellSingleQuote(v: string): string {
+  return `'${v.replace(/'/g, "'\\''")}'`;
+}
+
 function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
-  let innerCmd = CODEX_BIN;
+  // 同 cc-adapter：ssh2 非交互非登录 shell 受 Ubuntu/Debian rc 守卫拦截，
+  // 用 `bash -ilc` 强制加载远程 rc，使得 local 模式能拿到 ~/.bashrc 里的 OPENAI_*。
+  const lines: string[] = [];
 
   if (cfg.providerKind === 'custom') {
-    const parts: string[] = [];
-
-    if (cfg.envVars.CODEX_HOME) {
-      const safeHome = cfg.envVars.CODEX_HOME.replace(/'/g, "'\\''");
-      parts.push(`CODEX_HOME='${safeHome}'`);
-    }
-
-    if (cfg.envVars.OPENAI_BASE_URL) {
-      const safeUrl = cfg.envVars.OPENAI_BASE_URL.replace(/'/g, "'\\''");
-      parts.push(`OPENAI_BASE_URL='${safeUrl}'`);
-    }
-
-    if (cfg.envVars.OPENAI_API_KEY) {
-      const safeKey = cfg.envVars.OPENAI_API_KEY.replace(/'/g, "'\\''");
-      parts.push(`OPENAI_API_KEY='${safeKey}'`);
-    }
-
-    if (cfg.modelId) {
-      parts.push(`OPENAI_MODEL=${cfg.modelId}`);
-    }
-
-    if (parts.length) {
-      innerCmd = `env ${parts.join(' ')} ${innerCmd}`;
-    }
+    if (cfg.envVars.CODEX_HOME) lines.push(`export CODEX_HOME=${shellSingleQuote(cfg.envVars.CODEX_HOME)}`);
+    if (cfg.envVars.OPENAI_BASE_URL) lines.push(`export OPENAI_BASE_URL=${shellSingleQuote(cfg.envVars.OPENAI_BASE_URL)}`);
+    if (cfg.envVars.OPENAI_API_KEY) lines.push(`export OPENAI_API_KEY=${shellSingleQuote(cfg.envVars.OPENAI_API_KEY)}`);
+    if (cfg.modelId) lines.push(`export OPENAI_MODEL=${shellSingleQuote(cfg.modelId)}`);
   }
+  lines.push(`exec ${CODEX_BIN}`);
 
-  const escaped = innerCmd.replace(/"/g, '\\"');
-  return `tmux new-session -d -s ${sessionName} "${escaped}"`;
+  const bashScript = lines.join('; ');
+  const escapedScript = bashScript.replace(/'/g, `'\\''`);
+  const innerCmd = `bash -ilc '${escapedScript}'`;
+  const escapedForTmux = innerCmd.replace(/"/g, '\\"');
+  return `tmux new-session -d -s ${sessionName} "${escapedForTmux}"`;
 }
 
 function isIdle(processName: string, executor: RemoteExecutor): Promise<boolean> {
