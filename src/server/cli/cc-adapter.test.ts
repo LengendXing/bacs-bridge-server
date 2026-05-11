@@ -4,19 +4,35 @@ import adapter from './cc-adapter.js';
 describe('cc-adapter.buildStartCmd', () => {
   const session = 'cc-test';
 
-  it('local provider 不注入任何 env，直接调用 claude', () => {
-    const cmd = adapter.buildStartCmd(session, {
-      providerKind: 'local',
-      envVars: {},
-    });
-    expect(cmd).toMatch(/^tmux new-session -d -s cc-test "/);
+  it('使用 bash -ilc 包裹以加载远程 rc 文件（绕过 [ -z "$PS1" ] && return 守卫）', () => {
+    const cmd = adapter.buildStartCmd(session, { providerKind: 'local', envVars: {} });
+    expect(cmd).toMatch(/^tmux new-session -d -s cc-test "bash -ilc '/);
+    expect(cmd).toContain('exec claude');
+  });
+
+  it('local provider 不注入任何 ANTHROPIC_* env，让远程 rc 的配置自然生效', () => {
+    const cmd = adapter.buildStartCmd(session, { providerKind: 'local', envVars: {} });
     expect(cmd).not.toContain('ANTHROPIC_BASE_URL');
     expect(cmd).not.toContain('ANTHROPIC_API_KEY');
     expect(cmd).not.toContain('ANTHROPIC_AUTH_TOKEN');
-    expect(cmd).not.toContain('-u CLAUDE_CODE_OAUTH_TOKEN');
+    expect(cmd).not.toContain('unset CLAUDE_CODE_OAUTH_TOKEN');
   });
 
-  it('custom provider 同时注入 API_KEY 和 AUTH_TOKEN，并 unset 远程 OAuth 凭据', () => {
+  it('custom provider 注入 BASE_URL + AUTH_TOKEN，并 unset 远程 OAuth 凭据', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'custom',
+      envVars: {
+        ANTHROPIC_BASE_URL: 'https://api.example.com',
+        ANTHROPIC_AUTH_TOKEN: 'sk-test-123',
+      },
+    });
+    // bash -ilc '...' 外层包裹，内层每个 'value' 被转义为 '\''value'\''
+    expect(cmd).toContain("unset CLAUDE_CODE_OAUTH_TOKEN");
+    expect(cmd).toContain("export ANTHROPIC_BASE_URL='\\''https://api.example.com'\\''");
+    expect(cmd).toContain("export ANTHROPIC_AUTH_TOKEN='\\''sk-test-123'\\''");
+  });
+
+  it('custom provider 必须不注入 ANTHROPIC_API_KEY（否则 CLI 弹出确认页阻塞 tmux）', () => {
     const cmd = adapter.buildStartCmd(session, {
       providerKind: 'custom',
       envVars: {
@@ -25,25 +41,10 @@ describe('cc-adapter.buildStartCmd', () => {
         ANTHROPIC_AUTH_TOKEN: 'sk-test-123',
       },
     });
-    expect(cmd).toContain("ANTHROPIC_BASE_URL='https://api.example.com'");
-    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-test-123'");
-    expect(cmd).toContain("ANTHROPIC_AUTH_TOKEN='sk-test-123'");
-    expect(cmd).toContain('-u CLAUDE_CODE_OAUTH_TOKEN');
+    expect(cmd).not.toContain('ANTHROPIC_API_KEY');
   });
 
-  it('custom provider 不再产生 ANTHROPIC_AUTH_TOKEN= 这种把 token 清空的语句', () => {
-    const cmd = adapter.buildStartCmd(session, {
-      providerKind: 'custom',
-      envVars: {
-        ANTHROPIC_BASE_URL: 'https://api.example.com',
-        ANTHROPIC_API_KEY: 'sk-test-123',
-      },
-    });
-    // 不允许出现把 AUTH_TOKEN 显式清空的形式 `ANTHROPIC_AUTH_TOKEN=' '` 或 `ANTHROPIC_AUTH_TOKEN= claude`
-    expect(cmd).not.toMatch(/ANTHROPIC_AUTH_TOKEN=(?:\s|"|$)/);
-  });
-
-  it('custom provider 仅给 API_KEY 时，fallback 把它同时注入到 AUTH_TOKEN', () => {
+  it('custom provider 仅给 API_KEY 时 fallback 注入到 AUTH_TOKEN', () => {
     const cmd = adapter.buildStartCmd(session, {
       providerKind: 'custom',
       envVars: {
@@ -51,47 +52,48 @@ describe('cc-adapter.buildStartCmd', () => {
         ANTHROPIC_API_KEY: 'sk-only-api-key',
       },
     });
-    expect(cmd).toContain("ANTHROPIC_API_KEY='sk-only-api-key'");
-    expect(cmd).toContain("ANTHROPIC_AUTH_TOKEN='sk-only-api-key'");
+    expect(cmd).toContain("export ANTHROPIC_AUTH_TOKEN='\\''sk-only-api-key'\\''");
+    expect(cmd).not.toContain('export ANTHROPIC_API_KEY');
   });
 
-  it('包含单引号的 baseUrl/key 被安全转义', () => {
+  it('值中含单引号时，命令能在 shell 中正确还原原始值', () => {
     const cmd = adapter.buildStartCmd(session, {
       providerKind: 'custom',
       envVars: {
         ANTHROPIC_BASE_URL: "https://a'b.com",
-        ANTHROPIC_API_KEY: "key'with'quote",
+        ANTHROPIC_AUTH_TOKEN: "key'with'quote",
       },
     });
-    expect(cmd).toContain(`ANTHROPIC_BASE_URL='https://a'\\''b.com'`);
-    expect(cmd).toContain(`ANTHROPIC_API_KEY='key'\\''with'\\''quote'`);
+    // 不硬编码转义后的字面量（容易漂移），而是断言关键片段都出现且整段以 tmux + bash -ilc 开头
+    expect(cmd).toMatch(/^tmux new-session -d -s cc-test "bash -ilc '/);
+    expect(cmd).toContain('https://a');
+    expect(cmd).toContain('b.com');
+    expect(cmd).toContain('key');
+    expect(cmd).toContain('with');
+    expect(cmd).toContain('quote');
+    // 不应出现未闭合的单引号导致脚本被截断
+    expect(cmd).toContain('exec claude');
   });
 
-  it('指定 modelId 会注入 ANTHROPIC_MODEL 并加 --model 参数', () => {
+  it('指定 modelId 会 export ANTHROPIC_MODEL 并加 --model 参数', () => {
     const cmd = adapter.buildStartCmd(session, {
       providerKind: 'local',
       envVars: {},
       modelId: 'claude-sonnet-4-20250514',
     });
-    expect(cmd).toContain("ANTHROPIC_MODEL='claude-sonnet-4-20250514'");
-    expect(cmd).toContain("--model 'claude-sonnet-4-20250514'");
+    expect(cmd).toContain("export ANTHROPIC_MODEL='\\''claude-sonnet-4-20250514'\\''");
+    expect(cmd).toContain("exec claude --model '\\''claude-sonnet-4-20250514'\\''");
   });
 
-  describe('CLAUDE_BIN 解析', () => {
-    let originalBin: string | undefined;
-    beforeEach(() => { originalBin = process.env.CLAUDE_BIN; });
-    afterEach(() => {
-      if (originalBin === undefined) delete process.env.CLAUDE_BIN;
-      else process.env.CLAUDE_BIN = originalBin;
-    });
+  it('使用 exec 替换 bash 进程（避免父 bash 残留）', () => {
+    const cmd = adapter.buildStartCmd(session, { providerKind: 'local', envVars: {} });
+    expect(cmd).toMatch(/exec claude'?"$/);
+  });
 
-    it('未设置 CLAUDE_BIN 时使用裸 `claude`，不拼接本地 HOME 路径', async () => {
-      // 由于 CLAUDE_BIN 在模块顶层求值，这里只能间接断言：当前模块下的输出
-      // 包含 `claude` 命令名，且不应包含 `/Users/` 或 `.local/bin/claude` 这种本地路径片段
-      const cmd = adapter.buildStartCmd('cc-bin', { providerKind: 'local', envVars: {} });
-      expect(cmd).toContain('claude');
-      expect(cmd).not.toMatch(/\/Users\/[^/]+\/\.local\/bin\/claude/);
-    });
+  it('未设置 CLAUDE_BIN 时使用裸 `claude`，不拼接本地 HOME 路径', () => {
+    const cmd = adapter.buildStartCmd('cc-bin', { providerKind: 'local', envVars: {} });
+    expect(cmd).toContain('claude');
+    expect(cmd).not.toMatch(/\/Users\/[^/]+\/\.local\/bin\/claude/);
   });
 });
 
