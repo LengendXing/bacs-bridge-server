@@ -45,7 +45,7 @@ router.get('/api/models', requireAuth, (req, res) => {
  * - 替换该服务商的所有模型记录
  */
 router.post('/api/models/refresh/:providerId', requireAuth, async (req, res) => {
-  const providerId = parseInt(req.params.providerId, 10);
+  const providerId = parseInt(req.params.providerId as string, 10);
   if (isNaN(providerId)) {
     return res.json({ code: 1003, message: '无效的服务商 ID' });
   }
@@ -76,7 +76,7 @@ router.post('/api/models/refresh/:providerId', requireAuth, async (req, res) => 
  * 手动覆盖模型的 cliKind 标记
  */
 router.put('/api/models/:id/cli-kind', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   const { cliKind } = req.body;
 
   if (isNaN(id)) {
