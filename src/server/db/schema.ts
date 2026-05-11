@@ -204,8 +204,17 @@ export const bindings = sqliteTable('bindings', {
   /** 关联服务商 ID（可为空，表示使用本机环境变量） */
   providerId: integer('provider_id').references(() => providers.id),
 
-  /** 关联模型 ID（可为空，使用默认模型） */
+  /** 关联模型 ID（可为空，使用默认模型）— 仅当用户从探查成功的列表选时生效 */
   modelId: integer('model_id').references(() => models.id),
+
+  /** 模型字符串覆盖（优先于 modelId FK）。
+   *  用于：1) 服务商不支持 /v1/models 探查时从默认清单选；2) 用户手输自定义模型 ID。
+   *  buildCliConfig 读取顺序：modelOverride ?? models.modelId 字符串。 */
+  modelOverride: text('model_override'),
+
+  /** 推理 effort 档位（cc：low|medium|high|xhigh|max；codex：minimal|low|medium|high|xhigh）。
+   *  null = 不注入（用 CLI 默认）。 */
+  effort: text('effort'),
 
   /** 关联机器 ID（null = 本地执行，向后兼容） */
   machineId: integer('machine_id').references(() => machines.id),
