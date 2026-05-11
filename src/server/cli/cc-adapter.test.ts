@@ -90,6 +90,26 @@ describe('cc-adapter.buildStartCmd', () => {
     expect(cmd).toMatch(/exec claude'?"$/);
   });
 
+  it('指定 effort 时拼入 --effort 参数', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'local',
+      envVars: {},
+      modelId: 'claude-opus-4-7',
+      effort: 'max',
+    });
+    expect(cmd).toContain("--effort '\\''max'\\''");
+    expect(cmd).toContain("--model '\\''claude-opus-4-7'\\''");
+  });
+
+  it('不指定 effort 时不应出现 --effort', () => {
+    const cmd = adapter.buildStartCmd(session, {
+      providerKind: 'local',
+      envVars: {},
+      modelId: 'claude-haiku-4-5-20251001',
+    });
+    expect(cmd).not.toContain('--effort');
+  });
+
   it('未设置 CLAUDE_BIN 时使用裸 `claude`，不拼接本地 HOME 路径', () => {
     const cmd = adapter.buildStartCmd('cc-bin', { providerKind: 'local', envVars: {} });
     expect(cmd).toContain('claude');
