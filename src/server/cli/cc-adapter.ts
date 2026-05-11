@@ -90,13 +90,19 @@ function extractReply(raw: string, userMessage: string): string {
     if (/^\s*❯\s/.test(rawLines[i])) { lastPromptIdx = i; break; }
   }
   if (lastPromptIdx >= 0) {
-    // 若该 ❯ 行之后还有非空行，说明它是历史 prompt → 丢掉
-    // 若 ❯ 之后全部为空/纯框线，则它是"光标待命"行，保留前面的回复
-    const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l));
-    if (after.length > 0) {
-      rawLines = rawLines.slice(lastPromptIdx + 1);
-    } else {
+    const promptLine = rawLines[lastPromptIdx];
+    const isIdlePrompt = /^\s*❯\s*$/.test(promptLine);
+    if (isIdlePrompt) {
+      // 空闲光标（❯ 后面没有消息文本）→ 这是等待输入状态，保留它前面的回复
       rawLines = rawLines.slice(0, lastPromptIdx);
+    } else {
+      // 带消息文本的 ❯ → 可能是历史 prompt，检查后面是否有非 UI 内容
+      const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l) && !/(\? for shortcuts|ctrl\+o to expand)/i.test(l));
+      if (after.length > 0) {
+        rawLines = rawLines.slice(lastPromptIdx + 1);
+      } else {
+        rawLines = rawLines.slice(0, lastPromptIdx);
+      }
     }
   }
 
