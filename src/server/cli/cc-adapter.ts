@@ -131,19 +131,19 @@ function extractReply(raw: string, userMessage: string): string {
   }
   debug.lastPromptIdx = lastPromptIdx;
   if (lastPromptIdx >= 0) {
-    const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l));
-    const promptBody = rawLines[lastPromptIdx].replace(/^\s*❯\s?/, '').trim();
-    if (after.length > 0) {
-      // ❯ 行之后还有真实内容 → 那条 ❯ 是历史 prompt，丢掉它之前 + 它本身
-      rawLines = rawLines.slice(lastPromptIdx + 1);
-    } else if (!promptBody) {
-      // 空 ❯（光标待命行）→ 丢掉它之后（只剩框线/提示），保留前面的回复
+    const promptLine = rawLines[lastPromptIdx];
+    const isIdlePrompt = /^\s*❯\s*$/.test(promptLine);
+    if (isIdlePrompt) {
+      // 空闲光标（❯ 后面没有消息文本）→ 这是等待输入状态，保留它前面的回复
       rawLines = rawLines.slice(0, lastPromptIdx);
-      debug.lastPromptKept = true;
-    }
-    // 非空 ❯ 但后面没真实内容 → 可能是历史 prompt 后跟着框线，也丢掉它之前
-    else {
-      rawLines = rawLines.slice(0, lastPromptIdx);
+    } else {
+      // 带消息文本的 ❯ → 可能是历史 prompt，检查后面是否有非 UI 内容
+      const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l) && !/(\? for shortcuts|ctrl\+o to expand)/i.test(l));
+      if (after.length > 0) {
+        rawLines = rawLines.slice(lastPromptIdx + 1);
+      } else {
+        rawLines = rawLines.slice(0, lastPromptIdx);
+      }
     }
   }
 
