@@ -1,5 +1,11 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
+## v1.0.8 · 2026-05-11
+- [x] 彻底修复远程 Not logged in：用 bash -ilc 包裹 tmux 启动命令以加载远程 rc 文件，绕过 Ubuntu/Debian `[ -z "$PS1" ] && return` 守卫 ✅ 2026-05-11
+- [x] 去掉 ANTHROPIC_API_KEY 注入，避免 claude CLI 弹出确认页阻塞 tmux 会话 ✅ 2026-05-11
+- [x] codex-adapter 同步改造为 bash -ilc 启动 ✅ 2026-05-11
+- [x] 在真实远程主机 root@49.12.243.33 端到端验证 local + custom 两种模式都登录成功 ✅ 2026-05-11
+
 ## v1.0.7 · 2026-05-11
 - [x] 修复远程绑定 ENV 注入：CLAUDE_BIN 去本地 HOME / custom 同时注入 API_KEY+AUTH_TOKEN / env -u 屏蔽远程 OAuth（不动远程文件） ✅ 2026-05-11
 - [x] 新增 buildStartCmd 6 个单元测试防回归 ✅ 2026-05-11

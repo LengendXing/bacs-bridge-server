@@ -27,9 +27,10 @@ export function buildCliConfig(binding: typeof bindings.$inferSelect): CliStartC
   }
 
   if (binding.cliKind === 'cc') {
+    // 仅注入 ANTHROPIC_AUTH_TOKEN：CLI 检测到 ANTHROPIC_API_KEY 时会弹出
+    // "Do you want to use this API key?" 交互确认，阻塞 tmux 会话
     cfg.envVars = {
       ANTHROPIC_BASE_URL: provider.baseUrl || undefined,
-      ANTHROPIC_API_KEY: provider.apiKey || undefined,
       ANTHROPIC_AUTH_TOKEN: provider.apiKey || undefined,
     };
   } else if (binding.cliKind === 'codex') {
