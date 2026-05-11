@@ -79,6 +79,7 @@ router.put('/api/machines/:id', async (req, res) => {
   const db = getDb();
   const existing = db.select().from(machines).where(eq(machines.id, id)).get();
   if (!existing) return res.json({ code: 1004, message: '机器不存在' });
+  if (existing.builtin) return res.json({ code: 1002, message: '本机记录为系统内置，不允许修改' });
 
   const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
   const { name, host, port, osType, authType, username, password, privateKey, passphrase, notes } = req.body;
@@ -130,6 +131,7 @@ router.delete('/api/machines/:id', async (req, res) => {
   const db = getDb();
   const existing = db.select().from(machines).where(eq(machines.id, id)).get();
   if (!existing) return res.json({ code: 1004, message: '机器不存在' });
+  if (existing.builtin) return res.json({ code: 1002, message: '本机记录为系统内置，不允许删除' });
 
   // 检查是否有关联绑定
   const relatedBindings = db.select().from(bindings).all().filter(b => b.machineId === id);
@@ -159,6 +161,12 @@ router.post('/api/machines/:id/test', async (req, res) => {
   const db = getDb();
   const machine = db.select().from(machines).where(eq(machines.id, id)).get();
   if (!machine) return res.json({ code: 1004, message: '机器不存在' });
+  if (machine.builtin) {
+    return res.json({
+      code: 0,
+      data: { ok: true, hostname: 'localhost', os: machine.osVersion, latencyMs: 0 },
+    });
+  }
 
   try {
     const { createSshExecutor } = await import('../executor/ssh-factory.js');
