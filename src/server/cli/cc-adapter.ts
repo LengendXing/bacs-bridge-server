@@ -124,26 +124,43 @@ function extractReply(raw: string, userMessage: string): string {
     }
   }
 
-  // 二次防御：保留最后一个 `❯ 待命光标行` 之前的回复（光标行后通常只有框线/快捷键提示）
+  // 二次防御：处理 pane 末尾的 `❯` 行（空闲光标 vs. 历史/本轮 prompt）
+  // 关键：必须先按 promptBody 是否为空区分，再看其后是否有内容。
+  // 之前的 bug：先判 after.length > 0，导致空闲光标 `❯` + ` ? for shortcuts` 被当成"历史 prompt 后还有内容"
+  // → 走 slice(lastPromptIdx + 1) 把整段真实回复全部丢掉 → blocks/cleaned 为空 → 飞书"未能提取"
+  // 同时：cc 的 TUI 输入框是 `│ ❯ ... │`，光标行也可能是 `│ ❯ │`（被边框包裹）→ 一并识别
+  const promptLineRe = /^\s*(?:│\s*)?❯(?:\s|$)/;
   let lastPromptIdx = -1;
   for (let i = rawLines.length - 1; i >= 0; i--) {
-    if (/^\s*❯\s/.test(rawLines[i])) { lastPromptIdx = i; break; }
+    if (promptLineRe.test(rawLines[i])) { lastPromptIdx = i; break; }
   }
   debug.lastPromptIdx = lastPromptIdx;
   if (lastPromptIdx >= 0) {
-    const promptLine = rawLines[lastPromptIdx];
-    const isIdlePrompt = /^\s*❯\s*$/.test(promptLine);
-    if (isIdlePrompt) {
-      // 空闲光标（❯ 后面没有消息文本）→ 这是等待输入状态，保留它前面的回复
+    // 提取 promptBody：去掉左侧 `│` 边框 + `❯ ` 前缀，再去掉右侧 `│` 边框
+    const promptBody = rawLines[lastPromptIdx]
+      .replace(/^\s*(?:│\s*)?❯\s?/, '')
+      .replace(/\s*│\s*$/, '')
+      .trim();
+    // "真实内容"严格定义：排除框线、快捷键/状态提示行
+    const after = rawLines.slice(lastPromptIdx + 1).filter(l => {
+      const t = l.trim();
+      if (!t) return false;
+      if (/^[\s│┃─━╭╰╯╮┌┐└┘]+$/.test(t)) return false;
+      if (/(\? for shortcuts|esc to interrupt|ctrl\+[a-z]|to expand|to redo)/i.test(t)) return false;
+      return true;
+    });
+
+    if (!promptBody) {
+      // 空 ❯（光标待命行，含被边框包裹的 `│ ❯ │`）→ 总是丢掉它及之后，保留前面的回复
       rawLines = rawLines.slice(0, lastPromptIdx);
+      debug.lastPromptKept = true;
+    } else if (after.length > 0) {
+      // 有 body 的 ❯ 且其后仍有真实内容 → 是历史 prompt，丢它之前 + 它本身
+      rawLines = rawLines.slice(lastPromptIdx + 1);
     } else {
-      // 带消息文本的 ❯ → 可能是历史 prompt，检查后面是否有非 UI 内容
-      const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l) && !/(\? for shortcuts|ctrl\+o to expand)/i.test(l));
-      if (after.length > 0) {
-        rawLines = rawLines.slice(lastPromptIdx + 1);
-      } else {
-        rawLines = rawLines.slice(0, lastPromptIdx);
-      }
+      // 有 body 的 ❯ 但后面只剩框线/快捷键提示 → 该 ❯ 大概率是本轮 user 输入回显
+      // 此时本轮回复在 ❯ 之前已被前面的 cutIdx 裁掉，留下的是历史；保留 ❯ 之前内容更安全
+      rawLines = rawLines.slice(0, lastPromptIdx);
     }
   }
 
@@ -156,6 +173,7 @@ function extractReply(raw: string, userMessage: string): string {
     if (/^\s*│.*(Welcome back|Tips for getting started|Claude Code v|What.s new|Fixed:|API Usage|\/release-notes|\/login|\/logout|\/settings|cwd:|Try ")/.test(line)) continue;
     if (/^\s*│\s*>\s/.test(line)) continue;
     if (/^\s*❯/.test(line)) continue;
+    if (/^\s*│\s*❯/.test(line)) continue;
     if (/^\s*✻/.test(line)) continue;
     if (/(\? for shortcuts|ctrl\+o to expand|ctrl\+r to redo|ctrl\+c to)/i.test(line)) continue;
     if (/^\s*Listed\s+\d+\s+(director|file)/i.test(line)) continue;
