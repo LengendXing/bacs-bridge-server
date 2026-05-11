@@ -1,5 +1,37 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.4-Beta - 2026-05-11
+### 变更内容
+- **新增「快捷登录」功能（Android 客户端扫码登录）**：设置页新增「快捷登录」卡片，展示二维码 + 60s 倒计时 + 手动刷新按钮 + 倒计时归零自动刷新。客户端扫码后用短期 JWT 调 `/api/auth/exchange` 换长 JWT，避免长期 token 通过二维码泄露
+- **新增「对外服务地址」配置项**：设置页新增配置入口；二维码中的 `server` 字段优先使用此值，未配置则按 `req.protocol/host` 自动推断（含 `X-Forwarded-*` 反代支持）
+- **新增数据表 app_settings（KV）**：存放应用级配置；运行时 `CREATE TABLE IF NOT EXISTS` 兼容老库
+- **后端新增接口**：`POST /api/auth/qr-token`（需登录，返回 60s 短 JWT + server）、`POST /api/auth/exchange`（短 token 换长 token）、`GET / PUT /api/settings/external-url`
+- **JWT 模块扩展**：`signToken` 增加可选 `expiresIn` 参数
+- **顺手修复（Bindings）**：选「本机环境变量」(providerId=null) 时模型下拉为空 → 改为按 cliKind 列出所有模型并按 modelId 去重，同步与 cc-adapter「无论 providerKind 只要指定 model 就生效」的注入逻辑
+
+### 影响范围
+- src/server/db/schema.ts、src/server/db/index.ts（新增 ensureAppSettingsTable）
+- src/server/auth/jwt.ts（signToken 支持自定义 expiresIn）
+- src/server/routes/auth.ts（新增 qr-token / exchange）
+- src/server/routes/settings.ts（新增）
+- src/server/index.ts（挂载 settingsRoutes）
+- src/client/views/SettingsView.vue（快捷登录卡片 + 对外地址）
+- src/client/views/BindingsView.vue（模型下拉修复）
+- package.json（v1.0.4 → v1.0.4-Beta）
+
+### 验证方式
+- 设置页打开看到二维码 + 60s 倒计时 + 服务器地址；点「手动刷新」秒级刷新
+- 倒计时归零自动刷新，时间窗合理
+- 「对外服务地址」保存后立即生效（二维码 server 字段变更）
+- `curl POST /api/auth/qr-token`（带有效 X-Auth-Token）→ 返回 token / server / expiresIn / expiresAt
+- 客户端用短 token 调 `POST /api/auth/exchange` → 返回长 token
+
+### 已知不修
+- 二维码 token 仍允许 60s 内重复扫描（未实现"扫一次即作废"）
+- 短 token 未做 AES 加密（文档列为可选项）
+
+---
+
 ## v1.0.5 - 2026-05-11
 ### 变更内容
 - **修复 Web 系统日志 SSE 1002 错误（关键 bug）**：`bindings/providers/models/sessions/machines/logs` 6 个 router 之前都在顶部使用 `router.use(requireAuth)` 且未限定路径，导致任何 `/api/*` 请求（包括 `/api/logs/stream`）进入 router 时都被 requireAuth 拦截 → 浏览器 EventSource 走 `?token=` 永远拿到 1002。改为每条路由单独挂 `requireAuth`，SSE 路由独立鉴权（已支持 query token）
