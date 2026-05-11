@@ -100,15 +100,14 @@ router.get('/api/logs/stream', (req, res) => {
   });
 });
 
-// ── 其他日志接口均需认证 ──
-router.use(requireAuth);
+// ── 其他日志接口均需认证（逐路由挂载，避免 router.use 拦截 SSE） ──
 
 /**
  * GET /api/logs
  *
  * 查询审计日志，按时间倒序，默认返回最近 100 条
  */
-router.get('/api/logs', (req, res) => {
+router.get('/api/logs', requireAuth, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string, 10) || 100, 500);
   const action = req.query.action as string | undefined;
 
@@ -139,7 +138,7 @@ router.get('/api/logs', (req, res) => {
  *
  * 读取当天系统日志文件的最近 N 行
  */
-router.get('/api/logs/system', (req, res) => {
+router.get('/api/logs/system', requireAuth, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string, 10) || 200, 1000);
 
   const logFile = todayLogFile();
