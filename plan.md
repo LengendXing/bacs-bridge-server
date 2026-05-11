@@ -11,6 +11,9 @@
 - [x] Phase 4: Channel 抽象 + 飞书重构 + 路由实现 ✅ 2026-05-10
 - [x] Phase 5: PM2 + deploy.sh + 文档更新 ✅ 2026-05-10
 
+## v1.0.5 · 2026-05-11
+- [x] 修复 SSE 1002：6 个 router 改为逐路由挂 requireAuth（避免 router.use 拦截 SSE） ✅ 2026-05-11
+
 ## v1.0.4 · 2026-05-11
 - [x] 代码 Review + 修复 cc-adapter 模型未注入 + 编辑绑定空 secret 覆盖 bug ✅ 2026-05-11
 - [x] 机器管理添加默认本机记录（builtin） ✅ 2026-05-11
