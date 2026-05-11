@@ -61,10 +61,26 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
   // 运行时 schema 修复（兼容老库）：如缺少 os_version / builtin 列则补上
   ensureMachineColumns(sqlite);
 
+  // 运行时确保 app_settings 表存在（drizzle 迁移之外的 KV 表）
+  ensureAppSettingsTable(sqlite);
+
   // Seed 默认本机记录
   seedLocalMachine(sqlite);
 
   return db;
+}
+
+/**
+ * 兼容老库：确保 app_settings 表存在
+ */
+function ensureAppSettingsTable(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
 }
 
 /**

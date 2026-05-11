@@ -102,8 +102,8 @@
           </select>
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">模型</label>
-          <select v-model="form.modelId" class="input-mac mb-3" :disabled="!form.providerId">
-            <option :value="null">{{ form.providerId ? (filteredModels.length ? '默认（不指定模型）' : '该服务商下暂无可用模型') : '请先选择服务商' }}</option>
+          <select v-model="form.modelId" class="input-mac mb-3">
+            <option :value="null">{{ filteredModels.length ? '默认（不指定模型，读 env）' : '暂无可用模型' }}</option>
             <option v-for="m in filteredModels" :key="m.id" :value="m.id">
               {{ m.displayName || m.modelId }} <span v-if="m.displayName && m.displayName !== m.modelId">({{ m.modelId }})</span>
             </option>
@@ -158,11 +158,19 @@ const form = ref({
 });
 
 // 模型按 CLI 类型 + 服务商过滤
+// 选具体服务商时：仅该服务商下的模型
+// 选「本机环境变量」(providerId=null) 时：列出所有 cliKind 匹配的模型，按 modelId 去重
 const filteredModels = computed(() => {
-  if (!form.value.providerId) return [];
-  return modelList.value.filter(
-    m => m.providerId === form.value.providerId && m.cliKind === form.value.cliKind,
-  );
+  const byCli = modelList.value.filter(m => m.cliKind === form.value.cliKind);
+  if (form.value.providerId) {
+    return byCli.filter(m => m.providerId === form.value.providerId);
+  }
+  const seen = new Set<string>();
+  return byCli.filter(m => {
+    if (seen.has(m.modelId)) return false;
+    seen.add(m.modelId);
+    return true;
+  });
 });
 const formLoading = ref(false);
 const formError = ref('');

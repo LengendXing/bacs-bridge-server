@@ -30,6 +30,61 @@
       </div>
     </div>
 
+    <!-- 快捷登录（客户端扫码） -->
+    <div class="glass-card mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-base font-semibold" style="color: var(--text)">快捷登录</h3>
+        <span v-if="qrCountdown > 0" class="text-xs" style="color: var(--text-secondary)">
+          {{ qrCountdown }} 秒后自动刷新
+        </span>
+      </div>
+      <p class="text-sm mb-4" style="color: var(--text-secondary)">
+        Android 客户端扫描二维码即可登录，无需手动输入服务器地址或密码。二维码 60 秒有效，过期后自动刷新。
+      </p>
+      <div class="flex items-start gap-4">
+        <div
+          style="width: 200px; height: 200px; background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center;"
+        >
+          <canvas ref="qrLoginCanvas" style="width: 180px; height: 180px"></canvas>
+        </div>
+        <div class="flex-1">
+          <p v-if="qrServer" class="text-xs mb-2" style="color: var(--text-secondary)">
+            服务器：<code style="color: var(--text)">{{ qrServer }}</code>
+          </p>
+          <p v-if="qrError" class="text-sm mb-2" style="color: var(--danger)">{{ qrError }}</p>
+          <button
+            class="btn-mac btn-mac-sm"
+            :disabled="qrLoading"
+            @click="refreshQrLogin"
+          >
+            {{ qrLoading ? '生成中...' : '手动刷新' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对外服务地址 -->
+    <div class="glass-card mb-6">
+      <h3 class="text-base font-semibold mb-2" style="color: var(--text)">对外服务地址</h3>
+      <p class="text-sm mb-3" style="color: var(--text-secondary)">
+        用于快捷登录二维码中的 server 字段。留空则按当前请求自动推断（适合内网直连场景）。反向代理或域名场景必须显式填写。
+      </p>
+      <form @submit.prevent="handleSaveExternalUrl" class="flex items-center gap-2 max-w-xl">
+        <input
+          v-model="externalUrlInput"
+          type="text"
+          class="input-mac"
+          placeholder="http://192.168.1.100:3456"
+          style="flex: 1"
+        />
+        <button type="submit" class="btn-mac btn-mac-sm" :disabled="externalUrlSaving">
+          {{ externalUrlSaving ? '保存中...' : '保存' }}
+        </button>
+      </form>
+      <p v-if="externalUrlError" class="text-sm mt-2" style="color: var(--danger)">{{ externalUrlError }}</p>
+      <p v-if="externalUrlSuccess" class="text-sm mt-2" style="color: var(--success)">{{ externalUrlSuccess }}</p>
+    </div>
+
     <!-- 账户设置 -->
     <div class="glass-card mb-6">
       <h3 class="text-base font-semibold mb-4" style="color: var(--text)">账户设置</h3>
@@ -160,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useApi } from '../composables/useApi';
 import { useAuth } from '../composables/useAuth';
 import type { TotpSetupResponse } from '@shared/types';
@@ -320,5 +375,93 @@ async function handleDisableTotp() {
   }
 }
 
-onMounted(loadTotpStatus);
+// ── 快捷登录二维码 ──
+const qrLoginCanvas = ref<HTMLCanvasElement | null>(null);
+const qrServer = ref('');
+const qrCountdown = ref(0);
+const qrLoading = ref(false);
+const qrError = ref('');
+let qrTimer: ReturnType<typeof setInterval> | null = null;
+
+async function refreshQrLogin() {
+  qrError.value = '';
+  qrLoading.value = true;
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+  try {
+    const res = await api.post<{ token: string; server: string; expiresIn: number }>('/api/auth/qr-token', {});
+    if (res.code !== 0 || !res.data) {
+      qrError.value = res.message || '生成二维码失败';
+      return;
+    }
+    const { token, server, expiresIn } = res.data;
+    qrServer.value = server;
+    const payload = JSON.stringify({ type: 'bacs-login', server, token });
+    await nextTick();
+    if (qrLoginCanvas.value) {
+      await QRCode.toCanvas(qrLoginCanvas.value, payload, {
+        width: 180,
+        margin: 1,
+        color: { dark: '#1d1d1f', light: '#ffffff' },
+      });
+    }
+    qrCountdown.value = expiresIn;
+    qrTimer = setInterval(() => {
+      qrCountdown.value -= 1;
+      if (qrCountdown.value <= 0) {
+        if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+        refreshQrLogin();
+      }
+    }, 1000);
+  } catch {
+    qrError.value = '网络错误，请重试';
+  } finally {
+    qrLoading.value = false;
+  }
+}
+
+// ── 对外服务地址 ──
+const externalUrlInput = ref('');
+const externalUrlSaving = ref(false);
+const externalUrlError = ref('');
+const externalUrlSuccess = ref('');
+
+async function loadExternalUrl() {
+  try {
+    const res = await api.get<{ externalUrl: string }>('/api/settings/external-url');
+    if (res.code === 0 && res.data) {
+      externalUrlInput.value = res.data.externalUrl || '';
+    }
+  } catch { /* ignore */ }
+}
+
+async function handleSaveExternalUrl() {
+  externalUrlError.value = '';
+  externalUrlSuccess.value = '';
+  externalUrlSaving.value = true;
+  try {
+    const res = await api.put<{ externalUrl: string }>('/api/settings/external-url', {
+      externalUrl: externalUrlInput.value,
+    });
+    if (res.code === 0) {
+      externalUrlSuccess.value = '已保存，下次刷新二维码生效';
+      // 立即刷新二维码以应用新地址
+      refreshQrLogin();
+    } else {
+      externalUrlError.value = res.message || '保存失败';
+    }
+  } catch {
+    externalUrlError.value = '网络错误，请重试';
+  } finally {
+    externalUrlSaving.value = false;
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadTotpStatus(), loadExternalUrl()]);
+  refreshQrLogin();
+});
+
+onBeforeUnmount(() => {
+  if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+});
 </script>
