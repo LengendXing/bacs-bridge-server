@@ -84,15 +84,9 @@
           </template>
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">CLI 类型</label>
-          <select v-model="form.cliKind" class="input-mac mb-3" :disabled="modalMode === 'edit'">
+          <select v-model="form.cliKind" class="input-mac mb-3" :disabled="modalMode === 'edit'" @change="onCliOrProviderChange">
             <option value="cc">Claude Code</option>
             <option value="codex">Codex</option>
-          </select>
-
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">服务商</label>
-          <select v-model="form.providerId" class="input-mac mb-3">
-            <option :value="null">本机环境变量</option>
-            <option v-for="p in providerList" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">运行机器</label>
@@ -101,11 +95,27 @@
             <option v-for="m in machineList" :key="m.id" :value="m.id">{{ m.name }} ({{ m.host }}:{{ m.port }})</option>
           </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书 App ID</label>
-          <input v-model="form.feishuAppId" type="text" class="input-mac mb-3" placeholder="cli_xxx" required />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">服务商</label>
+          <select v-model="form.providerId" class="input-mac mb-3" @change="onCliOrProviderChange">
+            <option :value="null">本机环境变量</option>
+            <option v-for="p in providerList" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书 App Secret</label>
-          <input v-model="form.feishuAppSecret" type="password" class="input-mac mb-3" placeholder="飞书应用密钥" required />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">模型</label>
+          <select v-model="form.modelId" class="input-mac mb-3" :disabled="!form.providerId">
+            <option :value="null">{{ form.providerId ? (filteredModels.length ? '默认（不指定模型）' : '该服务商下暂无可用模型') : '请先选择服务商' }}</option>
+            <option v-for="m in filteredModels" :key="m.id" :value="m.id">
+              {{ m.displayName || m.modelId }} <span v-if="m.displayName && m.displayName !== m.modelId">({{ m.modelId }})</span>
+            </option>
+          </select>
+
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书 App ID</label>
+          <input v-model="form.feishuAppId" type="text" class="input-mac mb-3" placeholder="cli_xxx" :required="modalMode !== 'edit'" />
+
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
+            飞书 App Secret<span v-if="modalMode === 'edit'" style="color: var(--text-secondary); font-weight: normal">（留空不修改）</span>
+          </label>
+          <input v-model="form.feishuAppSecret" type="password" class="input-mac mb-3" placeholder="飞书应用密钥" :required="modalMode !== 'edit'" />
 
           <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">{{ formError }}</p>
           <div class="flex items-center gap-2">
@@ -123,7 +133,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useApi } from '../composables/useApi';
-import type { Binding, Provider, Machine } from '@shared/types';
+import type { Binding, Provider, Machine, Model } from '@shared/types';
 
 const { get, post, del } = useApi();
 
@@ -131,6 +141,7 @@ const bindings = ref<Binding[]>([]);
 const loading = ref(false);
 const providerList = ref<Provider[]>([]);
 const machineList = ref<Machine[]>([]);
+const modelList = ref<Model[]>([]);
 const unboundSessions = ref<string[]>([]);
 
 const showModal = ref(false);
@@ -138,11 +149,20 @@ const modalMode = ref<'create' | 'mount' | 'edit'>('create');
 const editId = ref('');
 const form = ref({
   processName: '',
-  cliKind: 'cc',
+  cliKind: 'cc' as 'cc' | 'codex',
   providerId: null as number | null,
+  modelId: null as number | null,
   machineId: null as number | null,
   feishuAppId: '',
   feishuAppSecret: '',
+});
+
+// 模型按 CLI 类型 + 服务商过滤
+const filteredModels = computed(() => {
+  if (!form.value.providerId) return [];
+  return modelList.value.filter(
+    m => m.providerId === form.value.providerId && m.cliKind === form.value.cliKind,
+  );
 });
 const formLoading = ref(false);
 const formError = ref('');
@@ -179,6 +199,19 @@ async function loadMachines() {
   } catch { /* */ }
 }
 
+async function loadModels() {
+  try {
+    const res = await get<Model[]>('/api/models');
+    if (res.code === 0) modelList.value = res.data || [];
+  } catch { /* */ }
+}
+
+function onCliOrProviderChange() {
+  // CLI 或服务商变更时，若当前 modelId 不在过滤后列表中则清空
+  const stillValid = filteredModels.value.some(m => m.id === form.value.modelId);
+  if (!stillValid) form.value.modelId = null;
+}
+
 async function loadUnboundSessions() {
   try {
     const query = form.value.machineId ? `?machineId=${form.value.machineId}` : '';
@@ -197,20 +230,22 @@ function onMachineChange() {
 function openCreate() {
   modalMode.value = 'create';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
   formError.value = '';
   loadProviders();
   loadMachines();
+  loadModels();
   showModal.value = true;
 }
 
 function openMount() {
   modalMode.value = 'mount';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
   formError.value = '';
   loadProviders();
   loadMachines();
+  loadModels();
   loadUnboundSessions();
   showModal.value = true;
 }
@@ -222,6 +257,7 @@ function openEdit(b: Binding) {
     processName: b.processName,
     cliKind: b.cliKind,
     providerId: b.providerId,
+    modelId: b.modelId,
     machineId: b.machineId,
     feishuAppId: b.feishuAppId || '',
     feishuAppSecret: '',
@@ -229,6 +265,7 @@ function openEdit(b: Binding) {
   formError.value = '';
   loadProviders();
   loadMachines();
+  loadModels();
   showModal.value = true;
 }
 
@@ -247,6 +284,7 @@ async function handleSubmit() {
         feishuAppId: form.value.feishuAppId,
         feishuAppSecret: form.value.feishuAppSecret,
         providerId: form.value.providerId,
+        modelId: form.value.modelId,
         machineId: form.value.machineId,
       });
     }

@@ -73,6 +73,8 @@ export interface Machine {
   host: string;
   port: number;
   osType: 'linux' | 'mac' | 'windows';
+  /** 系统版本号（如 "Darwin 22.6.0"），仅本机自动填充 */
+  osVersion: string | null;
   authType: 'password' | 'key';
   username: string;
   hasPassword: boolean;
@@ -80,6 +82,8 @@ export interface Machine {
   hasPassphrase: boolean;
   notes: string | null;
   status: 'online' | 'offline' | 'unknown';
+  /** 系统内置记录（如本机），不可编辑/删除 */
+  builtin: boolean;
   lastHeartbeat: string | null;
   createdAt: string;
   updatedAt: string;

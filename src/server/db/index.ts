@@ -10,6 +10,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as schema from './schema.js';
@@ -57,7 +58,53 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
     migrate(db, { migrationsFolder: migrationsPath });
   }
 
+  // 运行时 schema 修复（兼容老库）：如缺少 os_version / builtin 列则补上
+  ensureMachineColumns(sqlite);
+
+  // Seed 默认本机记录
+  seedLocalMachine(sqlite);
+
   return db;
+}
+
+/**
+ * 兼容老库：为 machines 表补齐新增列
+ */
+function ensureMachineColumns(sqlite: Database.Database): void {
+  const cols = sqlite.prepare(`PRAGMA table_info(machines)`).all() as { name: string }[];
+  const names = new Set(cols.map(c => c.name));
+  if (!names.has('os_version')) {
+    sqlite.exec(`ALTER TABLE machines ADD COLUMN os_version TEXT`);
+  }
+  if (!names.has('builtin')) {
+    sqlite.exec(`ALTER TABLE machines ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0`);
+  }
+}
+
+/**
+ * 确保 machines 表存在一条 builtin=1 的本机记录（local / localhost）。
+ * - 不存在则插入
+ * - 存在则刷新 osVersion 为当前系统版本
+ */
+function seedLocalMachine(sqlite: Database.Database): void {
+  const platform = os.platform(); // 'darwin' | 'linux' | 'win32' | ...
+  const osType = platform === 'darwin' ? 'mac' : platform === 'linux' ? 'linux' : platform;
+  const osVersion = `${os.type()} ${os.release()}`;
+
+  const existing = sqlite.prepare(`SELECT id FROM machines WHERE builtin = 1 LIMIT 1`).get() as { id: number } | undefined;
+
+  if (!existing) {
+    sqlite.prepare(`
+      INSERT INTO machines (name, host, port, os_type, os_version, auth_type, username, status, builtin)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run('local', 'localhost', 22, osType, osVersion, 'password', os.userInfo().username || 'local', 'online');
+  } else {
+    // 启动时刷新本机系统版本（系统升级或迁移后）
+    sqlite.prepare(`
+      UPDATE machines SET os_type = ?, os_version = ?, status = 'online', updated_at = datetime('now')
+      WHERE id = ?
+    `).run(osType, osVersion, existing.id);
+  }
 }
 
 /** 全局数据库单例（延迟初始化） */
