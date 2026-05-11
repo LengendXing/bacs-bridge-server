@@ -17,6 +17,10 @@
 - [x] 对外服务地址配置项（app_settings KV）+ X-Forwarded-* 反代支持 ✅ 2026-05-11
 - [x] 顺手修：Bindings 选本机环境变量时模型下拉为空 ✅ 2026-05-11
 
+## v1.0.6 · 2026-05-11
+- [x] extractReply 二次防御：识别被边框包裹的 `│ ❯ │` 空闲光标 + 加强 after 过滤 + cleaned 边框光标过滤（替代 v1.0.5 的 2b4e01d，6/6 测试） ✅ 2026-05-11
+- [x] 新增 cc-adapter.extractReply 单元测试 6 个场景防回归 ✅ 2026-05-11
+
 ## v1.0.5 · 2026-05-11
 - [x] 修复 SSE 1002：6 个 router 改为逐路由挂 requireAuth（避免 router.use 拦截 SSE） ✅ 2026-05-11
 
