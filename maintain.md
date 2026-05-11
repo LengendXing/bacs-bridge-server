@@ -1,5 +1,20 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.5 - 2026-05-11
+### 变更内容
+- **修复 Web 系统日志 SSE 1002 错误（关键 bug）**：`bindings/providers/models/sessions/machines/logs` 6 个 router 之前都在顶部使用 `router.use(requireAuth)` 且未限定路径，导致任何 `/api/*` 请求（包括 `/api/logs/stream`）进入 router 时都被 requireAuth 拦截 → 浏览器 EventSource 走 `?token=` 永远拿到 1002。改为每条路由单独挂 `requireAuth`，SSE 路由独立鉴权（已支持 query token）
+
+### 影响范围
+- src/server/routes/bindings.ts、providers.ts、models.ts、sessions.ts、machines.ts、logs.ts
+- package.json（v1.0.4 → v1.0.5）
+
+### 验证方式
+- 浏览器登录后访问 `/logs` 页面 → 系统日志标签 → 状态从「未连接」变为「已连接」，实时显示
+- curl 验证：`curl -s -i 'http://host/api/logs/stream?token=<JWT>'` 返回 200 + `text/event-stream`
+- curl 不带 token 仍返回 401 文本 `Unauthorized`（鉴权未关闭）
+
+---
+
 ## v1.0.4 - 2026-05-11
 ### 变更内容
 - **机器管理：默认本机记录**：启动时自动 seed 一条 `local/localhost` 记录（builtin=1），写入当前系统版本（如 `Darwin 22.6.0`）。本机不允许编辑/删除/SSH 测试，操作列显示 `-`，路由层硬拦截

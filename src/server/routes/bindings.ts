@@ -11,9 +11,8 @@ import { getExecutor } from '../executor/factory.js';
 import { getChannel } from '../channel/router.js';
 
 const router = Router();
-router.use(requireAuth);
 
-router.get('/api/status', async (_req, res) => {
+router.get('/api/status', requireAuth, async (_req, res) => {
   try {
     const db = getDb();
     const allBindings = db.select().from(bindings).all();
@@ -87,7 +86,7 @@ router.get('/api/status', async (_req, res) => {
   }
 });
 
-router.post('/api/bind', async (req, res) => {
+router.post('/api/bind', requireAuth, async (req, res) => {
   const { processName, cliKind, providerId, modelId, feishuAppId, feishuAppSecret, machineId } = req.body;
 
   if (!processName) {
@@ -160,7 +159,7 @@ router.post('/api/bind', async (req, res) => {
   res.json({ code: 0, data: result });
 });
 
-router.post('/api/bind/mount', async (req, res) => {
+router.post('/api/bind/mount', requireAuth, async (req, res) => {
   const { processName, cliKind, providerId, modelId, feishuAppId, feishuAppSecret, machineId } = req.body;
 
   if (!processName) {
@@ -228,7 +227,7 @@ router.post('/api/bind/mount', async (req, res) => {
   res.json({ code: 0, data: result });
 });
 
-router.post('/api/edit', async (req, res) => {
+router.post('/api/edit', requireAuth, async (req, res) => {
   const { id, feishuAppId, feishuAppSecret, providerId, modelId, machineId } = req.body;
 
   if (!id) {
@@ -284,7 +283,7 @@ router.post('/api/edit', async (req, res) => {
   res.json({ code: 0, data: result });
 });
 
-router.post('/api/unbind', async (req, res) => {
+router.post('/api/unbind', requireAuth, async (req, res) => {
   const { id, killProcess } = req.body;
 
   if (!id) {

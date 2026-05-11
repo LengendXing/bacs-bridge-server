@@ -16,8 +16,6 @@ import logger from '../middleware/logger.js';
 
 const router = Router();
 
-router.use(requireAuth);
-
 /**
  * GET /api/models?providerId=X
  *
@@ -25,7 +23,7 @@ router.use(requireAuth);
  * - 不带 providerId → 返回所有模型
  * - 带 providerId → 返回指定服务商的模型
  */
-router.get('/api/models', (req, res) => {
+router.get('/api/models', requireAuth, (req, res) => {
   const db = getDb();
   const providerId = req.query.providerId ? parseInt(req.query.providerId as string, 10) : undefined;
 
@@ -46,7 +44,7 @@ router.get('/api/models', (req, res) => {
  * - 调用服务商 /v1/models API
  * - 替换该服务商的所有模型记录
  */
-router.post('/api/models/refresh/:providerId', async (req, res) => {
+router.post('/api/models/refresh/:providerId', requireAuth, async (req, res) => {
   const providerId = parseInt(req.params.providerId, 10);
   if (isNaN(providerId)) {
     return res.json({ code: 1003, message: '无效的服务商 ID' });
@@ -77,7 +75,7 @@ router.post('/api/models/refresh/:providerId', async (req, res) => {
  *
  * 手动覆盖模型的 cliKind 标记
  */
-router.put('/api/models/:id/cli-kind', (req, res) => {
+router.put('/api/models/:id/cli-kind', requireAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { cliKind } = req.body;
 
