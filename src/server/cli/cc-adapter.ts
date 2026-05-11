@@ -7,21 +7,29 @@ const CLAUDE_BIN = process.env.CLAUDE_BIN || `${process.env.HOME}/.local/bin/cla
 
 function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
   let innerCmd = CLAUDE_BIN;
+  const envParts: string[] = [];
 
   if (cfg.providerKind === 'custom') {
-    const parts: string[] = [];
     if (cfg.envVars.ANTHROPIC_BASE_URL) {
       const safeUrl = cfg.envVars.ANTHROPIC_BASE_URL.replace(/'/g, "'\\''");
-      parts.push(`ANTHROPIC_BASE_URL='${safeUrl}'`);
+      envParts.push(`ANTHROPIC_BASE_URL='${safeUrl}'`);
     }
     if (cfg.envVars.ANTHROPIC_API_KEY) {
       const safeKey = cfg.envVars.ANTHROPIC_API_KEY.replace(/'/g, "'\\''");
-      parts.push(`ANTHROPIC_API_KEY='${safeKey}'`);
+      envParts.push(`ANTHROPIC_API_KEY='${safeKey}'`);
     }
-    parts.push('ANTHROPIC_AUTH_TOKEN=');
-    if (parts.length) {
-      innerCmd = `env ${parts.join(' ')} ${innerCmd}`;
-    }
+    envParts.push('ANTHROPIC_AUTH_TOKEN=');
+  }
+
+  // 模型注入（无论 providerKind，只要 binding 指定了模型就生效）
+  if (cfg.modelId) {
+    const safeModel = cfg.modelId.replace(/'/g, "'\\''");
+    envParts.push(`ANTHROPIC_MODEL='${safeModel}'`);
+    innerCmd = `${CLAUDE_BIN} --model '${safeModel}'`;
+  }
+
+  if (envParts.length) {
+    innerCmd = `env ${envParts.join(' ')} ${innerCmd}`;
   }
 
   const escaped = innerCmd.replace(/"/g, '\\"');

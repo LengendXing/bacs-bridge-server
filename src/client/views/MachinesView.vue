@@ -27,15 +27,19 @@
             <td colspan="6" class="text-center" style="color: var(--text-secondary)">暂无机器，点击「添加机器」注册远程服务器</td>
           </tr>
           <tr v-for="m in machineList" :key="m.id">
-            <td style="font-weight: 500">{{ m.name }}</td>
+            <td style="font-weight: 500">
+              {{ m.name }}
+              <span v-if="m.builtin" class="badge badge-info" style="margin-left: 6px; font-size: 10px">本机</span>
+            </td>
             <td style="color: var(--text-secondary)">{{ m.host }}:{{ m.port }}</td>
-            <td>{{ m.osType }}</td>
-            <td>{{ m.authType === 'password' ? '密码' : '密钥' }}</td>
+            <td>{{ m.osVersion || m.osType }}</td>
+            <td>{{ m.builtin ? '-' : (m.authType === 'password' ? '密码' : '密钥') }}</td>
             <td>
               <span :class="statusClass(m.status)">{{ statusLabel(m.status) }}</span>
             </td>
             <td>
-              <div class="flex items-center gap-1">
+              <span v-if="m.builtin" style="color: var(--text-secondary)">-</span>
+              <div v-else class="flex items-center gap-1">
                 <button class="btn-mac btn-mac-sm" @click="openEdit(m)">编辑</button>
                 <button class="btn-mac btn-mac-sm" :disabled="testingId === m.id" @click="testConn(m)">
                   {{ testingId === m.id ? '测试中...' : '测试连接' }}

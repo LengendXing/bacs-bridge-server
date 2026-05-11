@@ -102,24 +102,41 @@ export function startOutputPolling(
     return _executor;
   }
 
-  const timerId = setInterval(async () => {
-    const executor = await getEx();
-    const res = await adapter.capturePane(`${adapter.sessionPrefix}-${session.processName}`, undefined, executor);
-    if (res.error) {
-      clearInterval(timerId);
-      return;
-    }
+  const timerId = setInterval(() => {
+    getEx()
+      .then((executor) =>
+        adapter.capturePane(
+          `${adapter.sessionPrefix}-${session.processName}`,
+          undefined,
+          executor,
+        ),
+      )
+      .then((res) => {
+        if (res.error) {
+          clearInterval(timerId);
+          import('../middleware/logger.js').then((m) =>
+            m.default.log('error', '轮询 capturePane 失败，停止轮询', res.error),
+          );
+          return;
+        }
 
-    session.accumulated = res.output;
+        session.accumulated = res.output;
 
-    if (res.output.length > lastLength || res.output.length < lastLength * 0.5) {
-      lastLength = res.output.length;
-      if (session.stableTimer) clearTimeout(session.stableTimer);
-      session.stableTimer = setTimeout(() => {
-        tryFinish(session, adapter, onReply);
-      }, stableMs);
-    }
-    lastLength = res.output.length;
+        if (res.output.length > lastLength || res.output.length < lastLength * 0.5) {
+          lastLength = res.output.length;
+          if (session.stableTimer) clearTimeout(session.stableTimer);
+          session.stableTimer = setTimeout(() => {
+            tryFinish(session, adapter, onReply);
+          }, stableMs);
+        }
+        lastLength = res.output.length;
+      })
+      .catch((e: Error) => {
+        clearInterval(timerId);
+        import('../middleware/logger.js').then((m) =>
+          m.default.log('error', '轮询异常，停止轮询', e.message),
+        );
+      });
   }, pollInterval);
 
   setTimeout(() => tryFinish(session, adapter, onReply), 7000);
@@ -142,33 +159,59 @@ function tryFinish(
     return _executor;
   }
 
-  getEx().then(executor => {
-    return adapter.isIdle(processName, executor);
-  }).then(idle => {
-    if (!idle || session.replied) return;
-    if (sessions.get(processName) !== session) return;
-
-    setTimeout(async () => {
-      if (session.replied) return;
+  getEx()
+    .then((executor) => adapter.isIdle(processName, executor))
+    .then((idle) => {
+      if (!idle || session.replied) return;
       if (sessions.get(processName) !== session) return;
 
-      const executor = await getEx();
-      const idle2 = await adapter.isIdle(processName, executor);
-      if (!idle2) return;
+      setTimeout(() => {
+        if (session.replied) return;
+        if (sessions.get(processName) !== session) return;
 
-      const fresh = await adapter.capturePane(`${adapter.sessionPrefix}-${processName}`, undefined, executor);
-      if (!fresh.error && fresh.output.length > (session.accumulated || '').length) {
-        session.accumulated = fresh.output;
-      }
+        getEx()
+          .then((executor) => adapter.isIdle(processName, executor))
+          .then((idle2) => {
+            if (!idle2) return;
 
-      const reply = adapter.extractReply(session.accumulated, session.ctx.msgText);
-      if (!reply) {
-        onReply(session, '');
-        return;
-      }
+            return adapter
+              .capturePane(
+                `${adapter.sessionPrefix}-${processName}`,
+                undefined,
+                _executor!,
+              )
+              .then((fresh) => {
+                if (
+                  !fresh.error &&
+                  fresh.output.length > (session.accumulated || '').length
+                ) {
+                  session.accumulated = fresh.output;
+                }
 
-      session.replied = true;
-      onReply(session, reply);
-    }, 500);
-  });
+                const reply = adapter.extractReply(
+                  session.accumulated,
+                  session.ctx.msgText,
+                );
+                if (!reply) {
+                  onReply(session, '');
+                  return;
+                }
+
+                onReply(session, reply);
+              });
+          })
+          .catch((e: Error) => {
+            import('../middleware/logger.js').then((m) =>
+              m.default.log('error', 'tryFinish 完成检测异常', e.message),
+            );
+            session.replied = true;
+            onReply(session, '');
+          });
+      }, 500);
+    })
+    .catch((e: Error) => {
+      import('../middleware/logger.js').then((m) =>
+        m.default.log('error', 'tryFinish isIdle 异常', e.message),
+      );
+    });
 }
