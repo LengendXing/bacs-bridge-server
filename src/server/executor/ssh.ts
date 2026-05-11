@@ -235,13 +235,18 @@ export class SshExecutor implements RemoteExecutor {
     const exists = await this.sessionExists(sessionName);
     if (!exists) return { ok: false, error: `会话 ${sessionName} 不在线` };
     try {
+      // 远程 SSH 下每次 exec 是独立 channel，4 步分开调用会让 Enter 落到 cc TUI 还没消化完 paste
+      // 的时机，导致消息卡在输入框未提交（capturePane 拿到的还是上一轮内容 → 飞书看到"重复回复"）。
+      // 合并为单次 ssh exec：load-buffer → paste-buffer → delete-buffer → sleep 0.25 → send-keys C-m
+      // 使用 C-m 而非字符串 "Enter"，更可靠地触发 TUI 的提交。
       const b64 = Buffer.from(text, 'utf-8').toString('base64');
-      const loadResult = await this.exec(`echo ${b64} | base64 -d | tmux load-buffer -b cli_in -`);
-      if (!loadResult.ok) return { ok: false, error: `load-buffer 失败: ${loadResult.error}` };
-      const pasteResult = await this.exec(`tmux paste-buffer -b cli_in -t ${sessionName}`);
-      if (!pasteResult.ok) return { ok: false, error: `paste-buffer 失败: ${pasteResult.error}` };
-      await this.exec(`tmux delete-buffer -b cli_in 2>/dev/null || true`);
-      await this.exec(`tmux send-keys -t ${sessionName} Enter`);
+      const script =
+        `echo ${b64} | base64 -d | tmux load-buffer -b cli_in - && ` +
+        `tmux paste-buffer -b cli_in -t ${sessionName} && ` +
+        `tmux delete-buffer -b cli_in 2>/dev/null; ` +
+        `sleep 0.25 && tmux send-keys -t ${sessionName} C-m`;
+      const r = await this.exec(script);
+      if (!r.ok) return { ok: false, error: `sendInput 失败: ${r.error || r.stderr}` };
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: `send-keys 失败: ${e.message}` };

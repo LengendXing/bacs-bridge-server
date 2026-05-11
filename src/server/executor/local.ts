@@ -52,11 +52,16 @@ export class LocalExecutor implements RemoteExecutor {
     const exists = await this.sessionExists(sessionName);
     if (!exists) return { ok: false, error: `会话 ${sessionName} 不在线` };
     try {
+      // 与 ssh.ts 保持一致：合并为单条 shell 命令 + 短 sleep + C-m，避免 cc TUI 在
+      // paste 后立刻收到 Enter 时机过早而吞掉 Enter，导致消息卡在输入框
       const b64 = Buffer.from(text, 'utf-8').toString('base64');
-      await this.exec(`echo ${b64} | base64 -d | tmux load-buffer -b cli_in -`);
-      await this.exec(`tmux paste-buffer -b cli_in -t ${sessionName}`);
-      await this.exec(`tmux delete-buffer -b cli_in 2>/dev/null || true`);
-      await this.exec(`tmux send-keys -t ${sessionName} Enter`);
+      const script =
+        `echo ${b64} | base64 -d | tmux load-buffer -b cli_in - && ` +
+        `tmux paste-buffer -b cli_in -t ${sessionName} && ` +
+        `tmux delete-buffer -b cli_in 2>/dev/null; ` +
+        `sleep 0.25 && tmux send-keys -t ${sessionName} C-m`;
+      const r = await this.exec(script);
+      if (!r.ok) return { ok: false, error: `sendInput 失败: ${r.error || r.stderr}` };
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: `send-keys 失败: ${e.message}` };
