@@ -8,10 +8,9 @@ import { encryptCredential, sanitizeMachine } from '../crypto/credentials.js';
 import { invalidateExecutor } from '../executor/factory.js';
 
 const router = Router();
-router.use(requireAuth);
 
 // GET /api/machines
-router.get('/api/machines', (_req, res) => {
+router.get('/api/machines', requireAuth, (_req, res) => {
   const db = getDb();
   const all = db.select().from(machines).all();
   const sanitized = all.map(m => sanitizeMachine(m));
@@ -19,7 +18,7 @@ router.get('/api/machines', (_req, res) => {
 });
 
 // GET /api/machines/:id
-router.get('/api/machines/:id', (req, res) => {
+router.get('/api/machines/:id', requireAuth, (req, res) => {
   const db = getDb();
   const id = Number(req.params.id);
   const machine = db.select().from(machines).where(eq(machines.id, id)).get();
@@ -28,7 +27,7 @@ router.get('/api/machines/:id', (req, res) => {
 });
 
 // POST /api/machines
-router.post('/api/machines', (req, res) => {
+router.post('/api/machines', requireAuth, (req, res) => {
   const { name, host, port, osType, authType, username, password, privateKey, passphrase, notes } = req.body;
   if (!name || !host || !username) {
     return res.json({ code: 1003, message: '名称、IP、用户名为必填项' });
@@ -74,7 +73,7 @@ router.post('/api/machines', (req, res) => {
 });
 
 // PUT /api/machines/:id
-router.put('/api/machines/:id', async (req, res) => {
+router.put('/api/machines/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const db = getDb();
   const existing = db.select().from(machines).where(eq(machines.id, id)).get();
@@ -126,7 +125,7 @@ router.put('/api/machines/:id', async (req, res) => {
 });
 
 // DELETE /api/machines/:id
-router.delete('/api/machines/:id', async (req, res) => {
+router.delete('/api/machines/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const db = getDb();
   const existing = db.select().from(machines).where(eq(machines.id, id)).get();
@@ -156,7 +155,7 @@ router.delete('/api/machines/:id', async (req, res) => {
 });
 
 // POST /api/machines/:id/test
-router.post('/api/machines/:id/test', async (req, res) => {
+router.post('/api/machines/:id/test', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const db = getDb();
   const machine = db.select().from(machines).where(eq(machines.id, id)).get();
@@ -221,7 +220,7 @@ router.post('/api/machines/:id/test', async (req, res) => {
 });
 
 // POST /api/machines/:id/heartbeat
-router.post('/api/machines/:id/heartbeat', async (req, res) => {
+router.post('/api/machines/:id/heartbeat', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const db = getDb();
   const machine = db.select().from(machines).where(eq(machines.id, id)).get();
