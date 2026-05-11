@@ -1,5 +1,45 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.7 - 2026-05-11
+### 变更内容
+- **修复远程绑定的 ENV 注入语义**：SSH 绑定到远程机后，飞书收到 `Not logged in · Please run /login`。三处根因：
+  1. `CLAUDE_BIN` 用 `${process.env.HOME}/.local/bin/claude` 拼出本地 bridge 的家目录路径，发到远程后路径不存在 → 退而执行远程 PATH 里的 `claude`；
+  2. `custom` 模式只注入 `ANTHROPIC_API_KEY`，但第三方中转站普遍只认 `ANTHROPIC_AUTH_TOKEN`；
+  3. 残留一行 `envParts.push('ANTHROPIC_AUTH_TOKEN=')` 把 token 显式清空，反而压制了远程已有 OAuth 凭据，也没补充新 token → 远程 claude 处于"既没 env 又没 OAuth"的失登录状态。
+- **改动**（仅 ENV 层临时覆盖，绝不修改远程主机 `~/.claude/` 与 rc 文件）：
+  - `src/server/cli/cc-adapter.ts`：
+    - `CLAUDE_BIN` 默认改为裸 `claude`，依赖远程 PATH 解析；仍支持 `CLAUDE_BIN` 环境变量覆盖
+    - `custom` 模式同时注入 `ANTHROPIC_BASE_URL` + `ANTHROPIC_API_KEY` + `ANTHROPIC_AUTH_TOKEN`（后两者取同值）
+    - 用 `env -u CLAUDE_CODE_OAUTH_TOKEN` 屏蔽远程 `claude login` 写入的 OAuth 令牌（仅在本次子进程层生效）
+    - 抽出 `shellSingleQuote` 工具函数复用单引号转义
+  - `src/server/session/manager.ts`：`buildCliConfig` 的 `cc` 分支 envVars 增加 `ANTHROPIC_AUTH_TOKEN: provider.apiKey`
+- **行为对照**（按你"绑定即配置"诉求验证）：
+  | 绑定 provider | 机器 | bridge 注入 | 远程主机 `~/.claude/` |
+  |---|---|---|---|
+  | local | 本机 | 无 | 用本机配置 |
+  | local | 远程 | 无 | 用远程本机配置 ✅ |
+  | custom | 本机 | BASE/KEY/TOKEN，unset OAUTH | 不动 ✅ |
+  | custom | 远程 | BASE/KEY/TOKEN，unset OAUTH | **不动**（只在 tmux 子进程 ENV 临时覆盖）✅ |
+
+### 测试
+- `src/server/cli/cc-adapter.test.ts` 新增 6 个 `buildStartCmd` 用例：
+  1. `local` 不注入任何 env
+  2. `custom` 同时注入 `API_KEY` + `AUTH_TOKEN` 且 `-u CLAUDE_CODE_OAUTH_TOKEN`
+  3. 不再产生 `ANTHROPIC_AUTH_TOKEN=` 清空形式
+  4. 仅给 `API_KEY` 时 fallback 同步到 `AUTH_TOKEN`
+  5. 单引号转义安全
+  6. `CLAUDE_BIN` 未设时不带本地 HOME 路径
+- 共 13 个测试用例（原 7 个 extractReply + 新 6 个 buildStartCmd）全部通过
+- `npm run build` 通过；`npm run lint` 因仓库历史缺 eslint.config.js 未跑（非本次范围）
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts`（CLAUDE_BIN + buildStartCmd 重写）
+- `src/server/cli/cc-adapter.test.ts`（新增 buildStartCmd describe 块）
+- `src/server/session/manager.ts`（envVars 增加 ANTHROPIC_AUTH_TOKEN）
+- `package.json`（1.0.6 → 1.0.7）
+
+---
+
 ## v1.0.6 - 2026-05-11
 ### 变更内容
 - **修复 extractReply 二次防御（替代 v1.0.5 的 2b4e01d 版本）**：上一版只识别裸 `❯`（`/^\s*❯\s*$/`），漏掉 cc TUI 实际渲染的 `│ ❯ │`（被边框包裹的空闲光标）→ 残留输出仍含 `│ ❯ │` 提示行
