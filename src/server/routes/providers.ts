@@ -16,15 +16,14 @@ import logger from '../middleware/logger.js';
 
 const router = Router();
 
-// ── 所有服务商接口均需认证 ──
-router.use(requireAuth);
+// ── 所有服务商接口均需认证（逐路由挂载，避免拦截 SSE 等其他 router 的请求） ──
 
 /**
  * GET /api/providers
  *
  * 列出所有服务商（api_key 脱敏）
  */
-router.get('/api/providers', (_req, res) => {
+router.get('/api/providers', requireAuth, (_req, res) => {
   const db = getDb();
   const all = db.select().from(providers).all();
   // api_key 脱敏：只显示前6位和后4位
@@ -43,7 +42,7 @@ router.get('/api/providers', (_req, res) => {
  * - kind='custom' → 必须提供 base_url + api_key
  * - 创建后自动拉取模型列表
  */
-router.post('/api/providers', async (req, res) => {
+router.post('/api/providers', requireAuth, async (req, res) => {
   const { name, kind, baseUrl, apiKey } = req.body;
 
   if (!name) {
@@ -89,7 +88,7 @@ router.post('/api/providers', async (req, res) => {
  *
  * 编辑服务商（修改 base_url/api_key 后自动重新拉取模型）
  */
-router.put('/api/providers/:id', async (req, res) => {
+router.put('/api/providers/:id', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     return res.json({ code: 1003, message: '无效的 ID' });
@@ -137,7 +136,7 @@ router.put('/api/providers/:id', async (req, res) => {
  *
  * 删除服务商（级联删除其模型列表）
  */
-router.delete('/api/providers/:id', (req, res) => {
+router.delete('/api/providers/:id', requireAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     return res.json({ code: 1003, message: '无效的 ID' });
