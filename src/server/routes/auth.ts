@@ -15,6 +15,7 @@ import { getDb } from '../db/index.js';
 import { users, trustedDevices } from '../db/schema.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { signToken, verifyToken, type JwtPayload } from '../auth/jwt.js';
+import { inferRequestOrigin, readSetting } from './settings.js';
 import { generateSecret, buildOtpAuthUri, verifyTotp, generateRecoveryCodes, verifyRecoveryCode } from '../auth/totp.js';
 import { createTrustedDevice, verifyTrustedDevice, cleanExpiredDevices, describeUserAgent } from '../auth/trusted-device.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -367,6 +368,47 @@ router.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
   logger.log('info', `用户 ${user.username} 修改密码`);
   res.json({ code: 0, message: '密码已修改' });
+});
+
+/**
+ * POST /api/auth/qr-token
+ *
+ * 生成快捷登录二维码所需的短期 JWT（60 秒）。
+ * 客户端扫码后用此 token 调 /api/auth/exchange 换长 token。
+ */
+router.post('/api/auth/qr-token', requireAuth, (req, res) => {
+  const userId = req.user!.sub;
+  const username = req.user!.username;
+  const QR_TTL_SECONDS = 60;
+  const token = signToken({ sub: userId, username }, QR_TTL_SECONDS);
+  const server = readSetting('external_url') || inferRequestOrigin(req);
+  res.json({
+    code: 0,
+    data: {
+      token,
+      server,
+      expiresIn: QR_TTL_SECONDS,
+      expiresAt: Date.now() + QR_TTL_SECONDS * 1000,
+    },
+  });
+});
+
+/**
+ * POST /api/auth/exchange
+ *
+ * 客户端用扫码得到的短期 JWT 换取一个长 token（沿用 config.jwt.expiresIn）。
+ * 仅校验签名 + 有效期，token 本身只要还在 60s 内都算合法。
+ */
+router.post('/api/auth/exchange', (req, res) => {
+  const token = (req.body?.token as string)
+    || (req.headers['x-auth-token'] as string)
+    || req.cookies?.auth_token;
+  if (!token) return res.json({ code: 1003, message: '缺少 token' });
+  const payload = verifyToken(token);
+  if (!payload) return res.json({ code: 1002, message: 'token 无效或已过期' });
+  const longToken = signToken({ sub: payload.sub, username: payload.username });
+  logger.log('info', `用户 ${payload.username} 通过快捷登录换取长 token`);
+  res.json({ code: 0, data: { token: longToken } });
 });
 
 export default router;

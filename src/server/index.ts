@@ -36,6 +36,7 @@ import sessionRoutes from './routes/sessions.js';
 import machineRoutes from './routes/machines.js';
 import logRoutes from './routes/logs.js';
 import healthRoutes from './routes/health.js';
+import settingsRoutes from './routes/settings.js';
 
 // ── ESM-safe __dirname ────────────────────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
@@ -137,6 +138,9 @@ app.use(machineRoutes);
 
 /** Log viewer — Phase 2 */
 app.use(logRoutes);
+
+/** App settings (KV) — v1.0.4-Beta */
+app.use(settingsRoutes);
 
 // ── Start server ───────────────────────────────────────────────────────
 
