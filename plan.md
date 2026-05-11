@@ -1,5 +1,9 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
+## v1.0.7 · 2026-05-11
+- [x] 修复远程绑定 ENV 注入：CLAUDE_BIN 去本地 HOME / custom 同时注入 API_KEY+AUTH_TOKEN / env -u 屏蔽远程 OAuth（不动远程文件） ✅ 2026-05-11
+- [x] 新增 buildStartCmd 6 个单元测试防回归 ✅ 2026-05-11
+
 ## v1.0.0 · 全面重构（2026-05-10）
 
 - [x] Phase 1: Vite + Vue 3 + TypeScript 项目初始化 ✅ 2026-05-10
