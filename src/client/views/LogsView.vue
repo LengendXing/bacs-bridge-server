@@ -90,9 +90,13 @@ let eventSource: EventSource | null = null;
 
 function connectSSE() {
   if (eventSource) { eventSource.close(); }
-  // SSE 需要认证，token 放 URL query
-  const auth = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || '';
-  eventSource = new EventSource(`/api/logs/stream?token=${encodeURIComponent(auth)}`);
+  // SSE 需要认证，token 放 URL query（与 stores/auth.ts 一致使用 sessionStorage）
+  const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || '';
+  if (!token) {
+    connected.value = false;
+    return;
+  }
+  eventSource = new EventSource(`/api/logs/stream?token=${encodeURIComponent(token)}`);
 
   eventSource.onopen = () => { connected.value = true; };
   eventSource.onmessage = (event) => {

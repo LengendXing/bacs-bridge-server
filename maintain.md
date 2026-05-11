@@ -1,5 +1,31 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.4 - 2026-05-11
+### 变更内容
+- **机器管理：默认本机记录**：启动时自动 seed 一条 `local/localhost` 记录（builtin=1），写入当前系统版本（如 `Darwin 22.6.0`）。本机不允许编辑/删除/SSH 测试，操作列显示 `-`，路由层硬拦截
+- **菜单顺序调整**：首页 → 机器 → 服务商 → 绑定 → 日志 → 设置
+- **系统日志页面接通**：修复 `/api/logs/stream` 文件名与 logger 写入文件名不一致（`bridge-${date}.log` vs `${date}.log`）导致 SSE 永远空。新增初始 200 行回放 + 25s 心跳 + token 来源统一
+- **绑定弹窗增加模型字段**：表单顺序调整为「CLI 类型 → 运行机器 → 服务商 → 模型 → 飞书 ID/密钥」。模型下拉按 `cliKind + providerId` 过滤；CLI/服务商变更时自动校验当前 modelId 是否仍有效
+- **编辑绑定支持改模型**：CLI 类型保持禁改，模型字段开放编辑，提交时携带 `modelId`
+- **Bug 修复（cc-adapter）**：`buildStartCmd` 之前未注入模型，导致绑定指定模型对 Claude Code 无效。现在注入 `ANTHROPIC_MODEL` 环境变量并追加 `--model` 参数
+- **Bug 修复（编辑接口）**：`/api/edit` 当 `feishuAppSecret` 为空字符串时不再覆盖原密钥（前端编辑表单留空表示不改）
+- **schema 扩展**：machines 表新增 `os_version`、`builtin` 列；运行时 `ALTER TABLE` 兼容老库
+- **executor 路由本机短路**：`getExecutor` 检测到 builtin 机器走 LocalExecutor，避免 SSH 自连接
+
+### 影响范围
+- src/server/db/schema.ts、src/server/db/index.ts（新增 ensureMachineColumns/seedLocalMachine）
+- src/server/routes/machines.ts、src/server/routes/bindings.ts、src/server/routes/logs.ts
+- src/server/cli/cc-adapter.ts、src/server/executor/factory.ts
+- src/client/views/LayoutView.vue、MachinesView.vue、BindingsView.vue、LogsView.vue
+- src/shared/types.ts、package.json（v1.0.3 → v1.0.4）
+
+### Review 备注
+- 当前最近提交 `741915c` 已正确：`tryFinish` 不再提前置 `replied=true`
+- 项目缺少 ESLint 9 配置（`eslint.config.js` 不存在）；已知问题不阻塞本次迭代
+- npm audit 报 bcrypt → @mapbox/node-pre-gyp → tar 链路 14 个漏洞，修复需升级 bcrypt 6（breaking change），不在本次范围
+
+---
+
 ## v1.0.2 - 2026-05-10
 ### 变更内容
 - **菜单图标 macOS 线性风格**：用 lucide-vue-next 线性图标替换 emoji
