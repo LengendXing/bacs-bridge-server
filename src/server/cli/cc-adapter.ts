@@ -51,19 +51,52 @@ function extractReply(raw: string, userMessage: string): string {
 
   let rawLines = raw.split(/\r?\n/);
 
+  // 切割本轮回复：定位"本轮用户输入行"，其后即为本轮回复。
+  // TUI 中用户输入会以 `❯ <msg>` 形式回显，长消息会被换行框换行成多个 `❯ <part1>` / `<part2>`。
+  // 同一个 capturePane 输出里会包含历史所有轮次。必须可靠切到"本轮"。
   if (userMessage && userMessage.trim()) {
     const needle = userMessage.trim();
-    const probe = needle.slice(0, 60);
+    const probes = [needle.slice(0, 30), needle.slice(0, 12), needle.slice(0, 6)].filter(p => p.length >= 3);
     let cutIdx = -1;
-    for (let i = rawLines.length - 1; i >= 0; i--) {
-      const line = rawLines[i];
-      if (/^\s*❯\s/.test(line) && line.includes(probe)) {
-        cutIdx = i;
-        break;
+
+    // 1) 倒序找 `❯ ...` 且包含 probe 的行
+    for (const probe of probes) {
+      for (let i = rawLines.length - 1; i >= 0; i--) {
+        const line = rawLines[i];
+        if (/^\s*❯\s/.test(line) && line.includes(probe)) { cutIdx = i; break; }
+      }
+      if (cutIdx >= 0) break;
+    }
+
+    // 2) 找不到带 ❯ 的，回退：任意一行包含 probe（避免被 TUI 换行截断成 `❯ <p1>` + `<p2>` 时漏判）
+    if (cutIdx < 0) {
+      for (const probe of probes) {
+        for (let i = rawLines.length - 1; i >= 0; i--) {
+          if (rawLines[i].includes(probe)) { cutIdx = i; break; }
+        }
+        if (cutIdx >= 0) break;
       }
     }
+
     if (cutIdx >= 0) {
       rawLines = rawLines.slice(cutIdx + 1);
+    }
+  }
+
+  // 二次防御：切完后若仍出现 `❯ ...` 行（一般是切到了更早一轮，本轮 prompt 还在切片里），
+  // 以**最后一个** `❯` 行为基准，把它之前的内容（含该行）全部丢弃，保留其后的回复。
+  let lastPromptIdx = -1;
+  for (let i = rawLines.length - 1; i >= 0; i--) {
+    if (/^\s*❯\s/.test(rawLines[i])) { lastPromptIdx = i; break; }
+  }
+  if (lastPromptIdx >= 0) {
+    // 若该 ❯ 行之后还有非空行，说明它是历史 prompt → 丢掉
+    // 若 ❯ 之后全部为空/纯框线，则它是"光标待命"行，保留前面的回复
+    const after = rawLines.slice(lastPromptIdx + 1).filter(l => l.trim() && !/^[\s│┃─━╭╰╯╮]+$/.test(l));
+    if (after.length > 0) {
+      rawLines = rawLines.slice(lastPromptIdx + 1);
+    } else {
+      rawLines = rawLines.slice(0, lastPromptIdx);
     }
   }
 
