@@ -19,7 +19,10 @@ function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
     if (cfg.envVars.OPENAI_API_KEY) lines.push(`export OPENAI_API_KEY=${shellSingleQuote(cfg.envVars.OPENAI_API_KEY)}`);
     if (cfg.modelId) lines.push(`export OPENAI_MODEL=${shellSingleQuote(cfg.modelId)}`);
   }
-  lines.push(`exec ${CODEX_BIN}`);
+  // codex CLI：模型用 `-m <id>`，effort 用 `-c model_reasoning_effort=<level>`（本地实测）
+  const modelArg = cfg.modelId ? ` -m ${shellSingleQuote(cfg.modelId)}` : '';
+  const effortArg = cfg.effort ? ` -c model_reasoning_effort=${shellSingleQuote(cfg.effort)}` : '';
+  lines.push(`exec ${CODEX_BIN}${modelArg}${effortArg}`);
 
   const bashScript = lines.join('; ');
   const escapedScript = bashScript.replace(/'/g, `'\\''`);

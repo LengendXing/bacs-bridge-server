@@ -1,5 +1,12 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
+## v1.0.9 · 2026-05-11
+- [x] 绑定表单新增 effort 字段：cc 支持 low~max，codex 支持 minimal~xhigh；按模型 maxEffort 截断 ✅ 2026-05-11
+- [x] cc-adapter 注入 `--effort`，codex-adapter 注入 `-c model_reasoning_effort=` ✅ 2026-05-11
+- [x] bindings 表新增 modelOverride（优先于 FK）+ effort 字段 ✅ 2026-05-11
+- [x] 服务商探查失败时回退内置默认模型 5+5 + 支持手输自定义模型 ID ✅ 2026-05-11
+- [x] 远程实测 root@49.12.243.33：`--model claude-opus-4-7 --effort max` → pane 显示 "Opus 4.7 with max effort · ◈ max" ✅ 2026-05-11
+
 ## v1.0.8 · 2026-05-11
 - [x] 彻底修复远程 Not logged in：用 bash -ilc 包裹 tmux 启动命令以加载远程 rc 文件，绕过 Ubuntu/Debian `[ -z "$PS1" ] && return` 守卫 ✅ 2026-05-11
 - [x] 去掉 ANTHROPIC_API_KEY 注入，避免 claude CLI 弹出确认页阻塞 tmux 会话 ✅ 2026-05-11

@@ -37,7 +37,9 @@ function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
   }
 
   const modelArg = cfg.modelId ? ` --model ${shellSingleQuote(cfg.modelId)}` : '';
-  lines.push(`exec ${CLAUDE_BIN}${modelArg}`);
+  // claude CLI 支持 `--effort low|medium|high|xhigh|max`（v2.1.138 实测）
+  const effortArg = cfg.effort ? ` --effort ${shellSingleQuote(cfg.effort)}` : '';
+  lines.push(`exec ${CLAUDE_BIN}${modelArg}${effortArg}`);
 
   // bash 脚本整体用单引号包裹给 bash -ilc，对内部单引号做 `'\''` 闭合-转义-再开闭合
   const bashScript = lines.join('; ');
