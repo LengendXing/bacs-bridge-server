@@ -89,7 +89,7 @@ router.post('/api/providers', requireAuth, async (req, res) => {
  * 编辑服务商（修改 base_url/api_key 后自动重新拉取模型）
  */
 router.put('/api/providers/:id', requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     return res.json({ code: 1003, message: '无效的 ID' });
   }
@@ -137,7 +137,7 @@ router.put('/api/providers/:id', requireAuth, async (req, res) => {
  * 删除服务商（级联删除其模型列表）
  */
 router.delete('/api/providers/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
     return res.json({ code: 1003, message: '无效的 ID' });
   }
