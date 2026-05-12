@@ -1,5 +1,6 @@
-import type { CliAdapter, CliStartConfig } from './types.js';
+import type { CliAdapter, CliStartConfig, CliState, ChoicePanel } from './types.js';
 import type { RemoteExecutor } from '../executor/types.js';
+import { extractChoicePanel as ccExtractChoicePanel, sendChoice as ccSendChoice } from './cc-adapter.js';
 
 const SESSION_PREFIX = 'codex';
 const CODEX_BIN = process.env.CODEX_BIN || 'codex';
@@ -32,19 +33,47 @@ function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
 }
 
 function isIdle(processName: string, executor: RemoteExecutor): Promise<boolean> {
+  return detectState(processName, executor).then((s) => s === 'idle');
+}
+
+function detectState(processName: string, executor: RemoteExecutor): Promise<CliState> {
   const sessionName = `${SESSION_PREFIX}-${processName}`;
-  return executor.capturePane(sessionName, 15).then(res => {
-    if (res.error) return false;
+  return executor.capturePane(sessionName, 60).then((res) => {
+    if (res.error) return 'working';
     const tail = res.output;
-    if (/\(suggest\)|\(auto-edit\)|\(full-auto\)/.test(tail)) return true;
-    if (/^\s*>\s*$/m.test(tail)) return true;
-    const lastLines = tail.split('\n').slice(-5).join('\n');
-    if (!/thinking|running|executing|processing/i.test(lastLines)) {
-      const lastNonEmpty = lastLines.split('\n').filter(l => l.trim()).pop() || '';
-      if (/^\s*>\s*$/.test(lastNonEmpty)) return true;
+
+    // 优先：决策面板
+    const panel = extractChoicePanel(tail);
+    if (panel) return 'awaiting_choice';
+
+    // 工作中
+    if (/thinking|running|executing|processing/i.test(tail.split('\n').slice(-8).join('\n'))) {
+      return 'working';
     }
-    return false;
+
+    // 空闲：codex 输入光标 ">"（或带 mode 标记）
+    if (/\(suggest\)|\(auto-edit\)|\(full-auto\)/.test(tail)) return 'idle';
+    if (/^\s*>\s*$/m.test(tail)) return 'idle';
+    const lastLines = tail.split('\n').slice(-5).join('\n');
+    const lastNonEmpty = lastLines.split('\n').filter((l) => l.trim()).pop() || '';
+    if (/^\s*>\s*$/.test(lastNonEmpty)) return 'idle';
+
+    return 'working';
   });
+}
+
+/** codex 的决策面板与 cc 类似（同样是 ╭─...─╮ 框 + 数字./❯ 选项），复用 cc 的实现 */
+function extractChoicePanel(raw: string): ChoicePanel | null {
+  return ccExtractChoicePanel(raw);
+}
+
+function sendChoice(
+  sessionName: string,
+  userReply: string,
+  panel: ChoicePanel,
+  executor: RemoteExecutor,
+): Promise<{ ok: boolean; error?: string; chosenIndex?: number }> {
+  return ccSendChoice(sessionName, userReply, panel, executor);
 }
 
 function extractReply(raw: string, userMessage: string): string {
@@ -90,6 +119,9 @@ const codexAdapter: CliAdapter = {
   extractReply,
 
   isIdle,
+  detectState,
+  extractChoicePanel,
+  sendChoice,
 
   listSessions(executor: RemoteExecutor) {
     return executor.listSessionsByPrefix(SESSION_PREFIX);

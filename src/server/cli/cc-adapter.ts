@@ -1,4 +1,4 @@
-import type { CliAdapter, CliStartConfig } from './types.js';
+import type { CliAdapter, CliStartConfig, CliState, ChoicePanel } from './types.js';
 import type { RemoteExecutor } from '../executor/types.js';
 import config from '../config.js';
 
@@ -51,13 +51,220 @@ function buildStartCmd(sessionName: string, cfg: CliStartConfig): string {
 }
 
 function isIdle(processName: string, executor: RemoteExecutor): Promise<boolean> {
+  return detectState(processName, executor).then((s) => s === 'idle');
+}
+
+/** 三态识别：awaiting_choice 优先级最高（cc 在决策面板时不算 idle 也不算 working）
+ *
+ * cc 决策面板典型形态（来自实测 + cc 源码）：
+ *   ╭───────────────────────────────────────────────╮
+ *   │ Do you want to use this API key?              │
+ *   │                                               │
+ *   │ ❯ 1. Yes                                      │
+ *   │   2. No (recommended)                         │
+ *   ╰───────────────────────────────────────────────╯
+ *
+ * 关键特征：被 ╭─...─╮ 框包裹的多行块里同时含「问号结尾的标题行」+「数字./y/n 选项」。
+ * 注意：普通输入框 `│ ❯ ... │` 也是框包裹，不能只看 ❯，要排除"输入框光标行"。
+ */
+function detectState(processName: string, executor: RemoteExecutor): Promise<CliState> {
   const sessionName = `${SESSION_PREFIX}-${processName}`;
-  return executor.capturePane(sessionName, 15).then(res => {
-    if (res.error) return false;
+  // 抓 60 行：决策面板可能比 15 行高（含标题 + 多个选项 + 上下文说明）
+  return executor.capturePane(sessionName, 60).then((res) => {
+    if (res.error) return 'working';
     const tail = res.output;
-    if (/esc to interrupt/i.test(tail)) return false;
-    return /❯/.test(tail) || /\? for shortcuts/.test(tail);
+
+    // 1. 优先：决策面板检测（最强信号）
+    const panel = extractChoicePanel(tail);
+    if (panel) return 'awaiting_choice';
+
+    // 2. 工作中：明确的"运行中"信号
+    if (/esc to interrupt/i.test(tail)) return 'working';
+
+    // 3. 空闲：cc 输入框光标 + 快捷键提示同时存在 → 真 idle
+    //    单看 ❯ 不够（决策面板里也有 ❯，但已被第 1 步排除）
+    if (/❯/.test(tail) && /\? for shortcuts/.test(tail)) return 'idle';
+
+    // 默认按"还在工作"处理，避免在过渡帧把 working 误判为 idle 提前结束本轮
+    return 'working';
   });
+}
+
+/** 从 pane 文本里抠出「等待用户选择」的面板。识别不到返回 null。
+ *
+ * 算法：从下往上找最近的 ╰──╯（面板下边界），再向上找配对的 ╭──╮，
+ * 框内若同时含「问号标题」和「以 1./2. 或 ❯ 开头的选项行」就判定为面板。
+ * cc 把当前高亮项前面会有 `❯`，未高亮是空格，据此找 defaultIndex。
+ */
+export function extractChoicePanel(raw: string): ChoicePanel | null {
+  if (!raw) return null;
+  const lines = raw.split(/\r?\n/);
+
+  // 倒序找最近的面板下边界
+  let bottom = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/╰[─━]+╯/.test(lines[i])) { bottom = i; break; }
+  }
+  if (bottom < 0) return null;
+
+  // 向上找配对的上边界
+  let top = -1;
+  for (let i = bottom - 1; i >= 0; i--) {
+    if (/╭[─━]+╮/.test(lines[i])) { top = i; break; }
+  }
+  if (top < 0) return null;
+
+  const inside = lines.slice(top + 1, bottom);
+  // 剥掉左右 │ 边框 + 两端空格
+  const stripped = inside.map((l) =>
+    l.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, ''),
+  );
+
+  // 选项行：`❯ 1. Yes` / `  2. No (recommended)` / `❯ Yes` / `  No`
+  // 必须容忍前导 `❯` 或空格，序号可选（cc 也有不带数字的纯 Yes/No 面板）
+  const optRe = /^\s*(❯)?\s*(?:(\d+)[.)]\s*)?(.+?)\s*$/;
+  // 标题：cc 决策面板的"问句"通常以 `?` 结尾，且非空、非选项
+  const options: string[] = [];
+  let defaultIndex = 0;
+  let titleParts: string[] = [];
+  let optionStarted = false;
+
+  for (const s of stripped) {
+    const t = s.trim();
+    if (!t) continue;
+    // 排除分隔线、纯框线
+    if (/^[─━┃│┌┐└┘╭╰╯╮]+$/.test(t)) continue;
+    // 排除底栏快捷键提示（"Esc to cancel" / "↑/↓ to select" / "Enter to confirm"）
+    if (/(esc to cancel|to select|enter to confirm|to expand|to redo|tab to|shift\+tab)/i.test(t)) continue;
+
+    // 选项行判定：必须明显是"被列出的可选项"——开头有 ❯ 或者 数字. 序号
+    // 单纯短句（如 "Yes" 也可能是选项，但只在已经"看到序号选项"之后再接受裸文本）
+    const m = s.match(optRe);
+    const hasMarker = /^\s*❯/.test(s);
+    const hasNumber = m && m[2];
+    if (hasMarker || hasNumber) {
+      optionStarted = true;
+      const idx = m && m[2] ? parseInt(m[2], 10) : options.length + 1;
+      const body = m ? m[3].trim() : t;
+      // 用统一格式 "1. Yes"
+      const formatted = `${idx}. ${body}`;
+      if (hasMarker) defaultIndex = idx;
+      // 同序号去重（capturePane 偶尔会含残留行）
+      if (!options.some((o) => o.startsWith(`${idx}.`))) options.push(formatted);
+      continue;
+    }
+
+    if (!optionStarted) {
+      titleParts.push(t);
+    }
+  }
+
+  if (options.length < 2) return null;
+
+  // 标题：取问号结尾的最后一行；找不到就拼起来
+  let title = '';
+  for (let i = titleParts.length - 1; i >= 0; i--) {
+    if (/[?？]\s*$/.test(titleParts[i])) { title = titleParts[i]; break; }
+  }
+  if (!title) title = titleParts.join(' ').trim();
+
+  // 标题为空也允许（有些面板只有"Yes/No (recommended)"），用占位符
+  if (!title) title = '请选择';
+
+  return { title, options, defaultIndex };
+}
+
+/** 在决策面板下，把用户飞书自由文本回复 → tmux key 序列并发送。
+ *
+ * 解析规则（按优先级）：
+ *  - 纯数字 N 且 1≤N≤options.length → 直接发送数字键 N + 回车
+ *  - "yes/y/是/确认/同意/ok" → 选第 1 项；"no/n/否/取消/拒绝" → 选第 2 项
+ *  - 命中某个选项的关键词（含中文） → 选该项
+ *  - 都识别不到 → 报错（不冒险默认确认）
+ *
+ * 选好序号后：cc 面板对数字键直接响应（v2.x 实测），但更稳的做法是用「方向键归位 + 上下移动 + 回车」。
+ * 我们采用：先算出从 defaultIndex 到目标 index 的差值，发对应数量的 Up/Down，再发 C-m。
+ * 数字键作为 fallback：差值算不出（defaultIndex=0）时直接发数字键 + 回车。
+ */
+export async function sendChoice(
+  sessionName: string,
+  userReply: string,
+  panel: ChoicePanel,
+  executor: RemoteExecutor,
+): Promise<{ ok: boolean; error?: string; chosenIndex?: number }> {
+  const idx = resolveChoiceIndex(userReply, panel);
+  if (!idx) {
+    return {
+      ok: false,
+      error: `无法将"${userReply.slice(0, 30)}"解析到任何选项；请回复选项序号（1/2/...）或选项关键词（yes/no/是/否）`,
+    };
+  }
+  const keys: string[] = [];
+  if (panel.defaultIndex > 0 && idx !== panel.defaultIndex) {
+    const diff = idx - panel.defaultIndex;
+    const dir = diff > 0 ? 'Down' : 'Up';
+    for (let i = 0; i < Math.abs(diff); i++) keys.push(dir);
+    keys.push('C-m');
+  } else if (panel.defaultIndex === idx) {
+    // 已经在目标项 → 直接回车
+    keys.push('C-m');
+  } else {
+    // 没有 defaultIndex 信息 → 用数字键 + 回车
+    keys.push(String(idx));
+    keys.push('C-m');
+  }
+  const r = await executor.sendKeys(sessionName, keys, 100);
+  if (!r.ok) return { ok: false, error: r.error };
+  return { ok: true, chosenIndex: idx };
+}
+
+/** 把用户飞书回复解析为 1-based 选项序号。返回 0 表示无法解析。 */
+function resolveChoiceIndex(userReply: string, panel: ChoicePanel): number {
+  const reply = (userReply || '').trim().toLowerCase();
+  if (!reply) return 0;
+
+  // 规则 1：纯数字
+  const numMatch = reply.match(/^(\d+)\b/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    if (n >= 1 && n <= panel.options.length) return n;
+  }
+
+  // 规则 2：常见 yes/no 词典
+  const yesWords = ['yes', 'y', 'ok', '确认', '同意', '是', '好', '可以', '执行', 'sure'];
+  const noWords = ['no', 'n', '否', '拒绝', '取消', '不', '不要', 'cancel', 'deny'];
+  const isYes = yesWords.some((w) => reply === w || reply.startsWith(w + ' ') || reply.startsWith(w + '，') || reply.startsWith(w + ','));
+  const isNo = noWords.some((w) => reply === w || reply.startsWith(w + ' ') || reply.startsWith(w + '，') || reply.startsWith(w + ','));
+
+  // 在选项里找包含 yes/y 的项 → 是项；包含 no/n 的项 → 否项
+  if (isYes) {
+    for (let i = 0; i < panel.options.length; i++) {
+      if (/\byes\b|\(recommended\)/i.test(panel.options[i]) || /^\d+\.\s*y/i.test(panel.options[i])) {
+        return i + 1;
+      }
+    }
+    // 没找到明确的 yes 项 → 默认第 1 项（按 cc 习惯第 1 项常是 Yes）
+    return 1;
+  }
+  if (isNo) {
+    for (let i = 0; i < panel.options.length; i++) {
+      if (/\bno\b/i.test(panel.options[i]) || /^\d+\.\s*n/i.test(panel.options[i])) {
+        return i + 1;
+      }
+    }
+    return panel.options.length >= 2 ? 2 : 0;
+  }
+
+  // 规则 3：关键词包含匹配
+  for (let i = 0; i < panel.options.length; i++) {
+    const opt = panel.options[i].toLowerCase();
+    // 把 "1. yes" 拆掉序号再比
+    const body = opt.replace(/^\d+\.\s*/, '').trim();
+    if (!body) continue;
+    if (reply.includes(body) || body.includes(reply)) return i + 1;
+  }
+
+  return 0;
 }
 
 function extractReply(raw: string, userMessage: string): string {
@@ -404,6 +611,9 @@ const ccAdapter: CliAdapter = {
   extractReply,
 
   isIdle,
+  detectState,
+  extractChoicePanel,
+  sendChoice,
 
   listSessions(executor: RemoteExecutor) {
     return executor.listSessionsByPrefix(SESSION_PREFIX);
