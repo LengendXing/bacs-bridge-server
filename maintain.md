@@ -1,6 +1,6 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
-## v1.0.11 - 2026-05-12
+## v1.1.1 - 2026-05-12
 ### 变更内容
 - **修复 cc/codex 等待 Yes/No 决策时无法捕获 + 无法转发用户选择**。原本 cc 弹出 "Do you want to use this API key? 1.Yes 2.No" 等决策面板时，桥接侧 `isIdle` 把面板里的高亮 `❯` 误判为输入框光标 → 误以为 cc 已经 idle → 走 `extractReply` 提空内容 → 飞书既看不到面板，也无法把"1"/"是"转发给 cc。
 - **三态状态机**：`isIdle()` 改成 `detectState()` 返回 `idle | working | awaiting_choice`。`awaiting_choice` 优先级最高（先按面板特征识别 ╭─...─╮ 框 + 多个 1./2./❯ 选项 + 问号标题，命中即返回，避免被 working 或 idle 覆盖）。
@@ -33,7 +33,7 @@
 - `src/server/cli/cc-adapter.test.ts`（+15 用例）
 - `src/server/cli/codex-adapter.test.ts`（+2 用例）
 - `vitest.config.ts`（新增）
-- `package.json`（1.0.10 → 1.0.11）
+- `package.json`（1.0.10 → 1.1.1，中版本号升级，发布打 tag）
 
 ### 部署须知
 远程桥接服务必须 `git pull && npm run build && pm2 restart` 才能生效。
