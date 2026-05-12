@@ -53,6 +53,8 @@
             <td>
               <div class="flex items-center gap-1">
                 <button class="btn-mac btn-mac-sm" @click="copyAttach(b)" title="复制 tmux attach 命令">Attach</button>
+                <button class="btn-mac btn-mac-sm" :disabled="b.status !== 'online'"
+                  @click="openTerminal(b)" title="在浏览器内打开 tmux 终端">Terminal</button>
                 <button class="btn-mac btn-mac-sm" @click="openEdit(b)">编辑</button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">解绑</button>
               </div>
@@ -460,6 +462,25 @@ function copyAttach(b: Binding) {
     } else {
       prompt('复制以下命令并在终端执行:', cmd);
     }
+  }
+}
+
+async function openTerminal(b: Binding) {
+  // sessionStorage 不跨 tab 共享 → 通过短期 token 传递登录态
+  // 子窗口拿到后立刻调 /api/auth/exchange 换长 token 并存自己的 sessionStorage
+  let bootToken: string | null = null;
+  try {
+    const res = await post<{ token: string }>('/api/auth/qr-token', {});
+    if (res.code === 0 && res.data?.token) bootToken = res.data.token;
+  } catch { /* fallback：让子窗口自行去登录页 */ }
+
+  const params = new URLSearchParams();
+  if (bootToken) params.set('boot', bootToken);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const url = `/terminal/${encodeURIComponent(b.id)}${qs}`;
+  const win = window.open(url, `terminal-${b.id}`, 'width=1100,height=720,resizable=yes,scrollbars=no');
+  if (!win) {
+    alert('浏览器拦截了弹窗，请允许此站点的弹窗权限后重试');
   }
 }
 

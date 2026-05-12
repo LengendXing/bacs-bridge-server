@@ -3,6 +3,14 @@
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
 
+## v1.1.3 · 2026-05-12
+- [x] Web Terminal：「绑定」列表新增 Terminal 按钮，浏览器内 xterm 直连 tmux pane ✅ 2026-05-12
+- [x] 后端 pty-bridge（本机 node-pty / 远程 ssh2 shell channel）+ /ws/terminal WebSocket 端点 + 鉴权 + 审计 ✅ 2026-05-12
+- [x] 前端 TerminalView 独立路由 + 子窗口 token 交换 + ResizeObserver 同步窗口大小 ✅ 2026-05-12
+- [x] 安全防御：session 名白名单正则 + 关闭路径绝不 kill-session ✅ 2026-05-12
+- [x] pty-bridge.test.ts：isSafeSessionName 注入防御断言（50/50 全过）✅ 2026-05-12
+- [ ] 部署机端到端验证：happy path / 关窗不杀进程 / 远程 SSH / tmux session 不存在四组用例
+
 ## v1.1.2 · 2026-05-12
 - [x] 修复 2FA「信任设备」失效：cleanExpiredDevices gt/lt 条件写反 + logout 错误清 trusted_device cookie + useApi fetch 显式 credentials + cookie maxAge 用常量 ✅ 2026-05-12
 - [x] 顺手修复 describeUserAgent 把 iPhone(含"Mac OS X" 子串) 误识别为 macOS ✅ 2026-05-12

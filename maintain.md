@@ -1,5 +1,35 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.3 - 2026-05-12
+### 变更内容
+- **新功能：浏览器内 Web Terminal**。在「绑定」列表的操作列新增 `Terminal` 按钮，点击后通过 `window.open` 打开独立页面，xterm 直连绑定进程对应的 tmux pane（cc-xxx / codex-xxx），交互体验等同本地 `tmux attach`。核心约束：**关闭 web-terminal 窗口 ≠ kill 业务进程**，飞书消息桥继续工作。
+- **后端 `src/server/terminal/pty-bridge.ts`**：抽象 `TerminalSession` 接口；本机用 `node-pty` `spawn('bash', ['-ilc', 'exec tmux attach -t SESSION'])`；远程复用 `SshExecutor` 的 ssh2 client 开独立 `client.shell()` channel，首条命令同样 `exec tmux attach`，让 bash 被 tmux 替换 → channel 关闭走 SIGHUP，tmux 客户端干净 detach（业务 session 保留）。
+- **后端 `src/server/terminal/ws-server.ts`**：挂载 `/ws/terminal?bindingId=&token=&cols=&rows=` WebSocket 端点。鉴权走 `verifyToken`（query 参数，与 SSE 同款方案）；连接前用 `executor.sessionExists` 预检 tmux 存在；每 binding 同时刻最多 1 个活跃终端，新连接顶掉旧的；开/关都写 `audit_logs`。协议：二进制透传按键流，文本 JSON 控制（`resize` / `ready` / `error` / `exit`）。
+- **后端 `src/server/index.ts`**：用 `http.createServer(app)` 包装 Express 实例，在 listen 前调 `mountTerminalWs`，让 WebSocket 与 HTTP 共用端口。
+- **后端 `src/server/executor/ssh.ts`**：新增 `acquireClient()` 暴露已连接的 ssh2 Client，仅供 web-terminal 等需要直接开 channel 的场景使用，调用方不得 destroy 整个 client。
+- **前端 `src/client/views/TerminalView.vue`**：新增独立路由 `/terminal/:bindingId`（不嵌 LayoutView，全屏布局）。子窗口通过 `?boot=<60s short JWT>` 接收主窗口快捷登录 token，挂载时调 `/api/auth/exchange` 换长 token 存自己 sessionStorage（解决 sessionStorage 不跨 tab 共享的问题）。xterm + FitAddon + WebLinksAddon，ResizeObserver 同步 cols/rows，`Ctrl-b d` 主动 detach 显示「业务进程仍在运行」断开提示并提供重连按钮。
+- **前端 `BindingsView.vue`**：新增 Terminal 按钮，仅在绑定 `online` 时可点；先调 `/api/auth/qr-token` 取短 token 再 `window.open` 子窗口（1100×720）。
+- **安全防御**：`isSafeSessionName` 白名单正则 `/^[A-Za-z0-9_-]+$/` + 长度 ≤128，阻止 shell 元字符注入；任何「关闭终端」路径只 close PTY/channel，**绝不调用 `tmux kill-session`**（代码层防御，文档明示）。
+
+### 测试
+- 新增 `src/server/terminal/pty-bridge.test.ts`（3 用例）覆盖 `isSafeSessionName` 注入防御断言（合法名通过 / shell 元字符拒绝 / 边界长度）
+- `npm run test` → 50/50 通过（新增 3 + 既有 47）
+- `npm run build` → client + server 均通过；`TerminalView` 独立 chunk 73KB gzip
+- ⚠️ 端到端真机验证（happy path / 关窗不杀进程 / 远程 SSH / tmux session 不存在）需在部署机上跑，详见 `docs/plans/v1.1.3-web-terminal.md` 测试计划
+- ⚠️ `npm run lint` 因 ESLint 9 配置文件缺失（历史遗留）报错，与本次改动无关
+
+### 影响范围
+- `src/server/terminal/pty-bridge.ts`（新增）
+- `src/server/terminal/ws-server.ts`（新增）
+- `src/server/terminal/pty-bridge.test.ts`（新增）
+- `src/server/index.ts`（http.createServer 包装 + mountTerminalWs）
+- `src/server/executor/ssh.ts`（新增 acquireClient）
+- `src/client/views/TerminalView.vue`（新增）
+- `src/client/views/BindingsView.vue`（新增 Terminal 按钮 + openTerminal）
+- `src/client/router/index.ts`（新增 /terminal/:bindingId 独立路由）
+- `package.json`（1.1.2 → 1.1.3；新增 node-pty / xterm / xterm-addon-fit / xterm-addon-web-links / @types/ws 依赖）
+- `docs/plans/v1.1.3-web-terminal.md`（技术方案文档归档）
+
 ## v1.1.2 - 2026-05-12
 ### 变更内容
 - **修复 2FA「信任设备」失效**：用户勾选「信任此设备（30天内免验证）」后，下次登录依然被要求输入验证码。排查后发现是 4 个独立 bug 叠加，全部命中。

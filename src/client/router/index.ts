@@ -10,6 +10,13 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
   {
+    // 独立页面，不嵌 LayoutView：window.open 新窗口打开
+    path: '/terminal/:bindingId',
+    name: 'terminal',
+    component: () => import('../views/TerminalView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/',
     component: () => import('../views/LayoutView.vue'),
     meta: { requiresAuth: true },
