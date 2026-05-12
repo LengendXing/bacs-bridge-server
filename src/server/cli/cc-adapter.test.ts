@@ -192,3 +192,161 @@ describe('cc-adapter.extractReply', () => {
     expect(reply).not.toBe('');
   });
 });
+
+describe('cc-adapter.sendChoice', () => {
+  function makeExecutor() {
+    const calls: { keys: string[]; betweenMs?: number }[] = [];
+    return {
+      calls,
+      executor: {
+        kind: 'local' as const,
+        machineId: null,
+        async exec() { return { stdout: '', stderr: '', exitCode: 0, ok: true }; },
+        async sessionExists() { return true; },
+        async listSessionsByPrefix() { return []; },
+        async capturePane() { return { output: '' }; },
+        async sendInput() { return { ok: true }; },
+        async sendKeys(_session: string, keys: string[], betweenMs?: number) {
+          calls.push({ keys, betweenMs });
+          return { ok: true };
+        },
+        async killSession() {},
+      },
+    };
+  }
+
+  const panelYesNo = {
+    title: 'Do you want to use this API key?',
+    options: ['1. Yes', '2. No (recommended)'],
+    defaultIndex: 1,
+  };
+
+  it('用户回复"1" → 已在默认项 → 直接 C-m', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '1', panelYesNo, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0].keys).toEqual(['C-m']);
+  });
+
+  it('用户回复"2" → 默认在 1，按 1 次 Down + C-m', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '2', panelYesNo, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(2);
+    expect(calls[0].keys).toEqual(['Down', 'C-m']);
+  });
+
+  it('用户回复"yes"/"是" → 选第 1 项', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', 'yes', panelYesNo, executor);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0].keys).toEqual(['C-m']);
+
+    const ex2 = makeExecutor();
+    const r2 = await adapter.sendChoice('cc-test', '是', panelYesNo, ex2.executor);
+    expect(r2.chosenIndex).toBe(1);
+  });
+
+  it('用户回复"no"/"否" → 选 No（第 2 项）', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', 'no', panelYesNo, executor);
+    expect(r.chosenIndex).toBe(2);
+    expect(calls[0].keys).toEqual(['Down', 'C-m']);
+  });
+
+  it('用户回复无法识别 → ok:false 提示重试', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '不知道选啥', panelYesNo, executor);
+    expect(r.ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('从默认 2 移动到 3 → 1 次 Down + C-m', async () => {
+    const { calls, executor } = makeExecutor();
+    const panel3 = {
+      title: 'Pick',
+      options: ['1. A', '2. B', '3. C'],
+      defaultIndex: 2,
+    };
+    const r = await adapter.sendChoice('cc-test', '3', panel3, executor);
+    expect(r.chosenIndex).toBe(3);
+    expect(calls[0].keys).toEqual(['Down', 'C-m']);
+  });
+
+  it('从默认 3 移动到 1 → 2 次 Up + C-m', async () => {
+    const { calls, executor } = makeExecutor();
+    const panel3 = {
+      title: 'Pick',
+      options: ['1. A', '2. B', '3. C'],
+      defaultIndex: 3,
+    };
+    const r = await adapter.sendChoice('cc-test', '1', panel3, executor);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0].keys).toEqual(['Up', 'Up', 'C-m']);
+  });
+
+  it('defaultIndex=0（未识别） → 回退用数字键 + C-m', async () => {
+    const { calls, executor } = makeExecutor();
+    const panel = {
+      title: 'Pick',
+      options: ['1. A', '2. B'],
+      defaultIndex: 0,
+    };
+    const r = await adapter.sendChoice('cc-test', '2', panel, executor);
+    expect(r.chosenIndex).toBe(2);
+    expect(calls[0].keys).toEqual(['2', 'C-m']);
+  });
+});
+
+describe('cc-adapter.extractChoicePanel', () => {
+  it('识别标准 Yes/No 决策面板（带 ❯ 标记当前高亮项）', () => {
+    const pane = `● Reading file...
+╭────────────────────────────────────────╮
+│ Do you want to use this API key?       │
+│                                        │
+│ ❯ 1. Yes                               │
+│   2. No (recommended)                  │
+╰────────────────────────────────────────╯
+`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Do you want to use this API key/);
+    expect(panel!.options).toHaveLength(2);
+    expect(panel!.options[0]).toMatch(/^1\..*Yes/);
+    expect(panel!.options[1]).toMatch(/^2\..*No \(recommended\)/);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别 3 个选项的工具调用确认面板，defaultIndex 跟随 ❯', () => {
+    const pane = `╭──────────────────────────────────╮
+│ Allow Bash command "rm -rf /"?  │
+│                                  │
+│   1. Yes, once                   │
+│ ❯ 2. Yes, allow this session     │
+│   3. No                          │
+╰──────────────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.defaultIndex).toBe(2);
+  });
+
+  it('普通输入框（│ ❯ │）不应被识别为决策面板（选项数 < 2）', () => {
+    const pane = `● 答案。
+╭───╮
+│ ❯ │
+╰───╯
+  ? for shortcuts`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).toBeNull();
+  });
+
+  it('普通回复中无任何框 → 返回 null', () => {
+    expect(adapter.extractChoicePanel('hello world\nno panel here')).toBeNull();
+  });
+
+  it('空输入 → 返回 null', () => {
+    expect(adapter.extractChoicePanel('')).toBeNull();
+  });
+});

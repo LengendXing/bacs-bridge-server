@@ -247,6 +247,24 @@ export class SshExecutor implements RemoteExecutor {
     }
   }
 
+  async sendKeys(
+    sessionName: string,
+    keys: string[],
+    betweenMs = 80,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!keys.length) return { ok: true };
+    const exists = await this.sessionExists(sessionName);
+    if (!exists) return { ok: false, error: `会话 ${sessionName} 不在线` };
+    // 远程 SSH 下每个 exec 是独立 channel：把所有 send-keys 合并到一次 ssh exec
+    // 否则 cc TUI 处理 Down 还没完成就收到 C-m，可能选错或被吞
+    const segs = keys.map((k) => `tmux send-keys -t ${sessionName} ${shellQuoteKey(k)}`);
+    const sleep = betweenMs > 0 ? ` && sleep ${(betweenMs / 1000).toFixed(2)}` : '';
+    const script = segs.join(`${sleep} && `);
+    const r = await this.exec(script);
+    if (!r.ok) return { ok: false, error: `sendKeys 失败: ${r.error || r.stderr}` };
+    return { ok: true };
+  }
+
   async killSession(sessionName: string): Promise<void> {
     await this.exec(`tmux kill-session -t ${sessionName} 2>/dev/null || true`);
   }
@@ -272,4 +290,8 @@ export class SshExecutor implements RemoteExecutor {
     } catch { /* */ }
     this.pool.state = 'disconnected';
   }
+}
+
+function shellQuoteKey(k: string): string {
+  return `'${k.replace(/'/g, "'\\''")}'`;
 }
