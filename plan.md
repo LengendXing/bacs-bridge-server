@@ -1,8 +1,12 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
 ## 待办（按优先级）
-- [ ] [v1.1.2] 修复 2FA「信任设备」失效：用户勾选信任后下次登录仍要输入验证码（待排查 cookie/token 持久化、过期时间、校验链路）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
+
+## v1.1.2 · 2026-05-12
+- [x] 修复 2FA「信任设备」失效：cleanExpiredDevices gt/lt 条件写反 + logout 错误清 trusted_device cookie + useApi fetch 显式 credentials + cookie maxAge 用常量 ✅ 2026-05-12
+- [x] 顺手修复 describeUserAgent 把 iPhone(含"Mac OS X" 子串) 误识别为 macOS ✅ 2026-05-12
+- [x] 新增 trusted-device.test.ts（9 用例覆盖 create/verify/clean/UA） ✅ 2026-05-12
 
 ## v1.1.1 · 2026-05-12
 - [x] 修复 cc/codex 等待 Yes/No 决策面板时无法捕获、无法转发用户选择 ✅ 2026-05-12

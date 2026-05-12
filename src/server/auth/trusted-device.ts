@@ -7,7 +7,7 @@
  */
 
 import crypto from 'crypto';
-import { eq, and, gt } from 'drizzle-orm';
+import { eq, and, gt, lt } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { trustedDevices } from '../db/schema.js';
 import { TRUSTED_DEVICE_DAYS } from '../../shared/constants.js';
@@ -91,14 +91,14 @@ export function cleanExpiredDevices(userId?: number): void {
   const db = getDb();
   const now = new Date().toISOString();
 
-  // 直接用 Drizzle 的 delete API：gt(column, value) 表示 column > value
+  // 删除已过期记录：expiresAt < now
   if (userId) {
     db.delete(trustedDevices)
-      .where(and(eq(trustedDevices.userId, userId), gt(trustedDevices.expiresAt, now)))
+      .where(and(eq(trustedDevices.userId, userId), lt(trustedDevices.expiresAt, now)))
       .run();
   } else {
     db.delete(trustedDevices)
-      .where(gt(trustedDevices.expiresAt, now))
+      .where(lt(trustedDevices.expiresAt, now))
       .run();
   }
 }
@@ -120,16 +120,18 @@ export function describeUserAgent(ua: string): string {
     ? 'Edge'
     : 'Unknown';
 
-  const os = ua.includes('Mac')
+  // iOS / Android 优先于 macOS / Linux：iPhone UA 含 "Mac OS X" 子串，
+  // Android UA 含 "Linux" 子串，先判移动端能避免误识别为桌面 OS。
+  const os = ua.includes('iPhone') || ua.includes('iPad')
+    ? 'iOS'
+    : ua.includes('Android')
+    ? 'Android'
+    : ua.includes('Mac')
     ? 'macOS'
     : ua.includes('Windows')
     ? 'Windows'
     : ua.includes('Linux')
     ? 'Linux'
-    : ua.includes('iPhone') || ua.includes('iPad')
-    ? 'iOS'
-    : ua.includes('Android')
-    ? 'Android'
     : 'Unknown';
 
   return `${browser} / ${os}`;

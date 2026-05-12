@@ -6,6 +6,9 @@ import { ErrorCode } from '@shared/types';
 /**
  * API 请求封装
  * 统一处理 JWT 注入、401 跳转、响应解包
+ *
+ * credentials: 'same-origin' —— 让浏览器把 trusted_device 等同源 cookie
+ * 一并带上；默认值在某些反代/打包场景下可能丢 cookie，显式声明更稳。
  */
 export function useApi() {
   const auth = useAuthStore();
@@ -15,7 +18,7 @@ export function useApi() {
     const headers: Record<string, string> = {};
     if (auth.token) headers['X-Auth-Token'] = auth.token;
 
-    const res = await fetch(path, { headers });
+    const res = await fetch(path, { headers, credentials: 'same-origin' });
     if (res.status === 401) {
       auth.clearToken();
       throw new Error('未登录');
@@ -32,6 +35,7 @@ export function useApi() {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      credentials: 'same-origin',
     });
     if (res.status === 401) {
       auth.clearToken();
@@ -49,6 +53,7 @@ export function useApi() {
       method: 'PUT',
       headers,
       body: JSON.stringify(body),
+      credentials: 'same-origin',
     });
     if (res.status === 401) {
       auth.clearToken();
@@ -65,6 +70,7 @@ export function useApi() {
     const res = await fetch(path, {
       method: 'DELETE',
       headers,
+      credentials: 'same-origin',
     });
     if (res.status === 401) {
       auth.clearToken();
