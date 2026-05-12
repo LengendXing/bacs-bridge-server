@@ -1,5 +1,19 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.10 - 2026-05-12
+### 变更内容
+- **修复远程长任务期间 cc 看似"失联"的 bug**。SshExecutor 此前默认 60s 无 exec 就主动 `client.end()`，但远程 cc 跑长任务时桥接侧本就没指令——60s 一到自断 SSH，pollPane / sendInput 下一次再上来要重连，期间表现为"abcd 进程全部失联"。
+  - `src/server/executor/ssh.ts` 移除 `IDLE_TIMEOUT` 主动断连：`startIdleTimer` 改 no-op，断连只在底层 socket 真正出错时由 `'close'` 事件触发，下一次 exec 通过 `ensureConnected` 自动重连
+  - 心跳从 5min 收紧到 30s，更早发现"socket 半死"状态（NAT/防火墙静默 drop）
+  - 不改 sendInput / capturePane 等业务逻辑
+
+### 影响范围
+- src/server/executor/ssh.ts
+- 仅远程绑定（machineId 非 builtin）受影响；本机 LocalExecutor 无此问题
+
+### 部署须知
+远程桥接服务必须 `git pull && npm run build && pm2 restart` 才能生效，旧 dist 不会自愈。
+
 ## v1.0.9 - 2026-05-11
 ### 变更内容
 - **绑定表单：模型 + effort 启动注入**。v1.0.8 的 `--model` 注入已写对，但用户无法在 UI 上单独选 effort，只能把模型+effort 拼成字符串（如 `claude-opus-4-7 - max`）当 modelId 填 → CLI 忽略非法值回退默认 → 看起来"模型没生效"。本次从根上解决：
