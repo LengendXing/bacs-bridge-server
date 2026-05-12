@@ -1,5 +1,17 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
+## 待办（按优先级）
+- [ ] [v1.1.2] 修复 2FA「信任设备」失效：用户勾选信任后下次登录仍要输入验证码（待排查 cookie/token 持久化、过期时间、校验链路）
+- [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
+
+## v1.1.1 · 2026-05-12
+- [x] 修复 cc/codex 等待 Yes/No 决策面板时无法捕获、无法转发用户选择 ✅ 2026-05-12
+- [x] CliAdapter 三态识别（idle/working/awaiting_choice）+ 选择面板提取 + sendChoice ✅ 2026-05-12
+- [x] executor 新增 sendKeys（直接 tmux send-keys 走方向键/数字键不走 paste-buffer） ✅ 2026-05-12
+- [x] session 状态机：awaiting_choice 推决策卡片但不结束 session；用户回复路由到 sendChoice ✅ 2026-05-12
+- [x] 决策卡片 buildAwaitingCard 显示标题+选项+默认项标记 ✅ 2026-05-12
+- [x] vitest.config.ts 补全：`npm run test` 可扫到后端测试 ✅ 2026-05-12
+
 ## v1.0.10 · 2026-05-12
 - [x] 修复 SshExecutor 60s 主动空闲断连：长任务期间会让远程 cc 看似失联（实测 46.224.12.231 abcd 全部失联） ✅ 2026-05-12
 - [x] 心跳 5min → 30s，更快发现半死 socket ✅ 2026-05-12
