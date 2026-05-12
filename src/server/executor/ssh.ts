@@ -29,8 +29,9 @@ export class SshExecutor implements RemoteExecutor {
 
   private config: SshConnectConfig;
   private pool: PoolEntry;
-  private readonly IDLE_TIMEOUT = 60_000;
-  private readonly HEARTBEAT_INTERVAL = 300_000;
+  // 不再主动空闲断连：长任务期间桥接侧无指令，60s 自断会让远程 cc "失联"
+  // 真断了由下一次 exec 触发 ensureConnected 重连即可
+  private readonly HEARTBEAT_INTERVAL = 30_000;
   private readonly CONNECT_TIMEOUT = 10_000;
   private readonly EXEC_TIMEOUT = 15_000;
 
@@ -117,14 +118,7 @@ export class SshExecutor implements RemoteExecutor {
   }
 
   private startIdleTimer(): void {
-    this.stopIdleTimer();
-    this.pool.idleTimer = setTimeout(() => {
-      const idle = Date.now() - this.pool.lastUsed;
-      if (idle >= this.IDLE_TIMEOUT && this.pool.state === 'connected') {
-        logger.log('info', `SSH 空闲断开: machine=${this.machineId}`);
-        this.pool.client.end();
-      }
-    }, this.IDLE_TIMEOUT);
+    // no-op：v1.0.10 起不再主动空闲断连。lastUsed 仅供监控/日志使用
   }
 
   private stopIdleTimer(): void {

@@ -1,5 +1,9 @@
 # 任务计划 · 飞书 × Claude Code 桥接系统
 
+## v1.0.10 · 2026-05-12
+- [x] 修复 SshExecutor 60s 主动空闲断连：长任务期间会让远程 cc 看似失联（实测 46.224.12.231 abcd 全部失联） ✅ 2026-05-12
+- [x] 心跳 5min → 30s，更快发现半死 socket ✅ 2026-05-12
+
 ## v1.0.9 · 2026-05-11
 - [x] 绑定表单新增 effort 字段：cc 支持 low~max，codex 支持 minimal~xhigh；按模型 maxEffort 截断 ✅ 2026-05-11
 - [x] cc-adapter 注入 `--effort`，codex-adapter 注入 `-c model_reasoning_effort=` ✅ 2026-05-11
