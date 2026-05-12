@@ -1,5 +1,39 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.2 - 2026-05-12
+### 变更内容
+- **修复 2FA「信任设备」失效**：用户勾选「信任此设备（30天内免验证）」后，下次登录依然被要求输入验证码。排查后发现是 4 个独立 bug 叠加，全部命中。
+  1. **`cleanExpiredDevices` 条件写反（核心）**：`src/server/auth/trusted-device.ts` 用 `gt(expiresAt, now)` 表达"过期"，实际语义是"未来时间 = 还没过期"。每次登录开头调 `cleanExpiredDevices(user.id)` → 把**还在有效期内**的信任记录全删掉，过期的反而留着。`verifyTrustedDevice` 随后查不到 token 必走 2FA。改为 `lt(expiresAt, now)`。
+  2. **`logout` 清掉了 trusted_device cookie**：`src/server/routes/auth.ts` 退出登录调 `res.clearCookie('trusted_device')`，把 30 天的信任凭据立刻删除。但产品语义"30 天内免验证"应该是设备级，不该被会话生命周期影响。改为登出时**只清会话级凭据，保留设备信任 cookie**。撤销设备信任应走设置页（后续工单）。
+  3. **前端 fetch 未显式 `credentials`**：`src/client/composables/useApi.ts` 的 4 个请求（GET/POST/PUT/DELETE）都没设 `credentials`，默认 `same-origin` 在某些反代/打包场景下会丢 cookie，登录时读不到 `trusted_device` → 必走 2FA。统一改为 `credentials: 'same-origin'` 显式声明。
+  4. **cookie maxAge 写死 30 天**：`auth.ts` 两处 `30 * 24 * 60 * 60 * 1000` 与 DB 端的 `TRUSTED_DEVICE_DAYS` 常量分离，改一处会漏一处。抽出 `TRUSTED_DEVICE_COOKIE_MAX_AGE_MS` 常量统一引用。
+- **顺手修：`describeUserAgent` iPhone 误识别为 macOS**：iPhone UA 含 "Mac OS X" 子串，原代码先判 `Mac` 再判 `iPhone`，永远走不到 iOS 分支；Android UA 含 "Linux" 同理。把移动端判断提前。
+
+### 测试
+- 新增 `src/server/auth/trusted-device.test.ts`（9 用例）：
+  1. createTrustedDevice → verifyTrustedDevice 正常路径
+  2. 未知 token 返回 null
+  3. 过期 token 不通过验证
+  4. **cleanExpiredDevices 只删过期、保留有效**（核心回归用例）
+  5. cleanExpiredDevices 限定 userId 不影响其他用户
+  6. cleanExpiredDevices 不带 userId 全表清理
+  7. describeUserAgent Chrome / macOS / Safari iOS / Edge Windows
+- 全套 47/47 通过（cc-adapter 30 + codex-adapter 8 + trusted-device 9）
+- `npm run build` 通过
+- `npm audit` 6 个告警为 bcrypt → @mapbox/node-pre-gyp → tar 链路（已在 plan.md 列待办，breaking change 不在本版本范围）
+
+### 影响范围
+- `src/server/auth/trusted-device.ts`（cleanExpiredDevices 条件 + describeUserAgent OS 顺序）
+- `src/server/routes/auth.ts`（logout 不清 cookie + maxAge 用常量）
+- `src/client/composables/useApi.ts`（4 个请求加 `credentials: 'same-origin'`）
+- `src/server/auth/trusted-device.test.ts`（新增）
+- `package.json`（1.1.1 → 1.1.2）
+
+### 部署须知
+远程桥接服务必须 `git pull && npm run build && pm2 restart` 才能生效。**已存在的过期信任记录建议手动清一次**（旧 gt 逻辑下数据库里可能堆积了过期 token，新 lt 逻辑会在用户下次登录时自动清）。
+
+---
+
 ## v1.1.1 - 2026-05-12
 ### 变更内容
 - **修复 cc/codex 等待 Yes/No 决策时无法捕获 + 无法转发用户选择**。原本 cc 弹出 "Do you want to use this API key? 1.Yes 2.No" 等决策面板时，桥接侧 `isIdle` 把面板里的高亮 `❯` 误判为输入框光标 → 误以为 cc 已经 idle → 走 `extractReply` 提空内容 → 飞书既看不到面板，也无法把"1"/"是"转发给 cc。

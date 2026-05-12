@@ -20,6 +20,9 @@ import { generateSecret, buildOtpAuthUri, verifyTotp, generateRecoveryCodes, ver
 import { createTrustedDevice, verifyTrustedDevice, cleanExpiredDevices, describeUserAgent } from '../auth/trusted-device.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
+import { TRUSTED_DEVICE_DAYS } from '../../shared/constants.js';
+
+const TRUSTED_DEVICE_COOKIE_MAX_AGE_MS = TRUSTED_DEVICE_DAYS * 24 * 60 * 60 * 1000;
 
 const router = Router();
 
@@ -157,11 +160,10 @@ router.post('/api/auth/2fa/verify', async (req, res) => {
         describeUserAgent(ua),
         ip,
       );
-      // 设置 cookie，30 天有效
       res.cookie('trusted_device', deviceToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: TRUSTED_DEVICE_COOKIE_MAX_AGE_MS,
         sameSite: 'lax',
       });
     }
@@ -177,10 +179,12 @@ router.post('/api/auth/2fa/verify', async (req, res) => {
 /**
  * POST /api/auth/logout
  *
- * 登出接口：清除信任设备 cookie
+ * 登出接口。
+ * 注意：故意不清 trusted_device cookie —— 信任设备是设备级凭据，
+ * 语义是「这台设备 30 天内免 2FA」，登出/换账号不应失效。
+ * 用户要撤销设备信任请走设置页。
  */
-router.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('trusted_device');
+router.post('/api/auth/logout', (_req, res) => {
   res.json({ code: 0, message: '已退出' });
 });
 
@@ -263,7 +267,7 @@ router.post('/api/auth/2fa/enable', requireAuth, (req, res) => {
       res.cookie('trusted_device', deviceToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
+        maxAge: TRUSTED_DEVICE_COOKIE_MAX_AGE_MS,
         sameSite: 'lax',
       });
     })
