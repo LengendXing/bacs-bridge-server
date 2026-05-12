@@ -1,6 +1,6 @@
 {
   "name": "feishu-claudecode-bridge",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "飞书机器人 × AI CLI 消息桥接系统（支持 Claude Code / Codex）",
   "type": "module",
   "scripts": {

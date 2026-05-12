@@ -68,7 +68,30 @@ export class LocalExecutor implements RemoteExecutor {
     }
   }
 
+  async sendKeys(
+    sessionName: string,
+    keys: string[],
+    betweenMs = 80,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (!keys.length) return { ok: true };
+    const exists = await this.sessionExists(sessionName);
+    if (!exists) return { ok: false, error: `会话 ${sessionName} 不在线` };
+    // tmux send-keys 接受单字符/组合键名（C-m / Up / Down / 1）；用 sleep 0.0X 保持节奏
+    // 与 sendInput 不同：不走 paste-buffer，因为决策面板没有输入框，paste 会被吞
+    const segs = keys.map((k) => `tmux send-keys -t ${sessionName} ${shellQuoteKey(k)}`);
+    const sleep = betweenMs > 0 ? ` && sleep ${(betweenMs / 1000).toFixed(2)}` : '';
+    const script = segs.join(`${sleep} && `);
+    const r = await this.exec(script);
+    if (!r.ok) return { ok: false, error: `sendKeys 失败: ${r.error || r.stderr}` };
+    return { ok: true };
+  }
+
   async killSession(sessionName: string): Promise<void> {
     await this.exec(`tmux kill-session -t ${sessionName} 2>/dev/null || true`);
   }
+}
+
+function shellQuoteKey(k: string): string {
+  // tmux key 名通常只含字母数字 / `-`，但保险起见单引号包一层（拒绝注入）
+  return `'${k.replace(/'/g, "'\\''")}'`;
 }
