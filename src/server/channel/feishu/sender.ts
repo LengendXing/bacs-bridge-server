@@ -598,6 +598,46 @@ export function buildProgressCard(
  * @param elapsed     - 已耗时（秒）
  * @returns 交互式卡片对象
  */
+/**
+ * 构建「等待用户决策」卡片
+ *
+ * cc/codex 弹出 Yes/No 面板时，把面板原文 + 选项列表推给飞书，
+ * 用户回复"1"/"yes"/"是"等会被解析后发送给 tmux 会话。
+ */
+export function buildAwaitingCard(
+  processName: string,
+  title: string,
+  options: string[],
+  defaultIndex: number,
+  userQuestion: string,
+): InteractiveCard {
+  const question = userQuestion
+    ? userQuestion.length > 50 ? userQuestion.slice(0, 50) + '...' : userQuestion
+    : '';
+  const optList = options
+    .map((o, i) => {
+      const isDefault = i + 1 === defaultIndex;
+      return `${isDefault ? '👉 ' : '   '}${o}`;
+    })
+    .join('\n');
+  const md =
+    `**进程：** ${processName}` +
+    (question ? `\n**原问题：** ${question}` : '') +
+    `\n**待决策：** ${title}\n\n${optList}\n\n` +
+    `请直接回复：**选项序号**（如 \`1\`、\`2\`）或关键词（\`yes\`/\`no\`/\`是\`/\`否\`）`;
+  return {
+    header: {
+      title: { tag: 'plain_text', content: '⚠️ 【告警】Claude Code 等待你的决策' },
+      template: 'orange',
+    },
+    elements: [
+      { tag: 'markdown', content: md },
+      { tag: 'hr' },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '回复后将转发到 cc 会话；超时未回复保持等待' }] },
+    ],
+  };
+}
+
 export function buildTimeoutCard(processName: string, elapsed: number): InteractiveCard {
   const mm = Math.floor(elapsed / 60);
   return {

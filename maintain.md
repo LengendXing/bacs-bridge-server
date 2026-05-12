@@ -1,5 +1,45 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.0.11 - 2026-05-12
+### 变更内容
+- **修复 cc/codex 等待 Yes/No 决策时无法捕获 + 无法转发用户选择**。原本 cc 弹出 "Do you want to use this API key? 1.Yes 2.No" 等决策面板时，桥接侧 `isIdle` 把面板里的高亮 `❯` 误判为输入框光标 → 误以为 cc 已经 idle → 走 `extractReply` 提空内容 → 飞书既看不到面板，也无法把"1"/"是"转发给 cc。
+- **三态状态机**：`isIdle()` 改成 `detectState()` 返回 `idle | working | awaiting_choice`。`awaiting_choice` 优先级最高（先按面板特征识别 ╭─...─╮ 框 + 多个 1./2./❯ 选项 + 问号标题，命中即返回，避免被 working 或 idle 覆盖）。
+  - `src/server/cli/types.ts`：`CliAdapter` 新增 `detectState` / `extractChoicePanel` / `sendChoice`，`isIdle` 标记 deprecated 但保留兼容
+  - `src/server/cli/cc-adapter.ts`：实现三个新方法，`isIdle` 内部委托给 `detectState`
+  - `src/server/cli/codex-adapter.ts`：复用 cc 的 `extractChoicePanel` / `sendChoice`（codex 决策面板形态相同），`detectState` 接入工作中检测
+- **session 状态机改造**：`SessionState` 新增 `awaiting: { panel, panelKey, pushedAt } | null` 字段。`startOutputPolling` 改用 `{ onReply, onAwaiting }` 双回调：
+  - `awaiting_choice` → 调 `onAwaiting(panel)` 推决策卡片，**不结束 session**；通过 panelFingerprint 去重，同一面板不重复推
+  - 之前在等待但当前已无面板 → 清 `awaiting`，恢复常规 stable→tryFinish
+  - 处于 awaiting 时 hardDeadline 跳过、progress 卡片跳过，避免误导用户
+- **决策回复路由**：`ws-client.handleIncomingMessage` 中，`hasActiveSession + getSession().awaiting` → 走 `adapter.sendChoice` 而非新建 session：
+  - `sendChoice` 解析飞书自由文本（数字/yes/no/是/否/关键词包含）→ 算出目标序号 → 用 `defaultIndex` 与目标的差值发 `Up/Down`+ `C-m`，无 defaultIndex 则降级数字键 + `C-m`
+  - executor 接口新增 `sendKeys(sessionName, keys[], betweenMs)`：直接 `tmux send-keys` 不走 paste-buffer（决策面板没有输入框，paste 会被吞）；ssh + local 双实现合并到一次 exec 保证按键节奏
+- **新增决策卡片** `sender.buildAwaitingCard`：⚠️ 橙色，含面板标题、所有选项（默认项前加 👉）、引导用户回复方式
+- **vitest 配置补全**：项目 `vite.config.ts` 把 root 设到 `src/client`，导致 `npm run test` 扫不到后端测试。新增 `vitest.config.ts` 显式设 `include: src/**/*.test.ts`，恢复全套测试可跑
+- **测试**：cc-adapter.test.ts 新增 15 个用例（5 extractChoicePanel + 8 sendChoice），codex-adapter 新增 2 个；38/38 通过
+- **build**：通过
+- **audit**：6 个间接依赖告警（bcrypt→@mapbox/node-pre-gyp→tar），fix 需 bcrypt 主版本升级，列入 plan.md 待决，本版本不动
+
+### 影响范围
+- `src/server/cli/types.ts`（接口扩展 + 新类型 CliState/ChoicePanel）
+- `src/server/cli/cc-adapter.ts`（新增 detectState / extractChoicePanel / sendChoice / resolveChoiceIndex）
+- `src/server/cli/codex-adapter.ts`（detectState + 复用 cc 选择逻辑）
+- `src/server/executor/types.ts`（新增 sendKeys）
+- `src/server/executor/local.ts`（实现 sendKeys）
+- `src/server/executor/ssh.ts`（实现 sendKeys + shellQuoteKey）
+- `src/server/session/state.ts`（SessionState.awaiting + PollingHandlers + tryFinish 三态分支）
+- `src/server/channel/feishu/ws-client.ts`（active+awaiting 路由 sendChoice + onAwaiting 推卡片 + 进度/超时跳过）
+- `src/server/channel/feishu/sender.ts`（buildAwaitingCard）
+- `src/server/cli/cc-adapter.test.ts`（+15 用例）
+- `src/server/cli/codex-adapter.test.ts`（+2 用例）
+- `vitest.config.ts`（新增）
+- `package.json`（1.0.10 → 1.0.11）
+
+### 部署须知
+远程桥接服务必须 `git pull && npm run build && pm2 restart` 才能生效。
+
+---
+
 ## v1.0.10 - 2026-05-12
 ### 变更内容
 - **修复远程长任务期间 cc 看似"失联"的 bug**。SshExecutor 此前默认 60s 无 exec 就主动 `client.end()`，但远程 cc 跑长任务时桥接侧本就没指令——60s 一到自断 SSH，pollPane / sendInput 下一次再上来要重连，期间表现为"abcd 进程全部失联"。

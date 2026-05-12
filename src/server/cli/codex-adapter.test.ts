@@ -60,3 +60,22 @@ describe('codex-adapter.buildStartCmd', () => {
     expect(cmd).toContain('exec codex');
   });
 });
+
+describe('codex-adapter.extractChoicePanel (复用 cc 实现)', () => {
+  it('识别 ╭─...─╮ 框 + 多选项 → 返回 panel', () => {
+    const pane = `╭──────────────────────────╮
+│ Apply patch?             │
+│                          │
+│ ❯ 1. Yes                 │
+│   2. No                  │
+╰──────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(2);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('普通光标行 ">_" 不应误判', () => {
+    expect(adapter.extractChoicePanel('  > \n')).toBeNull();
+  });
+});

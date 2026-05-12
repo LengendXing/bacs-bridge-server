@@ -25,9 +25,11 @@ import {
   startOutputPolling,
   endSession,
   hasActiveSession,
+  getSession,
   type SessionState,
   type SessionContext,
 } from '../../session/state.js';
+import type { ChoicePanel } from '../../cli/types.js';
 import { buildCliConfig } from '../../session/manager.js';
 import { getDb } from '../../db/index.js';
 import { bindings } from '../../db/schema.js';
@@ -235,6 +237,47 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
     }
 
     if (hasActiveSession(processName)) {
+      // 关键：active session 处于 awaiting_choice → 把这条消息当成"用户对决策面板的回复"
+      // 通过 adapter.sendChoice 发送数字键/方向键，而不是 paste 文本到不存在的输入框
+      const existing = getSession(processName);
+      if (existing && existing.awaiting) {
+        const panel = existing.awaiting.panel;
+        const r = await adapter.sendChoice(
+          `${adapter.sessionPrefix}-${processName}`,
+          msgText,
+          panel,
+          executor,
+        );
+        if (!r.ok) {
+          sender
+            .sendText(
+              feishuAppId,
+              feishuAppSecret,
+              targetType,
+              targetId,
+              `❌ 选择失败：${r.error || '未识别的回复'}\n请回复选项序号（1/2/...）或关键词（yes/no/是/否）`,
+            )
+            .catch((e: Error) => logger.log('error', '发送选择失败提示失败', e.message));
+          return;
+        }
+        const chosen = r.chosenIndex
+          ? panel.options.find((o) => o.startsWith(`${r.chosenIndex}.`)) || `第 ${r.chosenIndex} 项`
+          : '已发送';
+        sender
+          .sendText(
+            feishuAppId,
+            feishuAppSecret,
+            targetType,
+            targetId,
+            `✅ 已转发选择：${chosen}\n等待 cc 后续输出...`,
+          )
+          .catch((e: Error) => logger.log('error', '发送选择确认失败', e.message));
+        // 清掉 awaiting，由轮询继续判断 cc 后续状态（idle / 又一个面板 / working）
+        existing.awaiting = null;
+        logger.log('info', `已转发选择到 ${processName}: idx=${r.chosenIndex}`);
+        return;
+      }
+
       sender
         .sendText(
           feishuAppId,
@@ -283,6 +326,8 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
     logger.log('info', `消息已路由到进程 ${processName}: ${msgText.slice(0, 60)}`);
 
     startProgressTimer(session, (s: SessionState) => {
+      // 等待用户决策时不发"处理中"卡片（避免误导）；决策卡片已推送
+      if (s.awaiting) return;
       const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
       const card = sender.buildProgressCard(s.processName, elapsed, s.ctx.msgText);
       sender
@@ -292,6 +337,11 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
 
     startHardDeadline(session, (s: SessionState) => {
       if (s.replied) return;
+      // 等待用户决策中 → 不算超时（用户可能正在飞书外离开），保持 session
+      if (s.awaiting) {
+        logger.log('info', `进程 ${s.processName} 处于 awaiting_choice，跳过硬超时`);
+        return;
+      }
       const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
       const reply = adapter.extractReply(s.accumulated, s.ctx.msgText);
       if (reply && reply.length > 5) {
@@ -307,24 +357,39 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
       }
     });
 
-    startOutputPolling(session, (s: SessionState, reply: string) => {
-      if (s.replied) return;
-      if (!reply) {
-        sender
-          .sendText(
-            s.ctx.feishuAppId,
-            s.ctx.feishuAppSecret,
-            s.ctx.targetType,
-            s.ctx.targetId,
-            '[CC 已完成处理，但未能提取到回复内容。请检查 tmux 会话或重试]',
-          )
-          .catch((e: Error) => logger.log('error', '发送空回复提示失败', e.message));
+    startOutputPolling(session, {
+      onReply: (s: SessionState, reply: string) => {
+        if (s.replied) return;
+        if (!reply) {
+          sender
+            .sendText(
+              s.ctx.feishuAppId,
+              s.ctx.feishuAppSecret,
+              s.ctx.targetType,
+              s.ctx.targetId,
+              '[CC 已完成处理，但未能提取到回复内容。请检查 tmux 会话或重试]',
+            )
+            .catch((e: Error) => logger.log('error', '发送空回复提示失败', e.message));
+          s.replied = true;
+          endSession(s.processName);
+          return;
+        }
         s.replied = true;
-        endSession(s.processName);
-        return;
-      }
-      s.replied = true;
-      sendReply(s, reply, false);
+        sendReply(s, reply, false);
+      },
+      onAwaiting: (s: SessionState, panel: ChoicePanel) => {
+        const card = sender.buildAwaitingCard(
+          s.processName,
+          panel.title,
+          panel.options,
+          panel.defaultIndex,
+          s.ctx.msgText,
+        );
+        sender
+          .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+          .catch((e: Error) => logger.log('error', '发送决策卡片失败', e.message));
+        logger.log('info', `cc 等待决策: ${panel.title}（${panel.options.length} 个选项）`);
+      },
     });
     } catch (e: any) {
       logger.log('error', '消息处理异常', e.message || e);
