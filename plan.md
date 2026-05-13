@@ -3,6 +3,15 @@
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
 
+## v1.1.4 · 2026-05-13
+- [x] BindingsView 右内容区改双 Tab（列表 + Terminal），底部胶囊 Tab Bar，250ms 平滑过渡 ✅ 2026-05-13
+- [x] 后端 /api/status 加分页（?page=&pageSize=，DB 层 limit/offset，向后兼容）✅ 2026-05-13
+- [x] 通用 Pagination.vue 组件（智能省略号、4 档 pageSize、mac 风格 + dark mode）✅ 2026-05-13
+- [x] Terminal 单例化：useTerminalSession composable 管 ws + xterm buffer + 5min idle timer ✅ 2026-05-13
+- [x] TerminalPanel.vue 组件抽取，TerminalView 改为路由包装层（独立路由直链保留）✅ 2026-05-13
+- [x] LayoutView keep-alive 包 BindingsView，切菜单状态保活 + 5 分钟超时断 ws ✅ 2026-05-13
+- [x] Terminal 按钮交互改为切 Tab，不再 window.open 新窗口 ✅ 2026-05-13
+
 ## v1.1.3 · 2026-05-12
 - [x] Web Terminal：「绑定」列表新增 Terminal 按钮，浏览器内 xterm 直连 tmux pane ✅ 2026-05-12
 - [x] 后端 pty-bridge（本机 node-pty / 远程 ssh2 shell channel）+ /ws/terminal WebSocket 端点 + 鉴权 + 审计 ✅ 2026-05-12

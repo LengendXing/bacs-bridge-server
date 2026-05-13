@@ -1,5 +1,23 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.4 - 2026-05-13
+### 变更内容
+- **重构「Terminal」交互**：BindingsView 右内容区从「单页表格」改为「双 Tab 容器」。Tab 1 = 进程绑定列表（含分页），Tab 2 = 内嵌 Terminal。原 `Terminal` 按钮不再 `window.open` 新窗口，改为：`useTerminalSession.connect(bindingId) + activeTab='terminal'`，所有进程**共用同一个 xterm 实例 + 同一个 WebSocket**（单例 store），切换目标 binding 时仅复用承载层，关旧 ws 连新 ws，省内存、易管理。
+- **列表分页（全站规范）**：后端 `GET /api/status` 新增 `?page=&pageSize=` 参数；走 `count(*)` 取总数 + `limit/offset` DB 层切片，仅对当前页做 `sessionExists/wsConnected` 异步查询，原全表 N 次 await 退化为 1 页 N 次；向后兼容：不传 `page` 仍返数组（HomeView 等老调用方零改动）。前端新增通用组件 `src/client/components/Pagination.vue`（智能省略号、4 档 pageSize 下拉、mac 风格 + dark mode）。
+- **Terminal 全局单例 + 5 分钟保活**：新增 `src/client/composables/useTerminalSession.ts`：模块级单例管理 ws + 状态 + 输出缓冲（最多 1MB，xterm 重挂时 replay）+ idle timer。用户离开 Terminal Tab（切到列表）或离开「绑定」菜单时启动 5 分钟计时器，超时未回则自动 `disconnect()`；5 分钟内切回则 `cancelIdleTimer()` 复用连接。`LayoutView` 用 `<keep-alive include="BindingsView">` 包裹 router-view，让切菜单时 BindingsView 状态保活，配合 `onActivated/onDeactivated` 控制 idle timer。
+- **Terminal 组件抽取**：新增 `src/client/components/TerminalPanel.vue`：纯展示层，接受 `bindingId` prop，挂载时创建 xterm + FitAddon + WebLinksAddon，订阅 composable 的 message handler，并通过 `replayBuffer` 重放历史输出；卸载时 dispose xterm 但**不**关 ws（由 composable 控制）。原 `TerminalView.vue` 改成路由包装层：保留独立路由 `/terminal/:bindingId`（含 boot token 换 token 流程）作为直链备份，渲染 `<TerminalPanel fullscreen>`。
+- **底部 Tab Bar + 250ms 过渡**：在 BindingsView 底部新增胶囊式 Tab Bar，点击切换 Tab，使用 `<Transition>` + `transform/opacity` 实现 250ms 平滑过渡（forward/backward 方向不同），Terminal Tab 上叠加状态指示灯（绿/黄/红）。
+
+### 影响范围
+- 后端：`src/server/routes/bindings.ts`
+- 前端新增：`src/client/components/Pagination.vue`、`src/client/components/TerminalPanel.vue`、`src/client/composables/useTerminalSession.ts`
+- 前端改动：`src/client/views/BindingsView.vue`、`src/client/views/TerminalView.vue`、`src/client/views/LayoutView.vue`
+
+### 测试
+- `npm run build` ✅（前端 Vite + 后端 tsc）
+- `npx vitest run` ✅ 50/50（含 v1.1.3 pty-bridge 注入防御等历史用例）
+- 端到端验证项（建议手测）：分页翻页 / 切换 pageSize / 切 Tab 5 分钟未回自动断 ws / 切菜单 5 分钟未回自动断 ws / 切回 5 分钟内复用 ws / Terminal Tab 切换不同 binding 关旧连新 / 关闭 Tab 不 kill tmux session
+
 ## v1.1.3 - 2026-05-12
 ### 变更内容
 - **新功能：浏览器内 Web Terminal**。在「绑定」列表的操作列新增 `Terminal` 按钮，点击后通过 `window.open` 打开独立页面，xterm 直连绑定进程对应的 tmux pane（cc-xxx / codex-xxx），交互体验等同本地 `tmux attach`。核心约束：**关闭 web-terminal 窗口 ≠ kill 业务进程**，飞书消息桥继续工作。
