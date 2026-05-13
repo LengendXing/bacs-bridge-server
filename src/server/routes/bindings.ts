@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { getDb } from '../db/index.js';
 import { bindings, providers, models, machines, auditLogs } from '../db/schema.js';
@@ -12,12 +12,26 @@ import { getChannel } from '../channel/router.js';
 
 const router = Router();
 
-router.get('/api/status', requireAuth, async (_req, res) => {
+router.get('/api/status', requireAuth, async (req, res) => {
   try {
     const db = getDb();
-    const allBindings = db.select().from(bindings).all();
 
-    const result = await Promise.all(allBindings.map(async (b) => {
+    const rawPage = Number.parseInt(String(req.query.page ?? ''), 10);
+    const rawSize = Number.parseInt(String(req.query.pageSize ?? ''), 10);
+    const paginated = Number.isFinite(rawPage) && rawPage > 0;
+    const page = paginated ? rawPage : 1;
+    const pageSize = paginated
+      ? Math.min(Math.max(Number.isFinite(rawSize) && rawSize > 0 ? rawSize : 10, 1), 100)
+      : 0;
+
+    const totalRow = db.select({ c: sql<number>`count(*)` }).from(bindings).get();
+    const total = Number(totalRow?.c ?? 0);
+
+    const pageBindings = paginated
+      ? db.select().from(bindings).limit(pageSize).offset((page - 1) * pageSize).all()
+      : db.select().from(bindings).all();
+
+    const result = await Promise.all(pageBindings.map(async (b) => {
       const adapter = getAdapter(b.cliKind);
       let isOnline = false;
       try {
@@ -81,7 +95,11 @@ router.get('/api/status', requireAuth, async (_req, res) => {
       };
     }));
 
-    res.json({ code: 0, data: result });
+    if (paginated) {
+      res.json({ code: 0, data: { items: result, total, page, pageSize } });
+    } else {
+      res.json({ code: 0, data: result });
+    }
   } catch (e: any) {
     logger.log('error', '获取绑定状态失败', e.message);
     res.json({ code: 1001, message: '获取状态失败: ' + e.message });
