@@ -62,6 +62,12 @@
           </tr>
         </tbody>
       </table>
+      <Pagination
+        v-model:page="page"
+        v-model:pageSize="pageSize"
+        :total="total"
+        :disabled="loading"
+      />
     </div>
 
     <!-- 新建/编辑/挂载弹窗 -->
@@ -153,8 +159,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useApi } from '../composables/useApi';
+import Pagination from '../components/Pagination.vue';
 import type { Binding, Provider, Machine, Model } from '@shared/types';
 import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '@shared/defaultModels';
 import type { CliKind } from '@shared/defaultModels';
@@ -163,6 +170,9 @@ const { get, post, del } = useApi();
 
 const bindings = ref<Binding[]>([]);
 const loading = ref(false);
+const page = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
 const providerList = ref<Provider[]>([]);
 const machineList = ref<Machine[]>([]);
 const modelList = ref<Model[]>([]);
@@ -242,10 +252,20 @@ const submitLabel = computed(() =>
 async function refresh() {
   loading.value = true;
   try {
-    const res = await get<Binding[]>('/api/status');
-    if (res.code === 0) bindings.value = res.data || [];
+    const res = await get<{ items: Binding[]; total: number; page: number; pageSize: number }>(
+      `/api/status?page=${page.value}&pageSize=${pageSize.value}`
+    );
+    if (res.code === 0 && res.data) {
+      bindings.value = res.data.items || [];
+      total.value = res.data.total || 0;
+      if (bindings.value.length === 0 && page.value > 1 && total.value > 0) {
+        page.value = Math.max(1, Math.ceil(total.value / pageSize.value));
+      }
+    }
   } catch { /* */ } finally { loading.value = false; }
 }
+
+watch([page, pageSize], () => { refresh(); });
 
 async function loadProviders() {
   try {
