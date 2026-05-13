@@ -150,6 +150,14 @@ export class SshExecutor implements RemoteExecutor {
     }
   }
 
+  /**
+   * 暴露已连接的底层 ssh2 Client，供 web-terminal 等需要直接开 channel 的场景使用。
+   * 调用方拿到 client 后只允许新开 shell/exec channel，不应 destroy/end client 本身。
+   */
+  async acquireClient(): Promise<Client> {
+    return this.ensureConnected();
+  }
+
   async exec(cmd: string, options?: ExecOptions): Promise<ExecResult> {
     try {
       const client = await this.ensureConnected();

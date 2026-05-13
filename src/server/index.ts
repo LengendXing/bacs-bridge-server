@@ -17,6 +17,7 @@
  */
 
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -26,6 +27,7 @@ import cookieParser from 'cookie-parser';
 import config from './config.js';
 import * as logger from './middleware/logger.js';
 import { restoreAllChannels } from './channel/router.js';
+import { mountTerminalWs } from './terminal/ws-server.js';
 
 // ── Route modules ──────────────────────────────────────────────────────
 import authRoutes from './routes/auth.js';
@@ -146,7 +148,12 @@ app.use(settingsRoutes);
 
 const { port, host } = config.server;
 
-app.listen(port, host, () => {
+// 用 http.createServer 包装，方便挂载 WebSocket（web-terminal 需要 upgrade 事件）
+const httpServer = http.createServer(app);
+
+mountTerminalWs(httpServer);
+
+httpServer.listen(port, host, () => {
   logger.log('info', 'Bridge Server 启动', { host, port, version });
   console.log(`Bridge Server v${version} 运行在 http://${host}:${port}`);
 
