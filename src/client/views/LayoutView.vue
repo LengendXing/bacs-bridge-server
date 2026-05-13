@@ -76,7 +76,11 @@
       </header>
 
       <div class="px-6 pb-6">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive include="BindingsView">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </div>
     </div>
   </div>

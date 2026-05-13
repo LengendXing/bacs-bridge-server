@@ -1,17 +1,34 @@
 <template>
-  <div>
+  <div class="bindings-page">
     <!-- Top bar -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-semibold" style="color: var(--text)">进程绑定状态</h2>
+      <h2 class="text-lg font-semibold" style="color: var(--text)">
+        {{ activeTab === 'list' ? '进程绑定状态' : 'Terminal' }}
+      </h2>
       <div class="flex items-center gap-2">
-        <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新建绑定</button>
-        <button class="btn-mac btn-mac-sm" @click="openMount">挂载已有</button>
-        <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">刷新</button>
+        <template v-if="activeTab === 'list'">
+          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新建绑定</button>
+          <button class="btn-mac btn-mac-sm" @click="openMount">挂载已有</button>
+          <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">刷新</button>
+        </template>
+        <template v-else>
+          <span v-if="terminalSession.bindingId.value" class="text-xs" style="color: var(--text-secondary)">
+            目标: {{ currentBindingName }}
+          </span>
+          <button v-if="terminalSession.status.value === 'open' || terminalSession.status.value === 'connecting'"
+            class="btn-mac btn-mac-danger btn-mac-sm"
+            @click="terminalSession.disconnect()"
+          >断开</button>
+        </template>
       </div>
     </div>
 
-    <!-- Bindings table -->
-    <div class="glass-card" style="padding: 0; overflow: hidden">
+    <!-- Tab content area -->
+    <div class="tab-area">
+      <Transition :name="tabTransitionName" mode="out-in">
+        <div v-if="activeTab === 'list'" key="list" class="tab-pane">
+          <!-- Bindings table -->
+          <div class="glass-card" style="padding: 0; overflow: hidden">
       <table class="table-mac">
         <thead>
           <tr>
@@ -62,12 +79,42 @@
           </tr>
         </tbody>
       </table>
-      <Pagination
-        v-model:page="page"
-        v-model:pageSize="pageSize"
-        :total="total"
-        :disabled="loading"
-      />
+            <Pagination
+              v-model:page="page"
+              v-model:pageSize="pageSize"
+              :total="total"
+              :disabled="loading"
+            />
+          </div>
+        </div>
+        <div v-else key="terminal" class="tab-pane terminal-pane">
+          <TerminalPanel :binding-id="terminalSession.bindingId.value" />
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Bottom Tab Bar -->
+    <div class="tab-bar">
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'list' }"
+        @click="setTab('list')"
+      >
+        <span class="tab-icon">📋</span>
+        <span>绑定列表</span>
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'terminal' }"
+        :disabled="!terminalSession.bindingId.value"
+        @click="setTab('terminal')"
+      >
+        <span class="tab-icon">⌨</span>
+        <span>Terminal</span>
+        <span v-if="terminalSession.status.value === 'open'" class="tab-indicator dot-green" />
+        <span v-else-if="terminalSession.status.value === 'connecting'" class="tab-indicator dot-yellow" />
+        <span v-else-if="terminalSession.status.value === 'closed'" class="tab-indicator dot-red" />
+      </button>
     </div>
 
     <!-- 新建/编辑/挂载弹窗 -->
@@ -159,9 +206,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onActivated, onDeactivated, onBeforeUnmount, watch } from 'vue';
 import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
+import TerminalPanel from '../components/TerminalPanel.vue';
+import { useTerminalSession, IDLE_TIMEOUT } from '../composables/useTerminalSession';
+
+defineOptions({ name: 'BindingsView' });
 import type { Binding, Provider, Machine, Model } from '@shared/types';
 import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '@shared/defaultModels';
 import type { CliKind } from '@shared/defaultModels';
@@ -173,6 +224,45 @@ const loading = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
+
+const terminalSession = useTerminalSession();
+type TabKey = 'list' | 'terminal';
+const activeTab = ref<TabKey>('list');
+const tabTransitionName = ref<'tab-forward' | 'tab-backward'>('tab-forward');
+
+const currentBindingName = computed(() => {
+  const id = terminalSession.bindingId.value;
+  if (!id) return '';
+  const b = bindings.value.find((x) => x.id === id);
+  return b ? `${b.machine}:${b.workdir}` : id;
+});
+
+function setTab(t: TabKey) {
+  if (t === activeTab.value) return;
+  tabTransitionName.value = t === 'terminal' ? 'tab-forward' : 'tab-backward';
+  activeTab.value = t;
+  if (t === 'terminal') {
+    terminalSession.cancelIdleTimer();
+  } else {
+    if (terminalSession.bindingId.value) {
+      terminalSession.startIdleTimer(IDLE_TIMEOUT);
+    }
+  }
+}
+
+onActivated(() => {
+  if (activeTab.value === 'terminal') {
+    terminalSession.cancelIdleTimer();
+  }
+});
+onDeactivated(() => {
+  if (terminalSession.bindingId.value) {
+    terminalSession.startIdleTimer(IDLE_TIMEOUT);
+  }
+});
+onBeforeUnmount(() => {
+  terminalSession.cancelIdleTimer();
+});
 const providerList = ref<Provider[]>([]);
 const machineList = ref<Machine[]>([]);
 const modelList = ref<Model[]>([]);
@@ -485,29 +575,109 @@ function copyAttach(b: Binding) {
   }
 }
 
-async function openTerminal(b: Binding) {
-  // sessionStorage 不跨 tab 共享 → 通过短期 token 传递登录态
-  // 子窗口拿到后立刻调 /api/auth/exchange 换长 token 并存自己的 sessionStorage
-  let bootToken: string | null = null;
-  try {
-    const res = await post<{ token: string }>('/api/auth/qr-token', {});
-    if (res.code === 0 && res.data?.token) bootToken = res.data.token;
-  } catch { /* fallback：让子窗口自行去登录页 */ }
-
-  const params = new URLSearchParams();
-  if (bootToken) params.set('boot', bootToken);
-  const qs = params.toString() ? `?${params.toString()}` : '';
-  const url = `/terminal/${encodeURIComponent(b.id)}${qs}`;
-  const win = window.open(url, `terminal-${b.id}`, 'width=1100,height=720,resizable=yes,scrollbars=no');
-  if (!win) {
-    alert('浏览器拦截了弹窗，请允许此站点的弹窗权限后重试');
-  }
+function openTerminal(b: Binding) {
+  terminalSession.connect(b.id);
+  setTab('terminal');
 }
 
 onMounted(() => { refresh(); loadMachines(); });
 </script>
 
 <style scoped>
+.bindings-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+.tab-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 520px;
+  overflow: hidden;
+}
+.tab-pane {
+  width: 100%;
+}
+.terminal-pane {
+  height: calc(100vh - 220px);
+  min-height: 480px;
+}
+
+.tab-forward-enter-active,
+.tab-forward-leave-active,
+.tab-backward-enter-active,
+.tab-backward-leave-active {
+  transition: transform 250ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 250ms ease;
+  will-change: transform, opacity;
+}
+.tab-forward-enter-from { transform: translateX(40px); opacity: 0; }
+.tab-forward-leave-to   { transform: translateX(-40px); opacity: 0; }
+.tab-backward-enter-from { transform: translateX(-40px); opacity: 0; }
+.tab-backward-leave-to   { transform: translateX(40px); opacity: 0; }
+
+.tab-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  margin-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+:global([data-theme="dark"]) .tab-bar {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  background: rgba(20, 20, 22, 0.6);
+}
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+:global([data-theme="dark"]) .tab-btn {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #9ca3af;
+}
+.tab-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04);
+}
+.tab-btn.active {
+  background: var(--text, #111827);
+  color: #fff;
+  border-color: var(--text, #111827);
+}
+:global([data-theme="dark"]) .tab-btn.active {
+  background: #e5e7eb;
+  color: #111;
+  border-color: #e5e7eb;
+}
+.tab-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.tab-icon { font-size: 14px; }
+.tab-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 4px;
+}
+.dot-green { background: #4ade80; }
+.dot-yellow { background: #facc15; }
+.dot-red { background: #ef4444; }
+
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex;
   align-items: center; justify-content: center; z-index: 100;
