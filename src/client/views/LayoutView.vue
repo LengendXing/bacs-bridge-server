@@ -4,6 +4,7 @@
     <aside v-if="menuLayout === 'left'" class="sidebar">
       <div class="sidebar-header">
         <BacsLogo :size="28" />
+        <span class="sidebar-title">笨迪桥接</span>
       </div>
       <nav class="sidebar-nav">
         <button
@@ -33,16 +34,14 @@
           <div>
             <div class="flex items-center gap-3">
               <BacsLogo :size="32" />
+              <span class="header-title">笨迪桥接</span>
             </div>
             <p class="text-sm mt-1" style="color: var(--text-secondary)">Bridge Admin Control System</p>
           </div>
-          <div class="flex items-center gap-4">
-            <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
-            <div class="flex items-center gap-2">
-              <Moon :size="16" :stroke-width="1.5" />
-              <div class="theme-toggle" @click="toggleTheme"></div>
-              <Sun :size="16" :stroke-width="1.5" />
-            </div>
+          <div class="flex items-center gap-2">
+            <Moon :size="16" :stroke-width="1.5" />
+            <div class="theme-toggle" @click="toggleTheme"></div>
+            <Sun :size="16" :stroke-width="1.5" />
           </div>
         </header>
 
@@ -60,18 +59,12 @@
         </div>
       </template>
 
-      <!-- 左侧模式：简化顶栏 -->
-      <header v-if="menuLayout === 'left'" class="flex items-center justify-between mb-6 px-6 pt-6">
+      <!-- 左侧模式：简化顶栏（仅主题切换） -->
+      <header v-if="menuLayout === 'left'" class="flex items-center justify-end mb-6 px-6 pt-6">
         <div class="flex items-center gap-2">
-          <BacsLogo :size="24" />
-        </div>
-        <div class="flex items-center gap-4">
-          <button class="btn-mac btn-mac-sm" @click="auth.logout(); router.push('/login')">退出</button>
-          <div class="flex items-center gap-2">
-            <Moon :size="16" :stroke-width="1.5" />
-            <div class="theme-toggle" @click="toggleTheme"></div>
-            <Sun :size="16" :stroke-width="1.5" />
-          </div>
+          <Moon :size="16" :stroke-width="1.5" />
+          <div class="theme-toggle" @click="toggleTheme"></div>
+          <Sun :size="16" :stroke-width="1.5" />
         </div>
       </header>
 
@@ -89,7 +82,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
 import { useAuth } from '../composables/useAuth';
 import BacsLogo from '../components/BacsLogo.vue';
 import { Home, Link, Server, Cloud, FileText, Settings, LogOut, Moon, Sun } from 'lucide-vue-next';
@@ -107,19 +99,16 @@ const tabs = [
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
-// ── 菜单布局：直接用响应式 ref，跟 localStorage 同步 ──
 const menuLayout = ref<'top' | 'left'>(
   (localStorage.getItem('menuLayout') as 'top' | 'left') || 'top'
 );
 
-// 监听 storage 事件（设置页修改时触发跨组件更新）
 window.addEventListener('storage', (e) => {
   if (e.key === 'menuLayout' && e.newValue) {
     menuLayout.value = e.newValue as 'top' | 'left';
   }
 });
 
-// 定时检查（同页面修改 localStorage 不会触发 storage 事件）
 let lastLayout = menuLayout.value;
 setInterval(() => {
   const current = localStorage.getItem('menuLayout') as 'top' | 'left' || 'top';
@@ -139,7 +128,6 @@ function toggleTheme() {
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 }
 
-// 初始化主题
 const saved = localStorage.getItem('theme');
 if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
@@ -151,13 +139,12 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   min-height: 100vh;
 }
 
-/* 左侧模式：flex 横排 */
 .layout-left {
   display: flex;
   flex-direction: row;
 }
 
-/* 左侧边栏 */
+/* 侧边栏 */
 .sidebar {
   width: 200px;
   min-width: 200px;
@@ -170,8 +157,18 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   top: 0;
 }
 .sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 20px 16px 12px;
   border-bottom: 1px solid var(--border);
+}
+.sidebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .sidebar-nav {
   flex: 1;
@@ -206,9 +203,6 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   height: 20px;
   flex-shrink: 0;
 }
-.sidebar-icon :deep(svg) {
-  display: block;
-}
 .sidebar-label {
   flex: 1;
   line-height: 1;
@@ -216,6 +210,14 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
 .sidebar-footer {
   padding: 8px;
   border-top: 1px solid var(--border);
+}
+
+/* 顶部模式标题 */
+.header-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
 }
 
 .main-area {
@@ -289,33 +291,5 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
 }
 .dark .theme-toggle::after {
   transform: translateX(22px);
-}
-
-.theme-toggle-sm {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  background: var(--border);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-.theme-toggle-sm::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.3s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-.dark .theme-toggle-sm {
-  background: var(--accent);
-}
-.dark .theme-toggle-sm::after {
-  transform: translateX(16px);
 }
 </style>

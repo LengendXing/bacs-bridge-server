@@ -3,6 +3,14 @@
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
 
+## v1.1.6 · 2026-05-14
+- [x] Logo 右侧加「笨迪桥接」文字（left 侧边栏 + top 顶栏） ✅ 2026-05-14
+- [x] 删除右上角退出按钮（left/top 两种模式均清理） ✅ 2026-05-14
+- [x] 新建 bacs_chat_time_line 表（迁移文件 0004_chat_timeline.sql + schema） ✅ 2026-05-14
+- [x] ws-client.ts 写入 timeline hook（收到消息 → DB 写入 + SSE 广播） ✅ 2026-05-14
+- [x] 新建 /api/timeline + /api/timeline/stream SSE 端点 ✅ 2026-05-14
+- [x] HomeView 首页 Timeline 区块（SSE 实时 + TransitionGroup 插入动画 + 展开/收起） ✅ 2026-05-14
+
 ## v1.1.5-fix · 2026-05-14
 - [x] 修复 Pagination.vue CSS 变量名错误（--mac-text* → --text*），background 改用 var(--card)/var(--border) ✅ 2026-05-14
 - [x] 修复 BindingsView tab-bar 灰色底部，统一用主题变量 var(--bg)/var(--card)/var(--accent) ✅ 2026-05-14
