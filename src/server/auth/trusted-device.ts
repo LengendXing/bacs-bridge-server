@@ -2,12 +2,17 @@
  * @module auth/trusted-device
  * @description 信任设备管理
  *
- * 用户勾选"信任此设备"后，生成 deviceToken 写入浏览器 cookie。
- * 有效期内（默认 30 天）该设备可跳过 2FA 验证。
+ * 双通道验证策略：
+ * 1. deviceId（主通道）：浏览器 FingerprintJS 计算的稳定指纹，存 localStorage，
+ *    不依赖 cookie，清 cookie 后仍有效。
+ * 2. deviceToken（辅助通道）：服务端随机生成，存 httpOnly cookie，
+ *    作为 deviceId 丢失时的备用验证手段。
+ *
+ * 只要任意一个通道命中有效记录，即可跳过 2FA。
  */
 
 import crypto from 'crypto';
-import { eq, and, gt, lt } from 'drizzle-orm';
+import { eq, and, gt, lt, or } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { trustedDevices } from '../db/schema.js';
 import { TRUSTED_DEVICE_DAYS } from '../../shared/constants.js';
@@ -18,30 +23,32 @@ import { TRUSTED_DEVICE_DAYS } from '../../shared/constants.js';
  * @param userId - 用户 ID
  * @param deviceName - 设备名称（从 User-Agent 摘要）
  * @param ipAddress - 请求 IP
+ * @param deviceId - 浏览器指纹 ID（可选，来自 FingerprintJS）
  * @param days - 有效天数，默认 30
  * @returns 生成的 deviceToken 字符串
- *
- * @example
- * ```ts
- * const token = await createTrustedDevice(1, 'Chrome/macOS', '192.168.1.1');
- * // 'td_a1b2c3d4...'
- * ```
  */
 export async function createTrustedDevice(
   userId: number,
   deviceName: string,
   ipAddress: string,
+  deviceId?: string,
   days = TRUSTED_DEVICE_DAYS,
 ): Promise<string> {
   const db = getDb();
   const token = `td_${crypto.randomBytes(32).toString('hex')}`;
-
-  // 计算过期时间
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+  // 若已有相同 deviceId 的记录，先删除再写入（刷新过期时间）
+  if (deviceId) {
+    db.delete(trustedDevices)
+      .where(and(eq(trustedDevices.userId, userId), eq(trustedDevices.deviceId, deviceId)))
+      .run();
+  }
 
   db.insert(trustedDevices).values({
     userId,
     deviceToken: token,
+    deviceId: deviceId ?? null,
     deviceName,
     ipAddress,
     expiresAt,
@@ -51,47 +58,61 @@ export async function createTrustedDevice(
 }
 
 /**
- * 验证信任设备令牌是否有效
+ * 验证信任设备（双通道）
  *
- * @param deviceToken - 浏览器 cookie 中的令牌
- * @returns 用户 ID（令牌有效），或 null（无效/过期）
- *
- * @example
- * ```ts
- * const userId = await verifyTrustedDevice('td_a1b2c3d4...');
- * if (userId) { // 跳过 2FA
- * ```
+ * @param userId - 当前登录用户的 ID（用于校验 token/deviceId 归属）
+ * @param deviceToken - 浏览器 cookie 中的令牌（可能为空）
+ * @param deviceId - 浏览器 localStorage 中的指纹（可能为空）
+ * @returns 是否为信任设备
  */
-export function verifyTrustedDevice(deviceToken: string): number | null {
+export function verifyTrustedDevice(
+  userId: number,
+  deviceToken?: string,
+  deviceId?: string,
+): boolean {
+  if (!deviceToken && !deviceId) return false;
+
   const db = getDb();
   const now = new Date().toISOString();
+
+  const conditions = [];
+
+  if (deviceToken) {
+    conditions.push(
+      and(
+        eq(trustedDevices.userId, userId),
+        eq(trustedDevices.deviceToken, deviceToken),
+        gt(trustedDevices.expiresAt, now),
+      )!,
+    );
+  }
+
+  if (deviceId) {
+    conditions.push(
+      and(
+        eq(trustedDevices.userId, userId),
+        eq(trustedDevices.deviceId, deviceId),
+        gt(trustedDevices.expiresAt, now),
+      )!,
+    );
+  }
 
   const row = db
     .select()
     .from(trustedDevices)
-    .where(
-      and(
-        eq(trustedDevices.deviceToken, deviceToken),
-        gt(trustedDevices.expiresAt, now),
-      )
-    )
+    .where(conditions.length === 1 ? conditions[0] : or(...conditions))
     .get();
 
-  return row?.userId ?? null;
+  return !!row;
 }
 
 /**
  * 清理过期的信任设备令牌
- *
- * 建议在用户登录时调用，保持表清洁。
- *
- * @param userId - 可选，只清理特定用户的过期令牌
  */
 export function cleanExpiredDevices(userId?: number): void {
   const db = getDb();
   const now = new Date().toISOString();
 
-  // 删除已过期记录：expiresAt < now
   if (userId) {
     db.delete(trustedDevices)
       .where(and(eq(trustedDevices.userId, userId), lt(trustedDevices.expiresAt, now)))
@@ -105,9 +126,6 @@ export function cleanExpiredDevices(userId?: number): void {
 
 /**
  * 从 User-Agent 字符串生成简短设备描述
- *
- * @param ua - 浏览器 User-Agent
- * @returns 简短描述，如 "Chrome / macOS" / "Safari / iOS"
  */
 export function describeUserAgent(ua: string): string {
   const browser = ua.includes('Chrome') && !ua.includes('Edg')
@@ -120,8 +138,7 @@ export function describeUserAgent(ua: string): string {
     ? 'Edge'
     : 'Unknown';
 
-  // iOS / Android 优先于 macOS / Linux：iPhone UA 含 "Mac OS X" 子串，
-  // Android UA 含 "Linux" 子串，先判移动端能避免误识别为桌面 OS。
+  // iOS / Android 优先于 macOS / Linux
   const os = ua.includes('iPhone') || ua.includes('iPad')
     ? 'iOS'
     : ua.includes('Android')

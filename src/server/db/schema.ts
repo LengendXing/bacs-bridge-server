@@ -68,8 +68,11 @@ export const trustedDevices = sqliteTable('trusted_devices', {
   /** 关联用户 ID */
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
-  /** 随机生成的设备令牌，存入浏览器 cookie */
+  /** 随机生成的设备令牌，存入浏览器 cookie（辅助通道，主要靠 deviceId） */
   deviceToken: text('device_token').notNull().unique(),
+
+  /** 浏览器端 FingerprintJS 计算的稳定设备指纹，存 localStorage */
+  deviceId: text('device_id'),
 
   /** 设备名称（从 User-Agent 摘要生成，如 "Chrome / macOS"） */
   deviceName: text('device_name'),
