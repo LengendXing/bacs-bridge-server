@@ -99,23 +99,16 @@ function onSizeChange(e: Event) {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(255, 255, 255, 0.6);
-}
-:global(.dark) .pagination-mac {
-  border-top-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid var(--border);
+  background: var(--card);
 }
 .pagination-info {
   font-size: 12px;
-  color: var(--mac-text-secondary, #6b7280);
+  color: var(--text-secondary);
 }
 .pagination-num {
   font-weight: 600;
-  color: var(--mac-text, #111827);
-}
-:global(.dark) .pagination-num {
-  color: #e5e7eb;
+  color: var(--text);
 }
 .pagination-controls {
   display: flex;
@@ -127,7 +120,7 @@ function onSizeChange(e: Event) {
 }
 .pagination-ellipsis {
   padding: 0 4px;
-  color: var(--mac-text-secondary, #9ca3af);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 .pagination-size {

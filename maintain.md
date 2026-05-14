@@ -1,5 +1,21 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.5-fix - 2026-05-14
+### 变更内容
+- **[修复] 主题色不一致（灰色底部）**：
+  - `Pagination.vue` 样式用了错误的 CSS 变量名 `--mac-text-secondary` / `--mac-text`（项目实际变量为 `--text-secondary` / `--text`），导致 dark/light 模式下 fallback 到 hardcoded 灰色（`#6b7280`、`#111827`、`#e5e7eb`）；修正为 `var(--text-secondary)` / `var(--text)`
+  - `pagination-mac` 容器 `background: transparent` + `border-top: rgba(0,0,0,0.06)` 不跟随主题；改为 `background: var(--card)` + `border-top: var(--border)`，与 glass-card 内部完全融合
+  - `BindingsView` tab-bar：`background: transparent` → `var(--bg)`；tab-btn 的 light 模式 `rgba(255,255,255,0.4)` → `var(--card)`，border `rgba(0,0,0,0.08)` → `var(--border)`；active 态统一用 `var(--accent)` / `var(--bg)` 代替 dark 模式特判的 `#e5e7eb`/`#111`
+- **[修复] 其他页面 table 无分页**：
+  - `MachinesView`：前端分页（`pagedMachines` computed），添加 `<Pagination>` 组件，默认每页 20 条
+  - `ProvidersView`：服务商列表 + 模型列表各自独立分页（`pagedProviders` / `pagedModels`），切换服务商时 modelPage 重置为第 1 页；models 卡片样式统一为 `padding:0; overflow:hidden` 与其他卡片一致
+
+### 影响范围
+- 改动：`src/client/components/Pagination.vue`、`src/client/views/BindingsView.vue`、`src/client/views/MachinesView.vue`、`src/client/views/ProvidersView.vue`
+
+### 测试
+- `npm run build` ✅（前端 Vite + 后端 tsc，0 错误）
+
 ## v1.1.5 - 2026-05-14
 ### 变更内容
 - **信任设备指纹重构**：引入 `@fingerprintjs/fingerprintjs`，前端在登录页计算稳定的浏览器设备指纹（基于 canvas/WebGL/UA 等多维度），存入 `localStorage`（key: `bacs_device_id`）。清 cookie 后指纹依然有效。

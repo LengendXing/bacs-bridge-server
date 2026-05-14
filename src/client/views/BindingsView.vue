@@ -623,45 +623,29 @@ onMounted(() => { refresh(); loadMachines(); });
   gap: 6px;
   padding: 10px 0;
   margin-top: 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(8px);
+  background: var(--bg);
   z-index: 5;
-}
-:global([data-theme="dark"]) .tab-bar {
-  border-top-color: rgba(255, 255, 255, 0.08);
-  background: rgba(20, 20, 22, 0.6);
 }
 .tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--border);
+  background: var(--card);
   border-radius: 999px;
   font-size: 13px;
-  color: var(--text-secondary, #6b7280);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 150ms ease;
 }
-:global([data-theme="dark"]) .tab-btn {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #9ca3af;
-}
 .tab-btn:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.04);
+  opacity: 0.85;
 }
 .tab-btn.active {
-  background: var(--text, #111827);
-  color: #fff;
-  border-color: var(--text, #111827);
-}
-:global([data-theme="dark"]) .tab-btn.active {
-  background: #e5e7eb;
-  color: #111;
-  border-color: #e5e7eb;
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
 }
 .tab-btn:disabled {
   opacity: 0.45;
