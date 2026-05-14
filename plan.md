@@ -3,6 +3,12 @@
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
 
+## v1.1.5-fix · 2026-05-14
+- [x] 修复 Pagination.vue CSS 变量名错误（--mac-text* → --text*），background 改用 var(--card)/var(--border) ✅ 2026-05-14
+- [x] 修复 BindingsView tab-bar 灰色底部，统一用主题变量 var(--bg)/var(--card)/var(--accent) ✅ 2026-05-14
+- [x] MachinesView 补充前端分页（Pagination 组件，默认 20 条/页） ✅ 2026-05-14
+- [x] ProvidersView 服务商列表 + 模型列表各加分页（切换服务商重置 modelPage） ✅ 2026-05-14
+
 ## v1.1.5 · 2026-05-14
 - [x] 引入 @fingerprintjs/fingerprintjs，实现 useDeviceId.ts（计算+localStorage 缓存） ✅ 2026-05-14
 - [x] trusted_devices 表加 device_id 列（迁移文件 0003_trusted_device_fingerprint.sql） ✅ 2026-05-14

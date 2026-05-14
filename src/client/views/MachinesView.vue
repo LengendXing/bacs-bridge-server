@@ -23,10 +23,10 @@
           <tr v-if="loading">
             <td colspan="6" class="text-center" style="color: var(--text-secondary)">加载中...</td>
           </tr>
-          <tr v-else-if="machineList.length === 0">
+          <tr v-else-if="pagedMachines.length === 0">
             <td colspan="6" class="text-center" style="color: var(--text-secondary)">暂无机器，点击「添加机器」注册远程服务器</td>
           </tr>
-          <tr v-for="m in machineList" :key="m.id">
+          <tr v-for="m in pagedMachines" :key="m.id">
             <td style="font-weight: 500">
               {{ m.name }}
               <span v-if="m.builtin" class="badge badge-info" style="margin-left: 6px; font-size: 10px">本机</span>
@@ -50,6 +50,12 @@
           </tr>
         </tbody>
       </table>
+      <Pagination
+        v-model:page="machinePage"
+        v-model:pageSize="machinePageSize"
+        :total="machineList.length"
+        :disabled="loading"
+      />
     </div>
 
     <!-- 测试结果弹窗 -->
@@ -139,14 +145,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useApi } from '../composables/useApi';
+import Pagination from '../components/Pagination.vue';
 import type { Machine, MachineTestResult } from '@shared/types';
 
 const { get, post, put, del } = useApi();
 
 const machineList = ref<Machine[]>([]);
 const loading = ref(false);
+const machinePage = ref(1);
+const machinePageSize = ref(20);
+const pagedMachines = computed(() => {
+  const start = (machinePage.value - 1) * machinePageSize.value;
+  return machineList.value.slice(start, start + machinePageSize.value);
+});
 const testingId = ref<number | null>(null);
 const testResult = ref<MachineTestResult | null>(null);
 

@@ -25,11 +25,11 @@
           <tr v-if="loading">
             <td colspan="5" class="text-center" style="color: var(--text-secondary)">加载中...</td>
           </tr>
-          <tr v-else-if="providers.length === 0">
+          <tr v-else-if="pagedProviders.length === 0">
             <td colspan="5" class="text-center" style="color: var(--text-secondary)">暂无服务商</td>
           </tr>
           <tr
-            v-for="p in providers"
+            v-for="p in pagedProviders"
             :key="p.id"
             :style="selectedId === p.id ? 'background: rgba(0,0,0,0.04)' : ''"
             @click="selectedId = p.id"
@@ -48,14 +48,22 @@
           </tr>
         </tbody>
       </table>
+      <Pagination
+        v-model:page="providerPage"
+        v-model:pageSize="providerPageSize"
+        :total="providers.length"
+        :disabled="loading"
+      />
     </div>
 
     <!-- Models section -->
-    <div v-if="selectedProvider" class="glass-card mt-6">
-      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">
-        模型列表 — {{ selectedProvider.name }}
-      </h3>
-      <table v-if="models.length > 0" class="table-mac">
+    <div v-if="selectedProvider" class="glass-card mt-6" style="padding: 0; overflow: hidden">
+      <div style="padding: 16px 16px 0">
+        <h3 class="text-base font-semibold" style="color: var(--text)">
+          模型列表 — {{ selectedProvider.name }}
+        </h3>
+      </div>
+      <table v-if="models.length > 0" class="table-mac" style="margin-top: 12px">
         <thead>
           <tr>
             <th>Model ID</th>
@@ -65,7 +73,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in models" :key="m.id">
+          <tr v-for="m in pagedModels" :key="m.id">
             <td style="font-family: monospace">{{ m.modelId }}</td>
             <td>{{ m.displayName || '-' }}</td>
             <td>{{ m.cliKind }}</td>
@@ -73,7 +81,13 @@
           </tr>
         </tbody>
       </table>
-      <p v-else class="text-sm" style="color: var(--text-secondary)">该服务商暂无模型数据</p>
+      <p v-if="models.length === 0" class="text-sm" style="color: var(--text-secondary); padding: 16px">该服务商暂无模型数据</p>
+      <Pagination
+        v-if="models.length > 0"
+        v-model:page="modelPage"
+        v-model:pageSize="modelPageSize"
+        :total="models.length"
+      />
     </div>
 
     <!-- 新建/编辑弹窗 -->
@@ -114,6 +128,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { useApi } from '../composables/useApi';
+import Pagination from '../components/Pagination.vue';
 import type { Provider, Model } from '@shared/types';
 
 const { get, post, put, del } = useApi();
@@ -122,6 +137,20 @@ const providers = ref<Provider[]>([]);
 const models = ref<Model[]>([]);
 const loading = ref(false);
 const selectedId = ref<number | null>(null);
+
+const providerPage = ref(1);
+const providerPageSize = ref(20);
+const pagedProviders = computed(() => {
+  const start = (providerPage.value - 1) * providerPageSize.value;
+  return providers.value.slice(start, start + providerPageSize.value);
+});
+
+const modelPage = ref(1);
+const modelPageSize = ref(20);
+const pagedModels = computed(() => {
+  const start = (modelPage.value - 1) * modelPageSize.value;
+  return models.value.slice(start, start + modelPageSize.value);
+});
 
 // 弹窗状态
 const showModal = ref(false);
@@ -161,7 +190,7 @@ async function loadModels() {
   } catch { models.value = []; }
 }
 
-watch(selectedId, loadModels);
+watch(selectedId, () => { modelPage.value = 1; loadModels(); });
 
 function openCreate() {
   isEdit.value = false;
