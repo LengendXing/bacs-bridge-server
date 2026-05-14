@@ -119,6 +119,7 @@ export interface MachineTestResult {
 export interface LoginRequest {
   username: string;
   password: string;
+  deviceId?: string;
 }
 
 /** 登录响应 */
@@ -133,6 +134,7 @@ export interface Verify2faRequest {
   tempToken: string;
   code: string;
   trustDevice?: boolean;
+  deviceId?: string;
 }
 
 /** 2FA 设置响应（含 QR 码 URL） */

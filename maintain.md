@@ -1,5 +1,23 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.5 - 2026-05-14
+### 变更内容
+- **信任设备指纹重构**：引入 `@fingerprintjs/fingerprintjs`，前端在登录页计算稳定的浏览器设备指纹（基于 canvas/WebGL/UA 等多维度），存入 `localStorage`（key: `bacs_device_id`）。清 cookie 后指纹依然有效。
+- **双通道验证**：`verifyTrustedDevice(userId, deviceToken?, deviceId?)` 同时检查 cookie token（辅助）和 deviceId 指纹（主通道），任意命中即视为信任设备，跳过 2FA。
+- **数据库加列**：`trusted_devices` 表新增 `device_id TEXT` 字段，新增 `(user_id, device_id)` 联合索引（迁移文件 `0003_trusted_device_fingerprint.sql`）。
+- **相同设备刷新**：同一 `deviceId` 再次信任时，旧记录先删再写（刷新过期时间），不产生重复行。
+- **前端统一携带**：`useAuth.login()` 和 `verify2fa()` 均自动调用 `getDeviceId()` 拿指纹，`deviceId` 随请求发给后端。
+- **类型更新**：`LoginRequest` / `Verify2faRequest` 加 `deviceId?: string`。
+- **测试全覆盖**：重写 trusted-device.test.ts，覆盖双通道命中、userId 不匹配、双通道均过期、重复 deviceId 刷新等 13 个用例，54/54 全通过。
+
+### 影响范围
+- 新增：`src/client/composables/useDeviceId.ts`、`src/server/db/migrations/0003_trusted_device_fingerprint.sql`
+- 改动：`src/server/auth/trusted-device.ts`、`src/server/routes/auth.ts`、`src/client/composables/useAuth.ts`、`src/shared/types.ts`、`src/server/db/schema.ts`、`src/server/auth/trusted-device.test.ts`
+
+### 测试
+- `npm run build` ✅（前端 Vite + 后端 tsc）
+- `npx vitest run` ✅ 54/54（含全部历史用例 + 新增双通道 trusted-device 用例）
+
 ## v1.1.4 - 2026-05-13
 ### 变更内容
 - **重构「Terminal」交互**：BindingsView 右内容区从「单页表格」改为「双 Tab 容器」。Tab 1 = 进程绑定列表（含分页），Tab 2 = 内嵌 Terminal。原 `Terminal` 按钮不再 `window.open` 新窗口，改为：`useTerminalSession.connect(bindingId) + activeTab='terminal'`，所有进程**共用同一个 xterm 实例 + 同一个 WebSocket**（单例 store），切换目标 binding 时仅复用承载层，关旧 ws 连新 ws，省内存、易管理。

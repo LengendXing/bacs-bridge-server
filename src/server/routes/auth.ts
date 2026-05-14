@@ -60,16 +60,13 @@ router.post('/api/auth/login', async (req, res) => {
     // 清理过期信任设备
     cleanExpiredDevices(user.id);
 
-    // 检查信任设备 cookie
+    // 检查信任设备：deviceId（主通道）+ cookie token（辅助通道）
     const deviceToken = req.cookies?.trusted_device;
-    if (deviceToken) {
-      const trustedUserId = verifyTrustedDevice(deviceToken);
-      if (trustedUserId === user.id) {
-        // 信任设备，跳过 2FA
-        const jwt = signToken({ sub: user.id, username: user.username });
-        logger.log('info', `用户 ${username} 登录（信任设备跳过 2FA）`);
-        return res.json({ code: 0, data: { token: jwt, require2fa: false } });
-      }
+    const deviceId = req.body?.deviceId as string | undefined;
+    if (verifyTrustedDevice(user.id, deviceToken, deviceId)) {
+      const jwt = signToken({ sub: user.id, username: user.username });
+      logger.log('info', `用户 ${username} 登录（信任设备跳过 2FA）`);
+      return res.json({ code: 0, data: { token: jwt, require2fa: false } });
     }
 
     // 未开启 2FA → 直接返回 JWT
@@ -99,7 +96,7 @@ router.post('/api/auth/login', async (req, res) => {
  * - 返回正式 JWT
  */
 router.post('/api/auth/2fa/verify', async (req, res) => {
-  const { tempToken, code, trustDevice } = req.body;
+  const { tempToken, code, trustDevice, deviceId } = req.body;
 
   if (!tempToken || !code) {
     return res.json({ code: 1003, message: '缺少临时令牌或验证码' });
@@ -155,12 +152,13 @@ router.post('/api/auth/2fa/verify', async (req, res) => {
     if (trustDevice) {
       const ua = req.headers['user-agent'] || 'Unknown';
       const ip = req.ip || '';
-      const deviceToken = await createTrustedDevice(
+      const newDeviceToken = await createTrustedDevice(
         user.id,
         describeUserAgent(ua),
         ip,
+        deviceId || undefined,
       );
-      res.cookie('trusted_device', deviceToken, {
+      res.cookie('trusted_device', newDeviceToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: TRUSTED_DEVICE_COOKIE_MAX_AGE_MS,
@@ -229,7 +227,7 @@ router.get('/api/auth/2fa/setup', requireAuth, (req, res) => {
  */
 router.post('/api/auth/2fa/enable', requireAuth, (req, res) => {
   const userId = req.user!.sub;
-  const { code } = req.body;
+  const { code, deviceId } = req.body;
 
   if (!code) {
     return res.json({ code: 1003, message: '请输入验证码' });
@@ -262,9 +260,9 @@ router.post('/api/auth/2fa/enable', requireAuth, (req, res) => {
   // 信任当前设备
   const ua = req.headers['user-agent'] || 'Unknown';
   const ip = req.ip || '';
-  createTrustedDevice(userId, describeUserAgent(ua), ip)
-    .then(deviceToken => {
-      res.cookie('trusted_device', deviceToken, {
+  createTrustedDevice(userId, describeUserAgent(ua), ip, deviceId || undefined)
+    .then(enableDeviceToken => {
+      res.cookie('trusted_device', enableDeviceToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: TRUSTED_DEVICE_COOKIE_MAX_AGE_MS,

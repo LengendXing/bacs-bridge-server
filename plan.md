@@ -3,6 +3,13 @@
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
 
+## v1.1.5 · 2026-05-14
+- [x] 引入 @fingerprintjs/fingerprintjs，实现 useDeviceId.ts（计算+localStorage 缓存） ✅ 2026-05-14
+- [x] trusted_devices 表加 device_id 列（迁移文件 0003_trusted_device_fingerprint.sql） ✅ 2026-05-14
+- [x] 后端 verifyTrustedDevice 改为双通道（deviceId 主 + cookie token 辅），createTrustedDevice 支持写入 deviceId ✅ 2026-05-14
+- [x] 前端 useAuth.login/verify2fa 自动带 deviceId，shared types 加 deviceId 字段 ✅ 2026-05-14
+- [x] 重写 trusted-device.test.ts，13 用例全覆盖双通道逻辑，54/54 全通过 ✅ 2026-05-14
+
 ## v1.1.4 · 2026-05-13
 - [x] BindingsView 右内容区改双 Tab（列表 + Terminal），底部胶囊 Tab Bar，250ms 平滑过渡 ✅ 2026-05-13
 - [x] 后端 /api/status 加分页（?page=&pageSize=，DB 层 limit/offset，向后兼容）✅ 2026-05-13
