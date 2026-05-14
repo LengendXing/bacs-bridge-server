@@ -39,6 +39,7 @@ import machineRoutes from './routes/machines.js';
 import logRoutes from './routes/logs.js';
 import healthRoutes from './routes/health.js';
 import settingsRoutes from './routes/settings.js';
+import timelineRoutes from './routes/timeline.js';
 
 // ── ESM-safe __dirname ────────────────────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
@@ -143,6 +144,9 @@ app.use(logRoutes);
 
 /** App settings (KV) — v1.0.4-Beta */
 app.use(settingsRoutes);
+
+/** Chat timeline — v1.1.6 */
+app.use(timelineRoutes);
 
 // ── Start server ───────────────────────────────────────────────────────
 

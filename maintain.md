@@ -1,5 +1,22 @@
 # 迭代日志 · 飞书 × Claude Code 桥接系统
 
+## v1.1.6 - 2026-05-14
+### 变更内容
+- **Logo 右侧加系统标题「笨迪桥接」**：left 模式 sidebar-header + top 模式 header 均显示标题
+- **删除右上角退出按钮**：左下角已有退出，top 模式 header 和 left 模式顶栏的退出按钮全部移除
+- **新建数据表 `bacs_chat_time_line`**：记录每条发送到飞书（及未来 Telegram 等）的消息，字段：id/platform/target_ip/process_name/content/created_at（迁移文件 0004_chat_timeline.sql）
+- **消息写入 Hook**：`channel/feishu/ws-client.ts` 收到用户消息并解析文本后，异步写入 `bacs_chat_time_line`；若绑定有 machineId 则查机器 host 作为 target_ip，否则为 localhost
+- **SSE 实时推送 `/api/timeline/stream`**：写入 DB 后通过 `broadcastTimeline()` 广播给所有订阅的 SSE 连接；心跳 25s；token 支持 query/header/cookie 三种传入方式
+- **首页 Timeline 区块**：统计卡片下方新增实时 Timeline；SSE 连接展示「● 实时」绿色状态；最多展示 20 条，超出截断；TransitionGroup 动画：新条目从顶部 scale+fade 进入，旧条目 translateY 下沉；点击展开/收起完整内容；平台 tag 彩色（飞书绿 / Telegram 蓝）
+
+### 影响范围
+- 新增：`src/server/routes/timeline.ts`、`src/server/db/migrations/0004_chat_timeline.sql`
+- 改动：`src/server/db/schema.ts`、`src/server/index.ts`、`src/server/channel/feishu/ws-client.ts`、`src/client/views/LayoutView.vue`、`src/client/views/HomeView.vue`
+
+### 测试
+- `npm run build` ✅（Vite + tsc，0 错误）
+- SQLite `bacs_chat_time_line` 表已创建 ✅
+
 ## v1.1.5-fix - 2026-05-14
 ### 变更内容
 - **[修复] 主题色不一致（灰色底部）**：

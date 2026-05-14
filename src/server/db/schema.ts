@@ -271,6 +271,35 @@ export const auditLogs = sqliteTable('audit_logs', {
 });
 
 // ════════════════════════════════════════════════════════════════════
+// 9. bacs_chat_time_line — 消息发送时间线
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * 消息时间线表（业务前缀 bacs_）
+ * 记录每一条从外部平台（飞书 / Telegram 等）发送到本系统的消息。
+ * 用于首页实时 Timeline 展示。
+ */
+export const chatTimeLine = sqliteTable('bacs_chat_time_line', {
+  /** 自增主键 */
+  id: integer('id').primaryKey({ autoIncrement: true }),
+
+  /** 消息来源平台：'feishu' | 'telegram' | ... */
+  platform: text('platform').notNull().default('feishu'),
+
+  /** 目标机器 IP（本机为 'localhost'，远程为实际 IP） */
+  targetIp: text('target_ip').notNull().default('localhost'),
+
+  /** 绑定的进程名 */
+  processName: text('process_name').notNull(),
+
+  /** 消息正文 */
+  content: text('content').notNull(),
+
+  /** 创建时间 */
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
 // 8. app_settings — 应用级 KV 设置
 // ════════════════════════════════════════════════════════════════════
 

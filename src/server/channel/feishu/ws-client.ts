@@ -32,10 +32,11 @@ import {
 import type { ChoicePanel } from '../../cli/types.js';
 import { buildCliConfig } from '../../session/manager.js';
 import { getDb } from '../../db/index.js';
-import { bindings } from '../../db/schema.js';
+import { bindings, machines, chatTimeLine } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import logger from '../../middleware/logger.js';
 import * as sender from './sender.js';
+import { broadcastTimeline } from '../../routes/timeline.js';
 
 // ── 类型定义 ────────────────────────────────────────────────────────────
 
@@ -210,6 +211,34 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
   }
   msgText = msgText.replace(/@_user_\d+\s*/g, '').trim();
   if (!msgText) return;
+
+  // 写入 timeline（异步，不阻塞主流程）
+  try {
+    const db = getDb();
+    let targetIp = 'localhost';
+    if (binding.machineId) {
+      const machine = db.select().from(machines).where(eq(machines.id, binding.machineId)).get();
+      if (machine?.host) targetIp = machine.host;
+    }
+    const row = db.insert(chatTimeLine).values({
+      platform: 'feishu',
+      targetIp,
+      processName: binding.processName,
+      content: msgText,
+    }).returning().get();
+    if (row) {
+      broadcastTimeline({
+        id: row.id,
+        platform: row.platform,
+        targetIp: row.targetIp,
+        processName: row.processName,
+        content: row.content,
+        createdAt: row.createdAt ?? new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    logger.log('error', 'timeline 写入失败', String(e));
+  }
 
   const chatId = message.chat_id;
   const targetId = chatId || event?.sender?.sender_id?.open_id;
