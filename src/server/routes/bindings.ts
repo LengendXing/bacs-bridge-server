@@ -362,6 +362,72 @@ router.post('/api/edit', requireAuth, async (req, res) => {
   res.json({ code: 0, data: result });
 });
 
+router.post('/api/rebind', requireAuth, async (req, res) => {
+  const { id } = req.body;
+
+  if (!id) {
+    return res.json({ code: 1003, message: '请提供绑定 ID' });
+  }
+
+  const db = getDb();
+  const existing = db.select().from(bindings).where(eq(bindings.id, id)).get();
+  if (!existing) {
+    return res.json({ code: 1004, message: '绑定不存在' });
+  }
+
+  // 1. 杀掉旧 tmux 进程
+  try {
+    const adapter = getAdapter(existing.cliKind);
+    const executor = await getExecutor(existing.machineId);
+    const sessionName = `${adapter.sessionPrefix}-${existing.processName}`;
+    await executor.killSession(sessionName);
+    logger.log('info', `刷新重连: 已杀旧进程 ${sessionName}`);
+  } catch (e: any) {
+    logger.log('warn', `刷新重连: 杀旧进程失败 ${existing.processName}`, e.message);
+  }
+
+  // 2. 断开飞书 WS
+  const channel = getChannel('feishu');
+  if (channel && existing.feishuAppId) {
+    channel.stop(existing.feishuAppId);
+  }
+
+  // 3. 按原配置重启 CLI 进程
+  const cfg = buildCliConfig(existing);
+  const startResult = await startCliProcess(existing.processName, existing.cliKind, cfg, existing.machineId);
+
+  if (!startResult.ok) {
+    logger.log('error', `刷新重连: CLI 进程启动失败 ${existing.processName}`, startResult.error);
+    db.update(bindings).set({ status: 'offline', updatedAt: new Date().toISOString() }).where(eq(bindings.id, id)).run();
+    return res.json({ code: 1001, message: startResult.error || 'CLI 进程启动失败' });
+  }
+
+  db.update(bindings).set({ status: 'online', updatedAt: new Date().toISOString() }).where(eq(bindings.id, id)).run();
+
+  // 4. 重连飞书 WS
+  if (channel && existing.feishuAppId && existing.feishuAppSecret) {
+    try {
+      const updatedBinding = db.select().from(bindings).where(eq(bindings.id, id)).get()!;
+      await channel.start(updatedBinding);
+    } catch (e: any) {
+      logger.log('error', `刷新重连: 飞书 WS 重启失败 ${existing.processName}`, e.message);
+    }
+  }
+
+  const userId = req.user?.sub;
+  db.insert(auditLogs).values({
+    userId,
+    action: 'bind_rebind',
+    target: existing.processName,
+    detail: `cliKind=${existing.cliKind}, machineId=${existing.machineId}`,
+    ipAddress: req.ip,
+  }).run();
+
+  logger.log('info', `绑定刷新重连成功: ${existing.processName}`);
+  const result = db.select().from(bindings).where(eq(bindings.id, id)).get();
+  res.json({ code: 0, data: result });
+});
+
 router.post('/api/unbind', requireAuth, async (req, res) => {
   const { id, killProcess } = req.body;
 

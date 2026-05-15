@@ -73,6 +73,8 @@
                 <button class="btn-mac btn-mac-sm" :disabled="b.status !== 'online'"
                   @click="openTerminal(b)" title="在浏览器内打开 tmux 终端">Terminal</button>
                 <button class="btn-mac btn-mac-sm" @click="openEdit(b)">编辑</button>
+                <button class="btn-mac btn-mac-sm" :disabled="rebindingMap[b.id] || b.status !== 'online'"
+                  @click="rebind(b)" title="保留配置重启 CLI 进程">{{ rebindingMap[b.id] ? '重启中...' : '刷新' }}</button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">解绑</button>
               </div>
             </td>
@@ -550,6 +552,24 @@ async function handleSubmit() {
     formError.value = '网络错误，请重试';
   } finally {
     formLoading.value = false;
+  }
+}
+
+const rebindingMap = ref<Record<string, boolean>>({});
+
+async function rebind(b: Binding) {
+  rebindingMap.value[b.id] = true;
+  try {
+    const res = await post('/api/rebind', { id: b.id });
+    if (res && res.code === 0) {
+      await refresh();
+    } else {
+      alert(res?.message || '刷新重连失败');
+    }
+  } catch {
+    alert('网络错误，请重试');
+  } finally {
+    delete rebindingMap.value[b.id];
   }
 }
 
