@@ -302,7 +302,7 @@ tmux attach -t cc-projectA
 
 ## 🗂 История версий
 
-Полный changelog: [maintain.md](../../maintain.md).
+Полный changelog: [maintain.md](../maintain.md).
 
 Последние версии:
 - **v1.1.7** (текущая) — Многоязычный README (10 языков) + документация bacs-android

@@ -302,7 +302,7 @@ A: **Nein.** Das Terminal detacht nur den tmux-Client; die Session läuft weiter
 
 ## 🗂 Versionshistorie
 
-Vollständiges Changelog: [maintain.md](../../maintain.md).
+Vollständiges Changelog: [maintain.md](../maintain.md).
 
 Aktuelle Versionen:
 - **v1.1.7** (aktuell) — Mehrsprachiges README (10 Sprachen) + bacs-android-Doku
