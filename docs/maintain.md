@@ -1,4 +1,19 @@
-# 迭代日志 · 飞书 × Claude Code 桥接系统
+# 迭代日志 · BACS Bridge Server
+
+## v1.1.7 - 2026-05-15
+### 变更内容
+- **多语言 README 文档（11 种语言）**：中文、英语、日语、德语、俄语、西班牙语、法语、阿拉伯语(RTL)、藏文、维吾尔语(RTL)、韩文
+- **项目改名**：`feishu-claudecode-bridge` → `bacs-bridge-server`（package.json / PM2 / deploy.sh / cll.sh / 所有 README / GitHub 仓库）
+- **修复删除服务商 502**：bindings 表 `provider_id` / `model_id` 外键缺 `onDelete`，删除被绑定的服务商时 SQLite 约束报错。删除前先 SET NULL 关联 binding 外键 + schema 加 `onDelete: 'set null'`
+- **清除历史密钥脚本**：git filter-repo 从历史中彻底删除含硬编码 API Key 的 5 个脚本（ai.sh / ai2.sh / ai-new1.sh / cc1.sh / clod.sh）
+- **根 README.md 替换为完整中文版**
+- **md 文件迁移到 docs/**：maintain.md / plan.md / requirements / codex-guide
+- **.gitignore 新增 ai*.sh / clod.sh / cc1.sh**
+
+### 影响范围
+- 新增：`docs/readme/README.*.md`（11 个）、`docs/rename-plan.md`
+- 改动：`README.md`、`package.json`、`package-lock.json`、`ecosystem.config.cjs`、`deploy.sh`、`cll.sh`、`src/server/index.ts`、`src/server/crypto/credentials.ts`、`src/server/routes/providers.ts`、`src/server/db/schema.ts`、`.gitignore`
+- 迁移：`maintain.md` → `docs/maintain.md`、`plan.md` → `docs/plan.md` 等
 
 ## v1.1.6 - 2026-05-14
 ### 变更内容
