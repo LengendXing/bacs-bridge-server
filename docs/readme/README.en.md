@@ -320,7 +320,7 @@ A: **No.** The terminal only detaches the tmux client; the session keeps running
 
 ## 🗂 Versioning
 
-Full changelog: [maintain.md](../../maintain.md).
+Full changelog: [maintain.md](../maintain.md).
 
 Recent versions:
 - **v1.1.7** (current) — Multi-language README (10 languages) + bacs-android documentation

@@ -329,7 +329,7 @@ R : **Non**. Le Web Terminal détache uniquement le client tmux, la session mét
 
 ## 🗂 Versions et itérations
 
-Journal complet des itérations : [maintain.md](../../maintain.md).
+Journal complet des itérations : [maintain.md](../maintain.md).
 
 Versions récentes :
 - **v1.1.7** (actuelle) — README multilingue (10+ langues) + présentation de l'application bacs-android associée

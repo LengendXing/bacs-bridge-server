@@ -329,7 +329,7 @@ R: **No**. Web Terminal solo hace detach del cliente de tmux, la sesión de nego
 
 ## 🗂 Versiones e iteraciones
 
-El registro completo de iteraciones está en [maintain.md](../../maintain.md).
+El registro completo de iteraciones está en [maintain.md](../maintain.md).
 
 Versiones recientes:
 - **v1.1.7** (actual) — README multilingüe (10+ idiomas) + presentación de bacs-android complementario

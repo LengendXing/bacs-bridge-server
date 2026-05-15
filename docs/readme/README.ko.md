@@ -329,7 +329,7 @@ A: **종료되지 않습니다**. Web Terminal은 tmux 클라이언트만 detach
 
 ## 🗂 버전 및 이터레이션
 
-전체 이터레이션 로그는 [maintain.md](../../maintain.md)를 참조하세요.
+전체 이터레이션 로그는 [maintain.md](../maintain.md)를 참조하세요.
 
 최근 버전:
 - **v1.1.7**（현재）—— 다국어 README 문서（10+ 개 언어）+ 연동 bacs-android 소개
