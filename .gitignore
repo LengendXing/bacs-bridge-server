@@ -14,5 +14,7 @@ data/
 # IDE
 .vscode/
 .idea/
-# Old project files (kept in git history for reference)
-# bridge-server/ and admin/ are deprecated by V1.0
+# Local dev scripts (may contain secrets — never commit)
+ai*.sh
+clod.sh
+cc1.sh
