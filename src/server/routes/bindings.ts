@@ -276,21 +276,74 @@ router.post('/api/edit', requireAuth, async (req, res) => {
 
   db.update(bindings).set(updates).where(eq(bindings.id, id)).run();
 
-  const wsNeedsRestart =
-    (feishuAppId !== undefined && feishuAppId !== existing.feishuAppId) ||
-    (feishuAppSecret !== undefined && feishuAppSecret !== existing.feishuAppSecret);
+  // 判断 CLI 配置是否变更（providerId / modelId / modelOverride / effort / machineId）
+  const cliConfigChanged =
+    (providerId !== undefined && (providerId || null) !== existing.providerId) ||
+    (modelId !== undefined && (modelId || null) !== existing.modelId) ||
+    (modelOverride !== undefined && (modelOverride || null) !== existing.modelOverride) ||
+    (effort !== undefined && (effort || null) !== existing.effort) ||
+    (machineId !== undefined && (machineId || null) !== existing.machineId);
 
-  if (wsNeedsRestart) {
+  if (cliConfigChanged) {
+    // 杀掉旧 tmux 进程
+    try {
+      const adapter = getAdapter(existing.cliKind);
+      const oldExecutor = await getExecutor(existing.machineId);
+      const oldSessionName = `${adapter.sessionPrefix}-${existing.processName}`;
+      await oldExecutor.killSession(oldSessionName);
+      logger.log('info', `编辑重连: 已杀旧进程 ${oldSessionName}`);
+    } catch (e: any) {
+      logger.log('warn', `编辑重连: 杀旧进程失败 ${existing.processName}`, e.message);
+    }
+
+    // 断开飞书 WS
     const channel = getChannel('feishu');
     if (channel && existing.feishuAppId) {
       channel.stop(existing.feishuAppId);
     }
-    if (channel && updates.feishuAppId && updates.feishuAppSecret) {
+
+    // 按新配置重启 CLI 进程
+    const updatedBinding = db.select().from(bindings).where(eq(bindings.id, id)).get()!;
+    const cfg = buildCliConfig(updatedBinding);
+    const startResult = await startCliProcess(
+      updatedBinding.processName,
+      updatedBinding.cliKind,
+      cfg,
+      updatedBinding.machineId,
+    );
+
+    if (!startResult.ok) {
+      logger.log('error', `编辑重连: CLI 进程启动失败 ${updatedBinding.processName}`, startResult.error);
+    } else {
+      db.update(bindings).set({ status: 'online', updatedAt: new Date().toISOString() }).where(eq(bindings.id, id)).run();
+    }
+
+    // 重连飞书 WS
+    if (channel && updatedBinding.feishuAppId && updatedBinding.feishuAppSecret) {
       try {
-        const updatedBinding = db.select().from(bindings).where(eq(bindings.id, id)).get()!;
         await channel.start(updatedBinding);
       } catch (e: any) {
-        logger.log('error', `飞书 WS 重启失败: ${existing.processName}`, e.message);
+        logger.log('error', `编辑重连: 飞书 WS 重启失败 ${updatedBinding.processName}`, e.message);
+      }
+    }
+  } else {
+    // 非 CLI 配置变更，仅飞书凭据变更时重启 WS
+    const wsNeedsRestart =
+      (feishuAppId !== undefined && feishuAppId !== existing.feishuAppId) ||
+      (feishuAppSecret !== undefined && feishuAppSecret !== existing.feishuAppSecret);
+
+    if (wsNeedsRestart) {
+      const channel = getChannel('feishu');
+      if (channel && existing.feishuAppId) {
+        channel.stop(existing.feishuAppId);
+      }
+      if (channel && updates.feishuAppId && updates.feishuAppSecret) {
+        try {
+          const updatedBinding = db.select().from(bindings).where(eq(bindings.id, id)).get()!;
+          await channel.start(updatedBinding);
+        } catch (e: any) {
+          logger.log('error', `飞书 WS 重启失败: ${existing.processName}`, e.message);
+        }
       }
     }
   }

@@ -117,6 +117,33 @@
       </button>
     </div>
 
+    <!-- Attach 复制弹窗 -->
+    <div v-if="showAttachModal" class="modal-overlay" @click.self="showAttachModal = false">
+      <div class="modal-card" style="width: 520px">
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">复制 Attach 命令</h3>
+        <div class="flex flex-col gap-3 mb-4">
+          <label class="attach-option" :class="{ selected: attachChoice === 'simple' }" @click="attachChoice = 'simple'">
+            <input type="radio" name="attachChoice" value="simple" :checked="attachChoice === 'simple'" />
+            <div>
+              <div class="text-sm font-medium" style="color: var(--text)">简洁版（本机 / 已登录远程）</div>
+              <code class="attach-cmd">{{ attachSimpleCmd }}</code>
+            </div>
+          </label>
+          <label v-if="attachFullCmd" class="attach-option" :class="{ selected: attachChoice === 'full' }" @click="attachChoice = 'full'">
+            <input type="radio" name="attachChoice" value="full" :checked="attachChoice === 'full'" />
+            <div>
+              <div class="text-sm font-medium" style="color: var(--text)">完整版（含 SSH）</div>
+              <code class="attach-cmd">{{ attachFullCmd }}</code>
+            </div>
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="copyAttachFromModal">复制</button>
+          <button class="btn-mac btn-mac-sm" @click="showAttachModal = false">取消</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 新建/编辑/挂载弹窗 -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-card" style="width: 460px">
@@ -534,29 +561,39 @@ async function confirmUnbind(b: Binding) {
   } catch { /* */ }
 }
 
+const showAttachModal = ref(false);
+const attachChoice = ref<'simple' | 'full'>('simple');
+const attachSimpleCmd = ref('');
+const attachFullCmd = ref('');
+
 function copyAttach(b: Binding) {
   const prefix = b.cliKind === 'codex' ? 'codex' : 'cc';
   const sessionName = `${prefix}-${b.processName}`;
 
-  let cmd: string;
+  attachSimpleCmd.value = `tmux attach -t ${sessionName}`;
+  attachFullCmd.value = '';
+
   if (b.machineId && b.machineName) {
     const m = machineList.value.find(m => m.id === b.machineId);
     if (m) {
       const portFlag = m.port && m.port !== 22 ? ` -p ${m.port}` : '';
-      cmd = `ssh ${m.username}@${m.host}${portFlag} -t "tmux attach -t ${sessionName}"`;
-    } else {
-      cmd = `tmux attach -t ${sessionName}`;
+      attachFullCmd.value = `ssh ${m.username}@${m.host}${portFlag} -t "tmux attach -t ${sessionName}"`;
     }
-  } else {
-    cmd = `tmux attach -t ${sessionName}`;
   }
 
-  let copied = false;
+  attachChoice.value = 'simple';
+  showAttachModal.value = true;
+}
+
+function copyAttachFromModal() {
+  const cmd = attachChoice.value === 'full' ? attachFullCmd.value : attachSimpleCmd.value;
+  if (!cmd) return;
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(cmd).then(() => {
-      alert(`已复制命令:\n${cmd}`);
+      showAttachModal.value = false;
     }).catch(() => {
       prompt('复制以下命令并在终端执行:', cmd);
+      showAttachModal.value = false;
     });
   } else {
     const ta = document.createElement('textarea');
@@ -565,13 +602,9 @@ function copyAttach(b: Binding) {
     ta.style.left = '-9999px';
     document.body.appendChild(ta);
     ta.select();
-    try { copied = document.execCommand('copy'); } catch { /* */ }
+    try { document.execCommand('copy'); } catch { /* */ }
     document.body.removeChild(ta);
-    if (copied) {
-      alert(`已复制命令:\n${cmd}`);
-    } else {
-      prompt('复制以下命令并在终端执行:', cmd);
-    }
+    showAttachModal.value = false;
   }
 }
 
@@ -670,6 +703,19 @@ onMounted(() => { refresh(); loadMachines(); });
 .modal-card {
   background: var(--card); border-radius: 12px; padding: 24px;
   max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.attach-option {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; transition: border-color 150ms, background 150ms;
+}
+.attach-option:hover { border-color: var(--accent); }
+.attach-option.selected { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+.attach-option input[type="radio"] { margin-top: 3px; accent-color: var(--accent); }
+.attach-cmd {
+  display: block; margin-top: 4px; font-size: 13px;
+  padding: 4px 8px; border-radius: 4px; word-break: break-all;
+  background: var(--bg); color: var(--text); font-family: ui-monospace, monospace;
 }
 </style>
 

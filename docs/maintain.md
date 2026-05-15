@@ -1,5 +1,15 @@
 # 迭代日志 · BACS Bridge Server
 
+## v1.1.8 - 2026-05-15
+### 变更内容
+- **编辑绑定自动重连 CLI 进程**：编辑绑定时若 providerId / modelId / modelOverride / effort / machineId 任一变更，自动 kill 旧 tmux 进程 → 断开飞书 WS → 按新配置重启 CLI → 重连 WS；仅飞书凭据变更时仍走原有 WS 重启逻辑
+- **Attach 按钮改为弹窗选择复制**：点击 Attach 弹出选择弹窗，展示简洁版（`tmux attach`）和完整版（含 SSH）两条命令，默认选中简洁版，底部有取消/复制按钮
+- **CI：推 tag 自动发布 GitHub Release**：新增 `.github/workflows/release.yml`，从 `docs/maintain.md` 自动提取 changelog
+
+### 影响范围
+- 改动：`src/server/routes/bindings.ts`（编辑重连逻辑）、`src/client/views/BindingsView.vue`（Attach 弹窗）
+- 新增：`.github/workflows/release.yml`
+
 ## v1.1.7 - 2026-05-15
 ### 变更内容
 - **多语言 README 文档（11 种语言）**：中文、英语、日语、德语、俄语、西班牙语、法语、阿拉伯语(RTL)、藏文、维吾尔语(RTL)、韩文
