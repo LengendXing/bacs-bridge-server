@@ -1,4 +1,4 @@
-# 任务计划 · 飞书 × Claude Code 桥接系统
+# 任务计划 · 机器人 × AI-CLI 桥接系统
 
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）

@@ -1,6 +1,6 @@
-# 🇫🇷 飞书 × AI CLI 桥接系统（bacs-bridge-server）
+# 🇫🇷 机器人 × AI-CLI 桥接系统（bacs-bridge-server）
 
-> Transformez votre bot Feishu en portail d'interaction distant pour Claude Code / Codex et autres CLI IA. Plus besoin de se connecter en SSH au serveur pour ouvrir un terminal — il suffit d'@ le bot dans Feishu pour piloter directement un ou plusieurs processus de programmation IA.
+> Transformez votre chatbot en portail d'interaction distant pour Claude Code / Codex et autres CLI IA. Plus besoin de se connecter en SSH au serveur pour ouvrir un terminal — il suffit d'@ le bot dans le chat pour piloter directement un ou plusieurs processus de programmation IA.
 
 [🌐 Versions multilingues](#-多语言版本--language-versions) · [🤖 Application Android bacs-android](#-配套安卓端-bacs-android)
 
@@ -25,12 +25,12 @@
 
 ## 🌟 Présentation du projet
 
-**bacs-bridge-server** est un système de pont bidirectionnel entre un bot Feishu et des outils CLI IA (Claude Code / Codex). Il achemine les événements de messages Feishu vers un processus CLI désigné via un Bridge Server persistant, puis renvoie les réponses du CLI au groupe Feishu ou à la conversation privée Feishu.
+**bacs-bridge-server** est un système de pont bidirectionnel entre un chatbot et des outils CLI IA (Claude Code / Codex). Il achemine les événements de messages du bot vers un processus CLI désigné via un Bridge Server persistant, puis renvoie les réponses du CLI au groupe ou à la conversation privée.
 
 Cas d'usage :
-- Pilotage collaboratif de tâches de programmation IA via un groupe Feishu en équipe
+- Pilotage collaboratif de tâches de programmation IA via un groupe de chat en équipe
 - Contrôle à distance de Claude Code sur un serveur depuis un appareil mobile ou une tablette, sans PC
-- Association de plusieurs processus IA sur un même serveur à différents groupes Feishu pour l'isolation des projets
+- Association de plusieurs processus IA sur un même serveur à différents groupes de chat pour l'isolation des projets
 - Observation en temps réel de la progression IA, des journaux et de la Timeline des conversations via le navigateur ou l'application Android
 
 ---
@@ -39,7 +39,7 @@ Cas d'usage :
 
 | Module | Capacité |
 |--------|----------|
-| **Multi-machines** | Gestion simultanée de plusieurs processus CLI sur un même serveur (cc-a / cc-b / codex-x ...), chacun lié de manière indépendante à un bot Feishu |
+| **Multi-machines** | Gestion simultanée de plusieurs processus CLI sur un même serveur (cc-a / cc-b / codex-x ...), chacun lié de manière indépendante à un chatbot |
 | **Gestion des machines distantes** | SSH Executor intégré pour gérer uniformément les sessions tmux de la machine locale et de plusieurs machines distantes |
 | **Double CLI** | Adaptateurs pour Claude Code (cc) et Codex, utilisables simultanément |
 | **Configuration flexible des fournisseurs** | Configurations intégrées pour Anthropic / OpenAI etc., support de base_url et API Key personnalisés |
@@ -57,8 +57,8 @@ Cas d'usage :
 
 ```
 ┌────────────┐   @ bot + message    ┌────────────────┐
-│  Utilisateur│ ───────────────────▶│  Plateforme     │
-│ (Feishu/mobile) │ ◀───────────────── │ Feishu Ouverte │
+│  Utilisateur│ ───────────────────▶│  Plataforma Bot │
+│ (Chat/mobile) │ ◀───────────────── │ (Bot Platform)  │
 └────────────┘                     └────────┬───────┘
                                             │ Webhook / WS
                                             ▼
@@ -67,7 +67,7 @@ Cas d'usage :
                               │ (Express + Vue + WS)    │
                               │                         │
                               │  ┌──────────────────┐   │
-                              │  │ Abstraction Channel│   │   ← Client WS Feishu
+                              │  │ Abstraction Channel│   │   ← Bot WS Client
                               │  │ Routage Session   │   │
                               │  │ CLI Adapter        │   │
                               │  │ Executor (local+SSH)│   │
@@ -213,8 +213,8 @@ bash deploy.sh   # Construction automatique + redémarrage PM2
 4. Menu « Machines » : la machine locale est prête par défaut ; pour une machine distante, créez-en une et renseignez les identifiants SSH
 5. Menu « Fournisseurs » : créez un fournisseur Anthropic / OpenAI / personnalisé, renseignez base_url + API Key
 6. Sur le serveur, lancez une session tmux : `tmux new-session -d -s cc-work`
-7. Menu « Bindings » : ajoutez une liaison de bot Feishu, renseignez App ID / App Secret / Verification Token / Encrypt Key + sélectionnez CLI + fournisseur + modèle + Effort
-8. Dans un groupe Feishu, @ le bot en envoyant un message quelconque → le backend démarrera automatiquement le processus cc/codex et établira le pont
+7. Menu « Bindings » : ajoutez une liaison de bot, renseignez App ID / App Secret / Verification Token / Encrypt Key + sélectionnez CLI + fournisseur + modèle + Effort
+8. Dans un groupe de chat, @ le bot en envoyant un message quelconque → le backend démarrera automatiquement le processus cc/codex et établira le pont
 
 ---
 
@@ -241,7 +241,7 @@ Accédez au menu « Bindings » → Ajouter :
 - **Effort** : les niveaux disponibles sont affichés selon le maxEffort du modèle
 - **Quatre éléments de l'application Feishu** : App ID / Secret / Verification Token / Encrypt Key
 
-Après enregistrement, le Bridge tente automatiquement de se connecter au WS de connexion longue Feishu. Une fois le statut passé à `online`, vous pouvez utiliser le bot en l'@ dans un groupe Feishu.
+Après enregistrement, le Bridge tente automatiquement de se connecter au WS de connexion longue Feishu. Une fois le statut passé à `online`, vous pouvez utiliser le bot en l'@ dans un groupe de chat.
 
 ### Web Terminal
 
@@ -257,7 +257,7 @@ Supporte Ctrl-b d pour détachement manuel, ResizeObserver pour synchroniser la 
 
 ### Timeline en temps réel
 
-La zone Timeline en bas de la page d'accueil affiche les 20 derniers messages Feishu (push en temps réel via SSE). Les nouvelles entrées glissent depuis le haut avec une animation scale+fade, clic pour développer/réduire le contenu complet, tags de plateforme colorés (vert Feishu / bleu Telegram réservé).
+La zone Timeline en bas de la page d'accueil affiche les 20 derniers messages du bot (push en temps réel via SSE). Les nouvelles entrées glissent depuis le haut avec une animation scale+fade, clic pour développer/réduire le contenu complet, tags de plateforme colorés (vert Feishu / bleu Telegram réservé).
 
 ### Journaux système
 
@@ -276,7 +276,7 @@ Icône soleil/lune en haut à droite pour basculer entre les modes Light / Dark,
 **bacs-android** est l'application Android officielle du système, vous permettant depuis votre téléphone de :
 
 - 🔔 Recevoir en temps réel les push de la Timeline du Bridge, les réponses IA arrivent comme des messages IM
-- ⌨️ Saisir directement des commandes sur le téléphone et les renvoyer au Bridge, sans ouvrir Feishu
+- ⌨️ Saisir directement des commandes sur le téléphone et les renvoyer au Bridge, sans ouvrir l'app de chat
 - 📊 Consulter l'état de tous les processus CLI liés (online / offline / awaiting_choice)
 - 📜 Parcourir l'historique des sessions et les journaux système
 - 🔐 Connexion TOTP à deux facteurs + confiance par empreinte digitale de l'appareil
@@ -310,7 +310,7 @@ Icône soleil/lune en haut à droite pour basculer entre les modes Light / Dark,
 
 ## ❓ Questions fréquentes
 
-**Q : Pas de réponse après l'envoi d'un message Feishu ?**
+**Q : Pas de réponse après l'envoi d'un message dans le chat ?**
 R : Vérifiez en priorité : ① le statut de la liaison est-il `online` ; ② la session tmux sur le serveur est-elle active ; ③ la API Key du fournisseur est-elle valide ; ④ consultez les journaux backend en temps réel dans le menu « Journaux ».
 
 **Q : Échec de connexion sur machine distante (Not logged in) ?**

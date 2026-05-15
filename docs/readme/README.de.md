@@ -1,6 +1,6 @@
-# Feishu × AI CLI Bridge (bacs-bridge-server)
+# Bot × AI-CLI Bridge (bacs-bridge-server)
 
-> Verwandelt den Feishu (Lark)-Bot in eine Remote-Schnittstelle für AI-CLI-Tools wie Claude Code / Codex. Kein SSH und kein Terminal-Öffnen mehr — einfach den Bot in Feishu erwähnen und einen oder mehrere AI-Coding-Prozesse steuern.
+> Verwandelt Chat-Bots in eine Remote-Schnittstelle für AI-CLI-Tools wie Claude Code / Codex. Kein SSH und kein Terminal-Öffnen mehr — einfach den Bot im Chat erwähnen und einen oder mehrere AI-Coding-Prozesse steuern.
 
 [🌐 Weitere Sprachen](#-sprachversionen) · [🤖 Android-App: bacs-android](#-android-app-bacs-android)
 
@@ -25,7 +25,7 @@
 
 ## 🌟 Einführung
 
-**bacs-bridge-server** ist eine bidirektionale Brücke zwischen Feishu (Lark)-Bots und AI-CLI-Tools (Claude Code / Codex). Ein dauerhaft laufender Bridge Server leitet Feishu-Nachrichten an bestimmte CLI-Prozesse weiter und sendet deren Antworten zurück in den entsprechenden Feishu-Chat.
+**bacs-bridge-server** ist eine bidirektionale Brücke zwischen Chat-Bots und AI-CLI-Tools (Claude Code / Codex). Ein dauerhaft laufender Bridge Server leitet Bot-Nachrichten an bestimmte CLI-Prozesse weiter und sendet deren Antworten zurück in den entsprechenden Chat.
 
 Anwendungsfälle:
 - Ein Team treibt AI-Coding-Aufgaben gemeinsam aus einer Feishu-Gruppe voran

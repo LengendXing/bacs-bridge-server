@@ -1,4 +1,4 @@
-# 飞书 × Claude Code 桥接系统 — REST API 文档
+# 机器人 × AI-CLI 桥接系统 — REST API 文档
 
 > 面向 **Android 客户端** 的接口文档
 > 服务版本：v1.0.6

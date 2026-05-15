@@ -1,6 +1,6 @@
-# Feishu × AI CLI Bridge (bacs-bridge-server)
+# Bot × AI-CLI Bridge (bacs-bridge-server)
 
-> Turn the Feishu (Lark) bot into a remote interaction front-end for AI CLIs such as Claude Code / Codex. No more SSH-into-a-server-and-open-a-terminal — just @-mention the bot in Feishu to drive one or many AI coding processes.
+> Turn chat bots into a remote interaction front-end for AI CLIs such as Claude Code / Codex. No more SSH-into-a-server-and-open-a-terminal — just @-mention the bot in your chat to drive one or many AI coding processes.
 
 [🌐 Other Languages](#-language-versions) · [🤖 Companion Android App: bacs-android](#-companion-android-app-bacs-android)
 
@@ -25,7 +25,7 @@
 
 ## 🌟 Introduction
 
-**bacs-bridge-server** is a bidirectional bridge between Feishu (Lark) bots and AI CLI tools (Claude Code / Codex). A long-running Bridge Server routes Feishu message events to specific CLI processes and pushes their replies back to the corresponding Feishu group or private chat.
+**bacs-bridge-server** is a bidirectional bridge between chat bots and AI CLI tools (Claude Code / Codex). A long-running Bridge Server routes bot message events to specific CLI processes and pushes their replies back to the corresponding group or private chat.
 
 Use cases:
 - A team that wants to drive AI coding tasks collaboratively from a Feishu group
@@ -207,7 +207,7 @@ bash deploy.sh   # rebuild + reload PM2
 5. **Providers**: add Anthropic / OpenAI / custom (base_url + API key)
 6. On the server start a tmux session: `tmux new-session -d -s cc-work`
 7. **Bindings**: new binding → fill Feishu App ID / Secret / Verification Token / Encrypt Key + pick CLI + provider + model + effort
-8. @ the bot in your Feishu group — the corresponding `cc` / `codex` process is started and bridged automatically
+8. @ the bot in your chat group — the corresponding `cc` / `codex` process is started and bridged automatically
 
 ---
 

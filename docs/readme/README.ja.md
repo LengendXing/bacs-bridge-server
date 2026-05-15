@@ -1,6 +1,6 @@
-# Feishu × AI CLI ブリッジ（bacs-bridge-server）
+# Bot × AI-CLI ブリッジ（bacs-bridge-server）
 
-> Feishu（Lark）ボットを Claude Code / Codex などの AI CLI のリモート操作インターフェースに変えます。SSH でサーバーに入って端末を開く必要はもうありません — Feishu でボットをメンションするだけで、1 台のサーバー上の複数の AI コーディングプロセスを駆動できます。
+> チャットボットを Claude Code / Codex などの AI CLI のリモート操作インターフェースに変えます。SSH でサーバーに入って端末を開く必要はもうありません — チャットでボットをメンションするだけで、1 台のサーバー上の複数の AI コーディングプロセスを駆動できます。
 
 [🌐 他の言語](#-言語バージョン) · [🤖 Android アプリ：bacs-android](#-android-アプリ-bacs-android)
 
@@ -25,12 +25,12 @@
 
 ## 🌟 概要
 
-**bacs-bridge-server** は Feishu（Lark）ボットと AI CLI（Claude Code / Codex）を双方向に橋渡しするシステムです。常駐する Bridge Server が Feishu のメッセージイベントを指定された CLI プロセスへルーティングし、CLI の応答を対応する Feishu グループや個人チャットへ返送します。
+**bacs-bridge-server** はチャットボットと AI CLI（Claude Code / Codex）を双方向に橋渡しするシステムです。常駐する Bridge Server がボットのメッセージイベントを指定された CLI プロセスへルーティングし、CLI の応答を対応するグループや個人チャットへ返送します。
 
 ユースケース：
-- チームが Feishu グループで AI コーディングタスクを共同で進める
+- チームがグループチャットで AI コーディングタスクを共同で進める
 - PC が手元になくても（スマホ・タブレットで）サーバー上の Claude Code を遠隔操作する
-- 1 台のサーバー上で複数の AI プロセスを別々の Feishu チャットに紐付けてプロジェクトを分離する
+- 1 台のサーバー上で複数の AI プロセスを別々のチャットに紐付けてプロジェクトを分離する
 - ブラウザや Android アプリから AI の進捗・ログ・タイムラインをリアルタイムに観察する
 
 ---
@@ -39,7 +39,7 @@
 
 | モジュール | 機能 |
 |----------|------|
-| **マルチプロセスバインディング** | 1 台のサーバー上で複数の CLI プロセス（cc-a / cc-b / codex-x ...）を同時管理し、それぞれ独立した Feishu ボットに紐付け |
+| **マルチプロセスバインディング** | 1 台のサーバー上で複数の CLI プロセス（cc-a / cc-b / codex-x ...）を同時管理し、それぞれ独立したボットに紐付け |
 | **リモートホスト管理** | 内蔵 SSH Executor でローカル + 複数リモートマシンの tmux セッションを統一管理 |
 | **デュアル CLI 対応** | Claude Code (`cc`) と Codex アダプターを自由に併用可能 |
 | **プロバイダ設定** | Anthropic / OpenAI / カスタム `base_url` + API キー |
@@ -57,8 +57,8 @@
 
 ```
 ┌────────────┐  @ボット + メッセージ  ┌────────────────┐
-│ ユーザー    │ ─────────────────────▶│  Feishu 開放    │
-│ (Web/スマホ)│ ◀───────────────────  │   プラットフォーム│
+│ ユーザー    │ ─────────────────────▶│  Bot プラットフォーム │
+│ (Web/スマホ)│ ◀───────────────────  │   プラットフォーム  │
 └────────────┘                        └────────┬───────┘
                                                │ Webhook / WS
                                                ▼
@@ -67,7 +67,7 @@
                               │ (Express + Vue + WS)    │
                               │                         │
                               │  ┌──────────────────┐   │
-                              │  │ Channel 層        │   │   ← Feishu WS Client
+                              │  │ Channel 層        │   │   ← Bot WS Client
                               │  │ Session ルーター  │   │
                               │  │ CLI アダプター    │   │
                               │  │ Executor (SSH+L) │   │
@@ -119,7 +119,7 @@ bacs-bridge-server/
 - npm ≥ 10（または pnpm）
 - tmux ≥ 3.0
 - 少なくとも 1 つの AI CLI バイナリ：`claude` または `codex`
-- Feishu の**企業内カスタムアプリ**（`im:message` / `im:message.group_at_msg` 権限）
+- ボットプラットフォームのアプリ（Feishu の場合：**企業内カスタムアプリ**、`im:message` / `im:message.group_at_msg` 権限）
 
 ### 2. ローカル開発
 
@@ -188,14 +188,14 @@ bash deploy.sh   # 自動的にビルド + PM2 リロード
 4. 「マシン」：ローカルは登録済み。リモートは SSH 認証情報を追加
 5. 「プロバイダ」：Anthropic / OpenAI / カスタム を作成
 6. サーバーで `tmux new-session -d -s cc-work` を実行
-7. 「バインディング」：Feishu の App ID / Secret / Verification Token / Encrypt Key + CLI + プロバイダ + モデル + Effort を入力
-8. Feishu グループでボットをメンション → cc / codex プロセスが自動起動
+7. 「バインディング」：ボットの App ID / Secret / Verification Token / Encrypt Key（Feishu の場合）+ CLI + プロバイダ + モデル + Effort を入力
+8. グループチャットでボットをメンション → cc / codex プロセスが自動起動
 
 ---
 
 ## 📘 ユーザーガイド
 
-### Feishu アプリ設定
+### ボットアプリ設定（Feishu / Lark の場合）
 
 1. [open.feishu.cn](https://open.feishu.cn/) で**企業内カスタムアプリ**を作成
 2. 権限を有効化：
@@ -214,7 +214,7 @@ bash deploy.sh   # 自動的にビルド + PM2 リロード
 - **プロバイダ**：作成済みプロバイダ
 - **モデル**：自動探索、失敗時はデフォルト一覧 or カスタム ID 入力
 - **Effort**：モデルの maxEffort に応じた段階
-- **Feishu 4 件セット**：App ID / Secret / Verification Token / Encrypt Key
+- **ボット認証情報**（Feishu の場合 4 件セット）：App ID / Secret / Verification Token / Encrypt Key
 
 保存後、Bridge が WS 長コネクションを開始し、`online` になればグループで @ メンションで利用可能。
 
@@ -230,7 +230,7 @@ tmux attach -t cc-projectA
 
 ### ライブタイムライン
 
-ホーム画面下部に直近 20 件の Feishu メッセージを SSE 配信。新着は上から scale+fade で挿入、クリックで展開/折りたたみ、プラットフォームタグは色分け。
+ホーム画面下部に直近 20 件のボットメッセージを SSE 配信。新着は上から scale+fade で挿入、クリックで展開/折りたたみ、プラットフォームタグは色分け。
 
 ### システムログ
 
@@ -249,7 +249,7 @@ tmux attach -t cc-projectA
 **bacs-android** は公式 Android クライアントです：
 
 - 🔔 タイムラインのプッシュをリアルタイム受信、AI 応答が IM のように届く
-- ⌨️ スマホからコマンドを直接送信、Feishu を開く必要なし
+- ⌨️ スマホからコマンドを直接送信、チャットアプリを開く必要なし
 - 📊 すべてのバインディングのステータス（online / offline / awaiting_choice）を監視
 - 📜 履歴セッションとシステムログを閲覧
 - 🔐 デバイスフィンガープリント信頼 + TOTP 2FA
@@ -283,7 +283,7 @@ tmux attach -t cc-projectA
 
 ## ❓ FAQ
 
-**Q: Feishu にメッセージを送ったがボットが返事しない。**
+**Q: ボットにメッセージを送ったが返事がない。**
 A: ① バインディングが `online`、② tmux セッションが生存、③ プロバイダの API キーが有効、④「ログ」メニューでバックエンドログを確認。
 
 **Q: リモートで "Not logged in" になる。**

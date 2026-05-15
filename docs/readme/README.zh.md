@@ -1,6 +1,6 @@
-# 飞书 × AI CLI 桥接系统（bacs-bridge-server）
+# 机器人 × AI-CLI 桥接系统（bacs-bridge-server）
 
-> 把飞书机器人变成 Claude Code / Codex 等 AI CLI 的远程交互入口。不再需要 SSH 进服务器开终端 —— 在飞书里 @ 机器人，就能直接驱动一个或多个 AI 编程进程。
+> 把聊天机器人变成 Claude Code / Codex 等 AI CLI 的远程交互入口。不再需要 SSH 进服务器开终端 —— 在聊天里 @ 机器人，就能直接驱动一个或多个 AI 编程进程。
 
 [🌐 多语言版本](#-多语言版本--language-versions) · [🤖 配套安卓端 bacs-android](#-配套安卓端-bacs-android)
 
@@ -25,12 +25,12 @@
 
 ## 🌟 项目简介
 
-**bacs-bridge-server** 是一个将飞书机器人与 AI CLI 工具（Claude Code / Codex）双向桥接的系统。它通过一个常驻的 Bridge Server 把飞书消息事件路由到指定的 CLI 进程，再把 CLI 的回复发送回飞书群或飞书私聊。
+**bacs-bridge-server** 是一个将聊天机器人与 AI CLI 工具（Claude Code / Codex）双向桥接的系统。它通过一个常驻的 Bridge Server 把机器人消息事件路由到指定的 CLI 进程，再把 CLI 的回复发送回群聊或私聊。
 
 适用场景：
-- 团队中通过飞书群协作驱动 AI 编程任务
+- 团队中通过群聊协作驱动 AI 编程任务
 - 在没有 PC 的场景（手机、平板）下，远程操控服务器上的 Claude Code
-- 把同一台服务器上的多个 AI 进程绑定到不同的飞书群，做项目隔离
+- 把同一台服务器上的多个 AI 进程绑定到不同的群聊，做项目隔离
 - 通过浏览器或安卓端实时观察 AI 处理进度、日志与对话 Timeline
 
 ---
@@ -39,7 +39,7 @@
 
 | 模块 | 能力 |
 |------|------|
-| **多机器绑定** | 支持同一服务器上同时管理多个 CLI 进程（cc-a / cc-b / codex-x ...），每个进程独立绑定一个飞书机器人 |
+| **多机器绑定** | 支持同一服务器上同时管理多个 CLI 进程（cc-a / cc-b / codex-x ...），每个进程独立绑定一个聊天机器人 |
 | **远程机器管理** | 内置 SSH Executor，可统一管理本机 + 多台远程机器的 tmux session |
 | **双 CLI 支持** | Claude Code（cc）和 Codex 两种 CLI 适配器，可同时混用 |
 | **服务商灵活配置** | 自带 Anthropic / OpenAI 等服务商配置，支持自定义 base_url 与 API Key |
@@ -214,7 +214,7 @@ bash deploy.sh   # 自动构建 + 重启 PM2
 5. 「服务商」菜单：新建 Anthropic / OpenAI / 自定义 服务商，填 base_url + API Key
 6. 服务器上启动 tmux session：`tmux new-session -d -s cc-work`
 7. 「绑定」菜单：新增飞书机器人绑定，填 App ID / App Secret / Verification Token / Encrypt Key + 选择 CLI + 服务商 + 模型 + Effort
-8. 飞书群里 @ 机器人发送任意消息 → 后台会自动启动 cc/codex 进程并桥接
+8. 聊天群里 @ 机器人发送任意消息 → 后台会自动启动 cc/codex 进程并桥接
 
 ---
 
@@ -310,7 +310,7 @@ tmux attach -t cc-projectA
 
 ## ❓ 常见问题
 
-**Q: 飞书消息发送后无响应？**
+**Q: 机器人消息发送后无响应？**
 A: 优先检查：① 绑定状态是否 `online`；② 服务器 tmux session 是否存活；③ 服务商 API Key 是否有效；④ 「日志」菜单实时查看后端日志。
 
 **Q: 远程机器登录失败（Not logged in）？**
