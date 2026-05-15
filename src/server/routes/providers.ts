@@ -7,10 +7,10 @@
  */
 
 import { Router } from 'express';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import https from 'https';
 import { getDb } from '../db/index.js';
-import { providers, models } from '../db/schema.js';
+import { providers, models, bindings } from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
 
@@ -148,8 +148,17 @@ router.delete('/api/providers/:id', requireAuth, (req, res) => {
     return res.json({ code: 1004, message: '服务商不存在' });
   }
 
+  // 先清除绑定中引用该服务商/模型的外键，再级联删除模型和服务商
+  db.update(bindings).set({ providerId: null, modelId: null }).where(eq(bindings.providerId, id)).run();
+  const relatedModels = db.select({ id: models.id }).from(models).where(eq(models.providerId, id)).all();
+  if (relatedModels.length > 0) {
+    const modelIds = relatedModels.map(m => m.id);
+    db.update(bindings).set({ modelId: null }).where(inArray(bindings.modelId, modelIds)).run();
+  }
+  db.delete(models).where(eq(models.providerId, id)).run();
+
   db.delete(providers).where(eq(providers.id, id)).run();
-  logger.log('info', `服务商删除: ${existing.name} (id=${id})`);
+  logger.log('info', `服务商删除: ${existing.name} (id=${id})，关联绑定已置空`);
   res.json({ code: 0, message: '已删除' });
 });
 

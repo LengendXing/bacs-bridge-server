@@ -205,10 +205,10 @@ export const bindings = sqliteTable('bindings', {
   cliKind: text('cli_kind').notNull().default('cc'),
 
   /** 关联服务商 ID（可为空，表示使用本机环境变量） */
-  providerId: integer('provider_id').references(() => providers.id),
+  providerId: integer('provider_id').references(() => providers.id, { onDelete: 'set null' }),
 
   /** 关联模型 ID（可为空，使用默认模型）— 仅当用户从探查成功的列表选时生效 */
-  modelId: integer('model_id').references(() => models.id),
+  modelId: integer('model_id').references(() => models.id, { onDelete: 'set null' }),
 
   /** 模型字符串覆盖（优先于 modelId FK）。
    *  用于：1) 服务商不支持 /v1/models 探查时从默认清单选；2) 用户手输自定义模型 ID。
