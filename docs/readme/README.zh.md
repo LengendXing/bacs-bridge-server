@@ -1,4 +1,4 @@
-# 飞书 × AI CLI 桥接系统（feishu-claudecode-bridge）
+# 飞书 × AI CLI 桥接系统（bacs-bridge-server）
 
 > 把飞书机器人变成 Claude Code / Codex 等 AI CLI 的远程交互入口。不再需要 SSH 进服务器开终端 —— 在飞书里 @ 机器人，就能直接驱动一个或多个 AI 编程进程。
 
@@ -25,7 +25,7 @@
 
 ## 🌟 项目简介
 
-**feishu-claudecode-bridge** 是一个将飞书机器人与 AI CLI 工具（Claude Code / Codex）双向桥接的系统。它通过一个常驻的 Bridge Server 把飞书消息事件路由到指定的 CLI 进程，再把 CLI 的回复发送回飞书群或飞书私聊。
+**bacs-bridge-server** 是一个将飞书机器人与 AI CLI 工具（Claude Code / Codex）双向桥接的系统。它通过一个常驻的 Bridge Server 把飞书消息事件路由到指定的 CLI 进程，再把 CLI 的回复发送回飞书群或飞书私聊。
 
 适用场景：
 - 团队中通过飞书群协作驱动 AI 编程任务
@@ -94,7 +94,7 @@
 ## 📁 项目结构
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # Vue 3 前端
 │   │   ├── views/            # 9 个核心页面（Home/Bindings/Machines/Providers/Terminal/Logs/Settings/Login/Layout）
@@ -137,8 +137,8 @@ feishu-claudecode-bridge/
 
 ```bash
 # 克隆
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 # 安装依赖
 npm install
@@ -166,19 +166,19 @@ npm run dev
 在目标服务器上执行：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 指定安装目录：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 部署后目录结构：
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← 源码（git pull 更新）
 └── deploy/       ← 运行时（PM2 从此启动）
 ```
@@ -186,8 +186,8 @@ feishu-claudecode-bridge/
 ### 方式二：手动 PM2 部署
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

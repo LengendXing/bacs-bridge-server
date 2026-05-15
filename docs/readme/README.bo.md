@@ -1,4 +1,4 @@
-# བོད་སྐད་ 🇨🇳 飞书 × AI CLI ཟམ་པའི་མ་ལག（feishu-claudecode-bridge）
+# བོད་སྐད་ 🇨🇳 飞书 × AI CLI ཟམ་པའི་མ་ལག（bacs-bridge-server）
 
 > ལིན་ཧྲུའུ་(飞书)འཕྲུལ་མི་དེ་ Claude Code / Codex སོགས་ AI CLI ཡི་ཐག་རིང་འབྲེལ་མཐུད་སྒོ་འཛུལ་སར་བསྒྱུར་བ། ད་ནས་ SSH བརྒྱུད་ནས་ཞབས་ཞུ་ཆས་(服务器)སྟེང་མཐའ་ཚུགས་(终端)ཁ་ཕྱེ་མི་དགོས། ལིན་ཧྲུའུ་ནང་ @ འཕྲུལ་མི་ལ་འབོད་པ་ཙམ་གྱིས་ AI ལས་བཟོ་(编程)འཐུམ་རིམ་(进程)གཅིག་གམ་མང་པོ་ཞིག་ཐད་ཀར་གཏོང་ཐུབ།
 
@@ -25,7 +25,7 @@
 
 ## 🌟 རྣམ་གཞག་ངོ་སྤྲོད
 
-**feishu-claudecode-bridge** ནི་ལིན་ཧྲུའུ་(飞书)འཕྲུལ་མི་དང་ AI CLI ལག་ཆ་(Claude Code / Codex)ཕན་ཚུན་ཟམ་པ་སྦྲེལ་བའི་མ་ལག་ཅིག་ཡིན། དེས་རྟག་བཞུགས་ Bridge Server བརྒྱུད་ནས་ལིན་ཧྲུའུ་འཕྲིན་བསྐུར་དོན་རྐྱེན་(消息事件)དེ་གཏན་འཁེལ་བའི་ CLI འཐུམ་རིམ་(进程)ལ་སྐྱེལ་བ་དང་། དེ་ནས་ CLI ཀྱི་ལན་དེ་ལིན་ཧྲུའུ་ཚོགས་པའམ་ལིན་ཧྲུའུ་སྒེར་གཏུག་(私聊)ནང་སླར་ཡང་བསྐུར་བ་ཡིན།
+**bacs-bridge-server** ནི་ལིན་ཧྲུའུ་(飞书)འཕྲུལ་མི་དང་ AI CLI ལག་ཆ་(Claude Code / Codex)ཕན་ཚུན་ཟམ་པ་སྦྲེལ་བའི་མ་ལག་ཅིག་ཡིན། དེས་རྟག་བཞུགས་ Bridge Server བརྒྱུད་ནས་ལིན་ཧྲུའུ་འཕྲིན་བསྐུར་དོན་རྐྱེན་(消息事件)དེ་གཏན་འཁེལ་བའི་ CLI འཐུམ་རིམ་(进程)ལ་སྐྱེལ་བ་དང་། དེ་ནས་ CLI ཀྱི་ལན་དེ་ལིན་ཧྲུའུ་ཚོགས་པའམ་ལིན་ཧྲུའུ་སྒེར་གཏུག་(私聊)ནང་སླར་ཡང་བསྐུར་བ་ཡིན།
 
 སྤྱོད་ཡུལ་གྱི་གནས་ཚུལ：
 - ཚོགས་པའི་ནང་ལིན་ཧྲུའུ་ཚོགས་པ་བརྒྱུད་ནས་མཉམ་འབྲེལ་སྒོས་ AI ལས་བཟོའི་ལས་འགན་གཏོང་བ
@@ -94,7 +94,7 @@
 ## 📁 རྣམ་གྲངས་གྲུབ་ཆ
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # Vue 3 མདུན་ས
 │   │   ├── views/            # ཤོག་གྲངས་9（Home/Bindings/Machines/Providers/Terminal/Logs/Settings/Login/Layout）
@@ -137,8 +137,8 @@ feishu-claudecode-bridge/
 
 ```bash
 # འདྲ་བཤུས་(克隆)
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 # བརྟེན་པ་(依赖)སྒྲིག་འཇུག
 npm install
@@ -166,19 +166,19 @@ npm run dev
 དམིགས་འཛུགས་ཞབས་ཞུ་ཆས་སྟེང་ལག་བསྟར་བྱོས：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 སྒྲིག་འཇུག་སྣོད་ཡིག་(安装目录)གཏན་འཁེལ་བྱོས：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 བཀོད་སྒྲིག་རྗེས་ཀྱི་སྣོད་ཡིག་གྲུབ་ཆ：
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← འ_original་ཚོགས་(git pull གསར་བཅོས)
 └── deploy/       ← འཁོར་སྐྱོད་དུས་ཚོད་(PM2 འདི་ནས་འགོ་བརྩམས)
 ```
@@ -186,8 +186,8 @@ feishu-claudecode-bridge/
 ### ཐབས་ལམ་གཉིས་པ：ལག་བསྟར་ PM2 བཀོད་སྒྲིག
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

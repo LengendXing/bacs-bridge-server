@@ -254,7 +254,7 @@ log_step "Step 7: PM2 启动"
 cd "${DEPLOY_DIR}"
 
 # 停止旧进程
-pm2 delete feishu-bridge 2>/dev/null || true
+pm2 delete bacs-bridge-server 2>/dev/null || true
 
 # 启动
 pm2 start ecosystem.config.cjs
@@ -278,7 +278,7 @@ ${GREEN}╔═══════════════════════
 ║  部署目录:  ${DEPLOY_DIR}
 ║  管理面板:  http://<IP>:${BRIDGE_PORT}/
 ║  健康检查:  http://<IP>:${BRIDGE_PORT}/health
-║  PM2 管理:  pm2 status / pm2 logs feishu-bridge
+║  PM2 管理:  pm2 status / pm2 logs bacs-bridge-server
 ║
 ║  更新流程:
 ║  1. cd ${SOURCE_DIR} && git pull

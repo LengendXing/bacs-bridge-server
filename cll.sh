@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# cll.sh — 一键部署飞书 × AI CLI 桥接系统
+# cll.sh — 一键部署 BACS Bridge Server
 #
 # 用法:
-#   bash cll.sh                        # 部署到 ~/feishu-claudecode-bridge
-#   bash cll.sh /opt/feishu-bridge     # 部署到指定目录
+#   bash cll.sh                        # 部署到 ~/bacs-bridge-server
+#   bash cll.sh /opt/bacs-bridge       # 部署到指定目录
 #
 # 做两件事:
 #   1. 拉取项目代码到 sourceCode/
@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-REPO="https://github.com/LengendXing/feishu-claudecode-bridge.git"
+REPO="https://github.com/LengendXing/bacs-bridge-server.git"
 BRANCH="main"
 
 GREEN='\033[0;32m'
@@ -24,7 +24,7 @@ log_step() { echo -e "${CYAN}[STEP]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
 
 # 根目录（sourceCode/ 和 deploy/ 的父目录）
-ROOT_DIR="${1:-$HOME/feishu-claudecode-bridge}"
+ROOT_DIR="${1:-$HOME/bacs-bridge-server}"
 SOURCE_DIR="${ROOT_DIR}/sourceCode"
 
 # ═══════════════════════════════════════════════════════════════

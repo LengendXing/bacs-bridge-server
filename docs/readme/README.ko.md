@@ -1,4 +1,4 @@
-# 🇰🇷 한국어 飞书 × AI CLI 브릿지 시스템（feishu-claudecode-bridge）
+# 🇰🇷 한국어 飞书 × AI CLI 브릿지 시스템（bacs-bridge-server）
 
 > 飞书 로봇을 Claude Code / Codex 등 AI CLI의 원격 인터랙션 입구로 변환합니다. 더 이상 서버에 SSH로 접속해 터미널을 열 필요가 없습니다 —— 飞书에서 로봇을 @멘션하면 하나 이상의 AI 프로그래밍 프로세스를 직접 구동할 수 있습니다.
 
@@ -25,7 +25,7 @@
 
 ## 🌟 프로젝트 소개
 
-**feishu-claudecode-bridge**는 飞书 로봇과 AI CLI 도구(Claude Code / Codex)를 양방향으로 브릿징하는 시스템입니다. 상주하는 Bridge Server를 통해 飞书 메시지 이벤트를 지정된 CLI 프로세스로 라우팅하고, CLI의 응답을 다시 飞书 그룹이나 飞书 개인 채팅으로 전송합니다.
+**bacs-bridge-server**는 飞书 로봇과 AI CLI 도구(Claude Code / Codex)를 양방향으로 브릿징하는 시스템입니다. 상주하는 Bridge Server를 통해 飞书 메시지 이벤트를 지정된 CLI 프로세스로 라우팅하고, CLI의 응답을 다시 飞书 그룹이나 飞书 개인 채팅으로 전송합니다.
 
 적용 시나리오:
 - 팀에서 飞书 그룹을 통해 협업하며 AI 프로그래밍 작업 구동
@@ -94,7 +94,7 @@
 ## 📁 프로젝트 구조
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # Vue 3 프론트엔드
 │   │   ├── views/            # 9개 핵심 페이지（Home/Bindings/Machines/Providers/Terminal/Logs/Settings/Login/Layout）
@@ -137,8 +137,8 @@ feishu-claudecode-bridge/
 
 ```bash
 # 클론
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 # 의존성 설치
 npm install
@@ -166,19 +166,19 @@ npm run dev
 대상 서버에서 실행:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 설치 디렉토리 지정:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 배포 후 디렉토리 구조:
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← 소스코드（git pull로 업데이트）
 └── deploy/       ← 런타임（PM2가 여기서 시작）
 ```
@@ -186,8 +186,8 @@ feishu-claudecode-bridge/
 ### 방법 2: 수동 PM2 배포
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

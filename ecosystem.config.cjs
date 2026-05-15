@@ -6,7 +6,7 @@
 module.exports = {
   apps: [
     {
-      name: 'feishu-bridge',
+      name: 'bacs-bridge-server',
       script: 'dist/server/index.js',
       instances: 1,
       autorestart: true,
