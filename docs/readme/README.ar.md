@@ -1,6 +1,6 @@
 <div dir="rtl">
 
-# 🇸🇦 نظام جسر فيشيو × AI CLI (feishu-claudecode-bridge)
+# 🇸🇦 نظام جسر فيشيو × AI CLI (bacs-bridge-server)
 
 > حوّل روبوت فيشيو إلى واجهة تفاعل عن بُعد مع أدوات AI CLI مثل Claude Code / Codex. لا حاجة بعد الآن للدخول عبر SSH إلى الخادم وفتح طرفية — فقط أشر إلى الروبوت بـ @ في فيشيو، واستطع تشغيل واحد أو أكثر من عمليات البرمجة بالذكاء الاصطناعي.
 
@@ -27,7 +27,7 @@
 
 ## 🌟 مقدمة المشروع
 
-**feishu-claudecode-bridge** هو نظام جسر ثنائي الاتجاه بين روبوتات فيشيو وأدوات AI CLI (Claude Code / Codex). يعمل خادم Bridge دائم التشغيل على توجيه أحداث رسائل فيشيو إلى عمليات CLI محددة، ثم يعيد إرسال ردود CLI إلى مجموعة فيشيو أو المحادثة الخاصة المقابلة.
+**bacs-bridge-server** هو نظام جسر ثنائي الاتجاه بين روبوتات فيشيو وأدوات AI CLI (Claude Code / Codex). يعمل خادم Bridge دائم التشغيل على توجيه أحداث رسائل فيشيو إلى عمليات CLI محددة، ثم يعيد إرسال ردود CLI إلى مجموعة فيشيو أو المحادثة الخاصة المقابلة.
 
 سيناريوهات الاستخدام:
 - التعاون عبر مجموعات فيشيو لتشغيل مهام البرمجة بالذكاء الاصطناعي ضمن الفريق
@@ -96,7 +96,7 @@
 ## 📁 هيكل المشروع
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # واجهة Vue 3 الأمامية
 │   │   ├── views/            # 9 صفحات أساسية
@@ -138,8 +138,8 @@ feishu-claudecode-bridge/
 ### 2. التشغيل المحلي
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 npm install
 cp .env.example .env
 npm run db:migrate
@@ -156,20 +156,20 @@ npm run dev
 ### الطريقة الأولى: نشر عن بُعد بنقرة واحدة (موصى به)
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 تحديد مجلد التثبيت:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 ### الطريقة الثانية: نشر يدوي بـ PM2
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

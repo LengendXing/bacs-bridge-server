@@ -1,4 +1,4 @@
-# 飞书 × AI CLI 桥接系统（feishu-claudecode-bridge） 🇪🇸 Español
+# 飞书 × AI CLI 桥接系统（bacs-bridge-server） 🇪🇸 Español
 
 > Convierte el bot de Feishu en una puerta de interacción remota para Claude Code / Codex y otras AI CLI. Ya no necesitas hacer SSH al servidor para abrir una terminal — en Feishu, basta con @mencionar al bot para controlar directamente uno o más procesos de programación con IA.
 
@@ -25,7 +25,7 @@
 
 ## 🌟 Introducción del proyecto
 
-**feishu-claudecode-bridge** es un sistema que realiza un puente bidireccional entre el bot de Feishu y las herramientas AI CLI (Claude Code / Codex). A través de un Bridge Server permanente, enruta los eventos de mensajes de Feishu hacia el proceso CLI designado, y luego envía las respuestas del CLI de vuelta al grupo o chat privado de Feishu.
+**bacs-bridge-server** es un sistema que realiza un puente bidireccional entre el bot de Feishu y las herramientas AI CLI (Claude Code / Codex). A través de un Bridge Server permanente, enruta los eventos de mensajes de Feishu hacia el proceso CLI designado, y luego envía las respuestas del CLI de vuelta al grupo o chat privado de Feishu.
 
 Escenarios de uso:
 - Colaboración en equipo a través de grupos de Feishu para dirigir tareas de programación con IA
@@ -94,7 +94,7 @@ Stack tecnológico:
 ## 📁 Estructura del proyecto
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # Frontend Vue 3
 │   │   ├── views/            # 9 páginas principales (Home/Bindings/Machines/Providers/Terminal/Logs/Settings/Login/Layout)
@@ -137,8 +137,8 @@ feishu-claudecode-bridge/
 
 ```bash
 # Clonar
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 # Instalar dependencias
 npm install
@@ -166,19 +166,19 @@ Accede a `http://localhost:3456/`, inicia sesión con la cuenta por defecto `nim
 Ejecutar en el servidor de destino:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 Especificar directorio de instalación:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 Estructura de directorios tras el despliegue:
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← Código fuente (actualizar con git pull)
 └── deploy/       ← Tiempo de ejecución (PM2 se inicia desde aquí)
 ```
@@ -186,8 +186,8 @@ feishu-claudecode-bridge/
 ### Método 2: Despliegue manual con PM2
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

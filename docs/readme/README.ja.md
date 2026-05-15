@@ -1,4 +1,4 @@
-# Feishu × AI CLI ブリッジ（feishu-claudecode-bridge）
+# Feishu × AI CLI ブリッジ（bacs-bridge-server）
 
 > Feishu（Lark）ボットを Claude Code / Codex などの AI CLI のリモート操作インターフェースに変えます。SSH でサーバーに入って端末を開く必要はもうありません — Feishu でボットをメンションするだけで、1 台のサーバー上の複数の AI コーディングプロセスを駆動できます。
 
@@ -25,7 +25,7 @@
 
 ## 🌟 概要
 
-**feishu-claudecode-bridge** は Feishu（Lark）ボットと AI CLI（Claude Code / Codex）を双方向に橋渡しするシステムです。常駐する Bridge Server が Feishu のメッセージイベントを指定された CLI プロセスへルーティングし、CLI の応答を対応する Feishu グループや個人チャットへ返送します。
+**bacs-bridge-server** は Feishu（Lark）ボットと AI CLI（Claude Code / Codex）を双方向に橋渡しするシステムです。常駐する Bridge Server が Feishu のメッセージイベントを指定された CLI プロセスへルーティングし、CLI の応答を対応する Feishu グループや個人チャットへ返送します。
 
 ユースケース：
 - チームが Feishu グループで AI コーディングタスクを共同で進める
@@ -94,7 +94,7 @@
 ## 📁 プロジェクト構成
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/          # Vue 3 フロントエンド
 │   ├── server/          # Express バックエンド
@@ -124,8 +124,8 @@ feishu-claudecode-bridge/
 ### 2. ローカル開発
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 npm install
 cp .env.example .env       # JWT_SECRET などを設定
@@ -147,19 +147,19 @@ npm run dev                # クライアント + サーバー並列起動
 対象サーバーで：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 ディレクトリ指定：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 デプロイ後のディレクトリ構成：
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← ソース（git pull で更新）
 └── deploy/       ← ランタイム（PM2 がここから起動）
 ```
@@ -167,8 +167,8 @@ feishu-claudecode-bridge/
 ### 方法 B — 手動 PM2
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

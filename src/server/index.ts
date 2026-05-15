@@ -1,6 +1,6 @@
 /**
  * @module server/index
- * @description Express server entry point for feishu-claudecode-bridge.
+ * @description Express server entry point for bacs-bridge-server.
  *
  * This file bootstraps the HTTP server, applies global middleware,
  * mounts all API route modules, and (in production) serves the

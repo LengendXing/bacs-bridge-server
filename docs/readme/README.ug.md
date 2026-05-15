@@ -1,6 +1,6 @@
 <div dir="rtl">
 
-# ئۇيغۇرچە 🇨🇳 飞书 × AI CLI كۆۋرۈك سىستېمىسى（feishu-claudecode-bridge）
+# ئۇيغۇرچە 🇨🇳 飞书 × AI CLI كۆۋرۈك سىستېمىسى（bacs-bridge-server）
 
 > 飞书 بوتىنى Claude Code / Codex قاتارلىق AI CLI نىڭ يىراقتىن ئۆزئارا تەسىر كۆرسىتىش كىرىش ئېغىزىغا ئايلاندۇرىدۇ. ئەمدى SSH بىلەن مۇلازىمېتىرغا كىرىپ تېرمىنال ئېچىش ھاجەتسىز —— 飞书 تە بوتنى @ قىلىپ، بىر ياكى بىر نەچچە AI پروگرامما ئىشلەش جەريانىنى بىۋاسىتە قوزغىتالايسىز.
 
@@ -27,7 +27,7 @@
 
 ## 🌟 پروژېكتىغا قىسقىچە تونۇشتۇرۇش
 
-**feishu-claudecode-bridge** بولسا 飞书 بوتى بىلەن AI CLI قوراللىرى（Claude Code / Codex）نى قوش يۆنىلىشلىك كۆۋرۈكلەشتۈرىدىغان سىستېما. ئۇ دائىملىق Bridge Server ئارقىلىق 飞书 ئۇچۇر ۋەقەلىرىنى بەلگىلەنگەن CLI جەريانىغا يۆتكەيدۇ، ئاندىن CLI نىڭ جاۋابىنى 飞书 توپى ياكى 飞书 خۇسۇسىي پاراڭغا قايتۇرۇپ ئەۋەتىدۇ.
+**bacs-bridge-server** بولسا 飞书 بوتى بىلەن AI CLI قوراللىرى（Claude Code / Codex）نى قوش يۆنىلىشلىك كۆۋرۈكلەشتۈرىدىغان سىستېما. ئۇ دائىملىق Bridge Server ئارقىلىق 飞书 ئۇچۇر ۋەقەلىرىنى بەلگىلەنگەن CLI جەريانىغا يۆتكەيدۇ، ئاندىن CLI نىڭ جاۋابىنى 飞书 توپى ياكى 飞书 خۇسۇسىي پاراڭغا قايتۇرۇپ ئەۋەتىدۇ.
 
 قوللىنىش كۆرۈنۈشلىرى：
 - كوللېكتىپتا 飞书 توپى ئارقىلىق AI پروگرامما ئىشلەش ۋەزىپىلىرىنى ھەمكارلىشىپ قوزغىتىش
@@ -96,7 +96,7 @@
 ## 📁 پروژېكت قۇرۇلمىسى
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/               # Vue 3 ئالدى يۈزى
 │   │   ├── views/            # 9 يادرولۇق بەت（Home/Bindings/Machines/Providers/Terminal/Logs/Settings/Login/Layout）
@@ -139,8 +139,8 @@ feishu-claudecode-bridge/
 
 ```bash
 # كلونلاش
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 # بېقىندىلىقلارنى قاچىلاش
 npm install
@@ -168,19 +168,19 @@ npm run dev
 نىشان مۇلازىمېتىردا ئىجرا قىلىڭ：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 قاچىلاش مۇندەرىجىسىنى بەلگىلەش：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 ئورۇنلاشتۇرغاندىن كېيىنكى مۇندەرىجە قۇرۇلمىسى：
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← مەنبە كودى（git pull بىلەن يېڭىلاش）
 └── deploy/       ← ئىجرا مۇھىتى（PM2 بۇ يەردىن قوزغىلىدۇ）
 ```
@@ -188,8 +188,8 @@ feishu-claudecode-bridge/
 ### ئۇسۇل 2：قوللىنىپ PM2 ئورۇنلاشتۇرۇش
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 

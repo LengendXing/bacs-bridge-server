@@ -13,6 +13,7 @@ function deriveKey(): Buffer {
   return Buffer.from(crypto.hkdfSync(
     'sha256',
     Buffer.from(secret, 'utf-8'),
+    // 保留旧项目名作为 HKDF info，改值会导致已加密 TOTP 密钥无法解密
     Buffer.from('feishu-bridge-credential-encryption-v1', 'utf-8'),
     Buffer.from('aes-256-gcm-key', 'utf-8'),
     32,

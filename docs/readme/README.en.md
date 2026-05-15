@@ -1,4 +1,4 @@
-# Feishu × AI CLI Bridge (feishu-claudecode-bridge)
+# Feishu × AI CLI Bridge (bacs-bridge-server)
 
 > Turn the Feishu (Lark) bot into a remote interaction front-end for AI CLIs such as Claude Code / Codex. No more SSH-into-a-server-and-open-a-terminal — just @-mention the bot in Feishu to drive one or many AI coding processes.
 
@@ -25,7 +25,7 @@
 
 ## 🌟 Introduction
 
-**feishu-claudecode-bridge** is a bidirectional bridge between Feishu (Lark) bots and AI CLI tools (Claude Code / Codex). A long-running Bridge Server routes Feishu message events to specific CLI processes and pushes their replies back to the corresponding Feishu group or private chat.
+**bacs-bridge-server** is a bidirectional bridge between Feishu (Lark) bots and AI CLI tools (Claude Code / Codex). A long-running Bridge Server routes Feishu message events to specific CLI processes and pushes their replies back to the corresponding Feishu group or private chat.
 
 Use cases:
 - A team that wants to drive AI coding tasks collaboratively from a Feishu group
@@ -94,7 +94,7 @@ Stack:
 ## 📁 Project Structure
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── src/
 │   ├── client/          # Vue 3 frontend
 │   │   ├── views/       # Home / Bindings / Machines / Providers / Terminal / Logs / Settings / Login / Layout
@@ -136,8 +136,8 @@ feishu-claudecode-bridge/
 ### 2. Local development
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 
 npm install
 cp .env.example .env       # then fill in JWT_SECRET etc.
@@ -159,19 +159,19 @@ Open `http://localhost:3456/`, log in as `nimasile` with the `ADMIN_PASSWORD` se
 On the target server:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh)
 ```
 
 With a custom directory:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/feishu-claudecode-bridge/main/cll.sh) /opt/feishu-bridge
+bash <(curl -fsSL https://raw.githubusercontent.com/LengendXing/bacs-bridge-server/main/cll.sh) /opt/bacs-bridge
 ```
 
 Resulting layout:
 
 ```
-feishu-claudecode-bridge/
+bacs-bridge-server/
 ├── sourceCode/   ← source (git pull to update)
 └── deploy/       ← runtime (PM2 starts here)
 ```
@@ -179,8 +179,8 @@ feishu-claudecode-bridge/
 ### Option B — Manual PM2
 
 ```bash
-git clone https://github.com/LengendXing/feishu-claudecode-bridge.git
-cd feishu-claudecode-bridge
+git clone https://github.com/LengendXing/bacs-bridge-server.git
+cd bacs-bridge-server
 bash deploy.sh
 ```
 
