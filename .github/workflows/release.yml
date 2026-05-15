@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version & changelog
+        id: info
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # 从 maintain.md 提取当前版本变更内容
+          CHANGELOG=$(sed -n "/^## v${VERSION}/,/^## v[0-9]/p" docs/maintain.md | head -n -1 | tail -n +3)
+          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ steps.info.outputs.version }}
+          body: |
+            ## v${{ steps.info.outputs.version }}
+
+            ${{ steps.info.outputs.changelog }}
+          draft: false
+          prerelease: false
