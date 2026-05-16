@@ -8,3 +8,4 @@
 - [x] 首页 Timeline 面板高度撑满视口 - HomeView.vue `.tl-body` max-height 480px → calc(100vh - 240px) + min-height 360px 保底（v1.1.16 ✅ 2026-05-16）
 - [x] 首页 Timeline 真铺满（v1.1.16 calc 方案视觉上未铺满）- HomeView 改 flex 布局：.home-root flex col + .tl-card flex:1 + .tl-body flex:1（v1.1.17 ✅ 2026-05-16）
 - [x] 顶部标题下展示当前系统版本 - vite.config define __APP_VERSION__ + LayoutView top/left 两种模式标题区都展示 v1.1.x（v1.1.18 ✅ 2026-05-16）
+- [x] Timeline 改回固定高度 + 内部滚动（按 bba 样图）- 撤掉 v1.1.17 flex 拉伸，.tl-body height: 440px overflow:auto（v1.1.19 ✅ 2026-05-16）

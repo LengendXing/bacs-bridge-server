@@ -1,5 +1,5 @@
 <template>
-  <div class="home-root">
+  <div>
     <!-- 统计卡片 -->
     <div class="grid grid-cols-4 gap-4">
       <div class="glass-card text-center">
@@ -21,7 +21,7 @@
     </div>
 
     <!-- Timeline -->
-    <div class="glass-card mt-6 tl-card" style="padding: 0; overflow: hidden">
+    <div class="glass-card mt-6" style="padding: 0; overflow: hidden">
       <div class="tl-header">
         <span class="tl-title">消息时间线</span>
         <span class="tl-badge" :class="{ 'tl-badge-live': sseActive }">
@@ -198,20 +198,8 @@ onUnmounted(() => {
   color: #00b96b;
 }
 
-.home-root {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100vh - 120px);
-}
-.tl-card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 .tl-body {
-  flex: 1;
-  min-height: 360px;
+  height: 440px;
   overflow-y: auto;
   padding: 8px 0;
 }
