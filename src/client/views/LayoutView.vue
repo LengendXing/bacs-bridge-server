@@ -180,9 +180,9 @@ const menuItems: MenuItem[] = [
     label: '绑定管理',
     icon: Link,
     children: [
+      { path: '/bots', label: 'Bots', icon: Bot },
       { path: '/providers', label: '服务商', icon: Cloud },
       { path: '/bindings', label: '绑定', icon: Link },
-      { path: '/bots', label: 'Bots 管理', icon: Bot },
     ],
   },
   { path: '/logs', label: '日志', icon: FileText },
