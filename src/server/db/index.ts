@@ -71,6 +71,13 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
   // 通过 app_settings.botsMigrationDone 标记保证只执行一次
   runBotsMigrationOnce(sqlite);
 
+  // 运行时确保 bindings.bot_id 列存在（v1.1.14 引入）
+  ensureBindingBotIdColumn(sqlite);
+
+  // 一次性回填：bindings.feishu_app_id → bindings.bot_id（按 bacs_bots.app_id 匹配）
+  // 通过 app_settings.bindingBotIdMigrationDone 标记保证只执行一次
+  runBindingBotIdBackfillOnce(sqlite);
+
   // Seed 默认本机记录
   seedLocalMachine(sqlite);
 
@@ -164,6 +171,78 @@ function runBotsMigrationOnce(sqlite: Database.Database): void {
 
   // eslint-disable-next-line no-console
   console.log(`[Bots 迁移] 扫描 ${rows.length} 条飞书绑定，新增 ${inserted} 条 Bot 记录`);
+}
+
+/**
+ * 兼容老库（v1.1.14）：为 bindings 表补齐 bot_id 列。
+ *
+ * v1.1.14 起新建/编辑绑定走 botId 关联 bacs_bots 表。老库 bindings 表无此列，
+ * 启动时通过 PRAGMA + ALTER TABLE 兜底（与 ensureMachineColumns 风格一致）。
+ */
+function ensureBindingBotIdColumn(sqlite: Database.Database): void {
+  const cols = sqlite.prepare(`PRAGMA table_info(bindings)`).all() as { name: string }[];
+  const names = new Set(cols.map(c => c.name));
+  if (!names.has('bot_id')) {
+    sqlite.exec(`ALTER TABLE bindings ADD COLUMN bot_id INTEGER REFERENCES bacs_bots(id) ON DELETE SET NULL`);
+  }
+}
+
+/**
+ * 一次性回填：根据 bindings.feishu_app_id 匹配 bacs_bots.app_id，回填 bindings.bot_id。
+ *
+ * 幂等：通过 app_settings.key = 'bindingBotIdMigrationDone' 标记。
+ * 仅处理 bot_id 为空且 feishu_app_id 非空的行；同一 app_id 在 bacs_bots 中可能有多条
+ * （理论上 platform=feishu + name 唯一，但不强制 app_id 唯一），按 id 最小者匹配。
+ *
+ * v1.1.14 引入。前置：runBotsMigrationOnce（v1.1.10）已把所有 binding 凭据迁入 bacs_bots。
+ */
+function runBindingBotIdBackfillOnce(sqlite: Database.Database): void {
+  const done = sqlite
+    .prepare(`SELECT value FROM app_settings WHERE key = 'bindingBotIdMigrationDone'`)
+    .get() as { value: string } | undefined;
+  if (done) return;
+
+  type Row = { id: string; feishu_app_id: string };
+  const rows = sqlite
+    .prepare(
+      `SELECT id, feishu_app_id
+       FROM bindings
+       WHERE bot_id IS NULL
+         AND feishu_app_id IS NOT NULL
+         AND feishu_app_id != ''`
+    )
+    .all() as Row[];
+
+  const findBot = sqlite.prepare(
+    `SELECT id FROM bacs_bots WHERE platform = 'feishu' AND app_id = ? ORDER BY id ASC LIMIT 1`
+  );
+  const updateBinding = sqlite.prepare(
+    `UPDATE bindings SET bot_id = ?, updated_at = datetime('now') WHERE id = ?`
+  );
+
+  let matched = 0;
+  let missing = 0;
+  for (const r of rows) {
+    const bot = findBot.get(r.feishu_app_id) as { id: number } | undefined;
+    if (bot) {
+      updateBinding.run(bot.id, r.id);
+      matched++;
+    } else {
+      missing++;
+    }
+  }
+
+  sqlite
+    .prepare(
+      `INSERT INTO app_settings (key, value) VALUES ('bindingBotIdMigrationDone', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+    )
+    .run(new Date().toISOString());
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[Binding-BotId 回填] 扫描 ${rows.length} 条绑定，匹配 ${matched} 条，未匹配 ${missing} 条`
+  );
 }
 
 /**

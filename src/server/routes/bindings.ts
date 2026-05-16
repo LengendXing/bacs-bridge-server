@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, sql } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { getDb } from '../db/index.js';
-import { bindings, providers, models, machines, auditLogs } from '../db/schema.js';
+import { bindings, providers, models, machines, auditLogs, bots } from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
 import { buildCliConfig, startCliProcess } from '../session/manager.js';
@@ -11,6 +11,68 @@ import { getExecutor } from '../executor/factory.js';
 import { getChannel } from '../channel/router.js';
 
 const router = Router();
+
+/**
+ * v1.1.14：根据请求体解析绑定所需的飞书凭据。
+ *
+ * 优先使用 botId（新建/编辑绑定的标准路径）；缺失时回退到旧字段 feishuAppId/Secret（兼容期）。
+ *
+ * @returns
+ *   - 成功：{ ok: true, botId, appId, secret, botName, platform }
+ *     - botId 可能为 null（旧客户端只传 feishuAppId/Secret 时）
+ *   - 失败：{ ok: false, message }
+ */
+function resolveBotCredentials(
+  db: ReturnType<typeof getDb>,
+  body: Record<string, any>
+):
+  | {
+      ok: true;
+      botId: number | null;
+      appId: string;
+      secret: string;
+      botName: string | null;
+      platform: string;
+    }
+  | { ok: false; message: string } {
+  const rawBotId = body?.botId;
+  const botId =
+    rawBotId === undefined || rawBotId === null || rawBotId === ''
+      ? null
+      : Number(rawBotId);
+
+  if (botId !== null) {
+    if (!Number.isFinite(botId) || botId <= 0) {
+      return { ok: false, message: 'botId 无效' };
+    }
+    const bot = db.select().from(bots).where(eq(bots.id, botId)).get();
+    if (!bot) {
+      return { ok: false, message: `Bot (id=${botId}) 不存在` };
+    }
+    if (!bot.appId || !bot.secret) {
+      return {
+        ok: false,
+        message: `Bot ${bot.platform}/${bot.name} 缺少 appId 或 secret，请先到 Bots 页面补全`,
+      };
+    }
+    return {
+      ok: true,
+      botId: bot.id,
+      appId: bot.appId,
+      secret: bot.secret,
+      botName: bot.name,
+      platform: bot.platform,
+    };
+  }
+
+  // 兼容期：旧客户端直接传 feishuAppId/Secret
+  const appId = body?.feishuAppId ? String(body.feishuAppId).trim() : '';
+  const secret = body?.feishuAppSecret ? String(body.feishuAppSecret).trim() : '';
+  if (!appId || !secret) {
+    return { ok: false, message: '请选择机器人（或填写飞书 App ID 和 App Secret）' };
+  }
+  return { ok: true, botId: null, appId, secret, botName: null, platform: 'feishu' };
+}
 
 router.get('/api/status', requireAuth, async (req, res) => {
   try {
@@ -72,6 +134,17 @@ router.get('/api/status', requireAuth, async (req, res) => {
         } catch { /* machines 表不存在 */ }
       }
 
+      // v1.1.14：关联 bots 表，前端列表展示「平台 / Bot 名称」替代裸 appId
+      let botName: string | null = null;
+      let botPlatform: string | null = null;
+      if (b.botId) {
+        try {
+          const bot = db.select().from(bots).where(eq(bots.id, b.botId)).get();
+          botName = bot?.name ?? null;
+          botPlatform = bot?.platform ?? null;
+        } catch { /* bots 表不存在 */ }
+      }
+
       return {
         id: b.id,
         processName: b.processName,
@@ -82,6 +155,9 @@ router.get('/api/status', requireAuth, async (req, res) => {
         effort: b.effort,
         machineId: b.machineId ?? null,
         machineName,
+        botId: b.botId ?? null,
+        botName,
+        botPlatform,
         feishuAppId: b.feishuAppId,
         feishuAppSecret: b.feishuAppSecret
           ? `${b.feishuAppSecret.slice(0, 4)}****`
@@ -107,16 +183,20 @@ router.get('/api/status', requireAuth, async (req, res) => {
 });
 
 router.post('/api/bind', requireAuth, async (req, res) => {
-  const { processName, cliKind, providerId, modelId, modelOverride, effort, feishuAppId, feishuAppSecret, machineId } = req.body;
+  const { processName, cliKind, providerId, modelId, modelOverride, effort, machineId } = req.body;
 
   if (!processName) {
     return res.json({ code: 1003, message: '请填写进程名' });
   }
-  if (!feishuAppId || !feishuAppSecret) {
-    return res.json({ code: 1003, message: '请填写飞书 App ID 和 App Secret' });
-  }
 
   const db = getDb();
+
+  // v1.1.14：优先用 botId 解析凭据；旧字段 feishuAppId/Secret 兼容期保留
+  const cred = resolveBotCredentials(db, req.body);
+  if (!cred.ok) {
+    return res.json({ code: 1003, message: cred.message });
+  }
+
   const existing = db.select().from(bindings).where(eq(bindings.processName, processName)).get();
   if (existing) {
     return res.json({ code: 1003, message: `进程名 ${processName} 已被占用` });
@@ -135,8 +215,9 @@ router.post('/api/bind', requireAuth, async (req, res) => {
       modelId: modelId || null,
       modelOverride: modelOverride || null,
       effort: effort || null,
-      feishuAppId,
-      feishuAppSecret,
+      botId: cred.botId,
+      feishuAppId: cred.appId,
+      feishuAppSecret: cred.secret,
       machineId: resolvedMachineId,
       status: 'offline',
     }).run();
@@ -172,7 +253,7 @@ router.post('/api/bind', requireAuth, async (req, res) => {
     userId,
     action: 'bind_create',
     target: processName,
-    detail: `cliKind=${kind}, feishuAppId=${feishuAppId}, machineId=${resolvedMachineId}`,
+    detail: `cliKind=${kind}, botId=${cred.botId ?? 'null'}, feishuAppId=${cred.appId}, machineId=${resolvedMachineId}`,
     ipAddress: req.ip,
   }).run();
 
@@ -182,13 +263,18 @@ router.post('/api/bind', requireAuth, async (req, res) => {
 });
 
 router.post('/api/bind/mount', requireAuth, async (req, res) => {
-  const { processName, cliKind, providerId, modelId, modelOverride, effort, feishuAppId, feishuAppSecret, machineId } = req.body;
+  const { processName, cliKind, providerId, modelId, modelOverride, effort, machineId } = req.body;
 
   if (!processName) {
     return res.json({ code: 1003, message: '请填写进程名' });
   }
-  if (!feishuAppId || !feishuAppSecret) {
-    return res.json({ code: 1003, message: '请填写飞书 App ID 和 App Secret' });
+
+  const db = getDb();
+
+  // v1.1.14：优先用 botId 解析凭据
+  const cred = resolveBotCredentials(db, req.body);
+  if (!cred.ok) {
+    return res.json({ code: 1003, message: cred.message });
   }
 
   const kind = cliKind || 'cc';
@@ -201,7 +287,6 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
     return res.json({ code: 1004, message: `tmux 会话 ${sessionName} 不存在，请先启动 CLI 进程` });
   }
 
-  const db = getDb();
   const existing = db.select().from(bindings).where(eq(bindings.processName, processName)).get();
   if (existing) {
     return res.json({ code: 1003, message: `进程名 ${processName} 已被绑定` });
@@ -217,8 +302,9 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
       modelId: modelId || null,
       modelOverride: modelOverride || null,
       effort: effort || null,
-      feishuAppId,
-      feishuAppSecret,
+      botId: cred.botId,
+      feishuAppId: cred.appId,
+      feishuAppSecret: cred.secret,
       machineId: resolvedMachineId,
       status: 'online',
     }).run();
@@ -242,7 +328,7 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
     userId,
     action: 'bind_mount',
     target: processName,
-    detail: `cliKind=${kind}, mount existing session, machineId=${resolvedMachineId}`,
+    detail: `cliKind=${kind}, botId=${cred.botId ?? 'null'}, mount existing session, machineId=${resolvedMachineId}`,
     ipAddress: req.ip,
   }).run();
 
@@ -252,7 +338,7 @@ router.post('/api/bind/mount', requireAuth, async (req, res) => {
 });
 
 router.post('/api/edit', requireAuth, async (req, res) => {
-  const { id, feishuAppId, feishuAppSecret, providerId, modelId, modelOverride, effort, machineId } = req.body;
+  const { id, botId, feishuAppId, feishuAppSecret, providerId, modelId, modelOverride, effort, machineId } = req.body;
 
   if (!id) {
     return res.json({ code: 1003, message: '请提供绑定 ID' });
@@ -265,6 +351,30 @@ router.post('/api/edit', requireAuth, async (req, res) => {
   }
 
   const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
+
+  // v1.1.14：若 botId 提供（且与 existing 不同），从 bots 表查新凭据覆盖 feishuAppId/Secret
+  if (botId !== undefined) {
+    if (botId === null || botId === '') {
+      updates.botId = null;
+    } else {
+      const newBotId = Number(botId);
+      if (!Number.isFinite(newBotId) || newBotId <= 0) {
+        return res.json({ code: 1003, message: 'botId 无效' });
+      }
+      const bot = db.select().from(bots).where(eq(bots.id, newBotId)).get();
+      if (!bot) {
+        return res.json({ code: 1004, message: `Bot (id=${newBotId}) 不存在` });
+      }
+      if (!bot.appId || !bot.secret) {
+        return res.json({ code: 1003, message: `Bot ${bot.platform}/${bot.name} 缺少凭据` });
+      }
+      updates.botId = bot.id;
+      updates.feishuAppId = bot.appId;
+      updates.feishuAppSecret = bot.secret;
+    }
+  }
+
+  // 旧字段兼容：botId 未提供时仍可单独改 feishuAppId/Secret
   if (feishuAppId !== undefined && feishuAppId !== '') updates.feishuAppId = feishuAppId;
   // 空字符串 = 不修改密钥（避免编辑表单留空覆盖原值）；显式 null = 清空
   if (feishuAppSecret !== undefined && feishuAppSecret !== '') updates.feishuAppSecret = feishuAppSecret;
@@ -327,10 +437,14 @@ router.post('/api/edit', requireAuth, async (req, res) => {
       }
     }
   } else {
-    // 非 CLI 配置变更，仅飞书凭据变更时重启 WS
+    // 非 CLI 配置变更，仅飞书凭据/Bot 关联变更时重启 WS
+    // v1.1.14：botId 变更也算飞书凭据变更（因为它推导出新的 appId/secret）
+    const newBotIdNum =
+      botId === undefined ? undefined : botId === null || botId === '' ? null : Number(botId);
     const wsNeedsRestart =
-      (feishuAppId !== undefined && feishuAppId !== existing.feishuAppId) ||
-      (feishuAppSecret !== undefined && feishuAppSecret !== existing.feishuAppSecret);
+      (newBotIdNum !== undefined && newBotIdNum !== (existing.botId ?? null)) ||
+      (updates.feishuAppId !== undefined && updates.feishuAppId !== existing.feishuAppId) ||
+      (updates.feishuAppSecret !== undefined && updates.feishuAppSecret !== existing.feishuAppSecret);
 
     if (wsNeedsRestart) {
       const channel = getChannel('feishu');

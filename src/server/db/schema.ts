@@ -223,11 +223,16 @@ export const bindings = sqliteTable('bindings', {
   /** 关联机器 ID（null = 本地执行，向后兼容） */
   machineId: integer('machine_id').references(() => machines.id),
 
-  /** 飞书应用 App ID */
+  /** 飞书应用 App ID（冗余字段，v1.1.14 起由 botId 关联推导写入；保留兼容 ws-client 既有读取路径） */
   feishuAppId: text('feishu_app_id'),
 
-  /** 飞书应用 App Secret */
+  /** 飞书应用 App Secret（冗余字段，同上） */
   feishuAppSecret: text('feishu_app_secret'),
+
+  /** 关联机器人 ID（v1.1.14 引入；新建/编辑绑定时通过此关联 bacs_bots 表，
+   *  服务端从 bots 表查 appId/secret 写入上面两个冗余字段；
+   *  on delete set null：Bot 删除时绑定保留但需重新关联） */
+  botId: integer('bot_id').references(() => bots.id, { onDelete: 'set null' }),
 
   /** 进程状态：'online' | 'offline' */
   status: text('status').default('offline'),
