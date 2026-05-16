@@ -10,3 +10,4 @@
 - [x] 顶部标题下展示当前系统版本 - vite.config define __APP_VERSION__ + LayoutView top/left 两种模式标题区都展示 v1.1.x（v1.1.18 ✅ 2026-05-16）
 - [x] Timeline 改回固定高度 + 内部滚动（按 bba 样图）- 撤掉 v1.1.17 flex 拉伸，.tl-body height: 440px overflow:auto（v1.1.19 ✅ 2026-05-16）
 - [x] Timeline 高度 +320px（440 → 760px）- HomeView .tl-body height 调整（v1.1.20 ✅ 2026-05-16）
+- [x] Timeline 高度砍 80px（760 → 680px）- HomeView .tl-body height 微调（v1.1.21 ✅ 2026-05-16）
