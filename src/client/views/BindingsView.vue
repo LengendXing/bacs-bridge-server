@@ -33,7 +33,7 @@
         <thead>
           <tr>
             <th>进程名称</th>
-            <th>飞书 App ID</th>
+            <th>平台 / 机器人</th>
             <th>WS 状态</th>
             <th>状态</th>
             <th>CLI 类型</th>
@@ -52,7 +52,14 @@
           </tr>
           <tr v-for="b in bindings" :key="b.id">
             <td style="font-weight: 500">{{ b.processName }}</td>
-            <td style="color: var(--text-secondary)">{{ b.feishuAppId || '-' }}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <span style="padding: 2px 6px; border-radius: 4px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary)">
+                  {{ b.botPlatform === 'feishu' ? '飞书' : b.botPlatform === 'telegram' ? 'TG' : b.botPlatform === 'qq' ? 'QQ' : b.botPlatform === 'wechat' ? '微信' : '飞书' }}
+                </span>
+                <span :title="b.feishuAppId || ''">{{ b.botName || '— 未关联 —' }}</span>
+              </div>
+            </td>
             <td>
               <span :class="b.wsConnected ? 'badge badge-online' : 'badge badge-offline'">
                 {{ b.wsConnected ? '已连接' : '未连接' }}
@@ -213,13 +220,28 @@
             </select>
           </template>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">飞书 App ID</label>
-          <input v-model="form.feishuAppId" type="text" class="input-mac mb-3" placeholder="cli_xxx" :required="modalMode !== 'edit'" />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">平台</label>
+          <select v-model="form.platform" @change="onPlatformChange" class="input-mac mb-3">
+            <option value="feishu">飞书</option>
+            <option value="telegram" disabled>Telegram（暂未支持）</option>
+            <option value="qq" disabled>QQ（暂未支持）</option>
+            <option value="wechat" disabled>微信（暂未支持）</option>
+          </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            飞书 App Secret<span v-if="modalMode === 'edit'" style="color: var(--text-secondary); font-weight: normal">（留空不修改）</span>
-          </label>
-          <input v-model="form.feishuAppSecret" type="password" class="input-mac mb-3" placeholder="飞书应用密钥" :required="modalMode !== 'edit'" />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">机器人</label>
+          <template v-if="botList.length > 0">
+            <select v-model="form.botId" class="input-mac mb-3" required>
+              <option :value="null" disabled>请选择机器人</option>
+              <option v-for="b in botList" :key="b.id" :value="b.id">
+                {{ b.name }}（{{ b.appId.slice(0, 10) }}{{ b.appId.length > 10 ? '...' : '' }}）
+              </option>
+            </select>
+          </template>
+          <div v-else class="mb-3 p-3 rounded text-xs" style="background: var(--bg-secondary); color: var(--text-secondary)">
+            该平台下暂无机器人，请先到
+            <router-link to="/bots" class="underline" style="color: var(--accent-color)">Bots 页面</router-link>
+            创建后再来绑定
+          </div>
 
           <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">{{ formError }}</p>
           <div class="flex items-center gap-2">
@@ -311,9 +333,28 @@ const form = ref({
   modelOverride: '' as string,
   effort: null as string | null,
   machineId: null as number | null,
-  feishuAppId: '',
-  feishuAppSecret: '',
+  // v1.1.14：绑定改为关联 bacs_bots（先选平台再选 Bot）
+  platform: 'feishu' as 'feishu' | 'telegram' | 'qq' | 'wechat',
+  botId: null as number | null,
 });
+
+// v1.1.14：当前平台下可选的机器人列表（来自 /api/bots?platform=xxx）
+interface BotItem { id: number; platform: string; name: string; appId: string; remark: string | null }
+const botList = ref<BotItem[]>([]);
+
+async function loadBots(platform: string) {
+  try {
+    const res = await get<BotItem[]>(`/api/bots?platform=${encodeURIComponent(platform)}`);
+    if (res.code === 0) botList.value = res.data || [];
+    else botList.value = [];
+  } catch { botList.value = []; }
+}
+
+function onPlatformChange() {
+  // 切换平台时清空已选 Bot 并重新加载该平台的 Bot 列表
+  form.value.botId = null;
+  loadBots(form.value.platform);
+}
 
 // 模型按 CLI 类型 + 服务商过滤；探查失败时 fallback 到内置默认模型
 const filteredModels = computed(() => {
@@ -469,20 +510,21 @@ function onMachineChange() {
 function openCreate() {
   modalMode.value = 'create';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, modelOverride: '', effort: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, modelOverride: '', effort: null, machineId: null, platform: 'feishu', botId: null };
   formError.value = '';
   useCustomModel.value = false;
   probeFailed.value = false;
   loadProviders();
   loadMachines();
   loadModels();
+  loadBots(form.value.platform);
   showModal.value = true;
 }
 
 function openMount() {
   modalMode.value = 'mount';
   editId.value = '';
-  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, modelOverride: '', effort: null, machineId: null, feishuAppId: '', feishuAppSecret: '' };
+  form.value = { processName: '', cliKind: 'cc', providerId: null, modelId: null, modelOverride: '', effort: null, machineId: null, platform: 'feishu', botId: null };
   formError.value = '';
   useCustomModel.value = false;
   probeFailed.value = false;
@@ -490,6 +532,7 @@ function openMount() {
   loadMachines();
   loadModels();
   loadUnboundSessions();
+  loadBots(form.value.platform);
   showModal.value = true;
 }
 
@@ -504,37 +547,54 @@ function openEdit(b: Binding) {
     modelOverride: b.modelOverride || '',
     effort: b.effort || null,
     machineId: b.machineId,
-    feishuAppId: b.feishuAppId || '',
-    feishuAppSecret: '',
+    platform: (b.botPlatform as 'feishu' | 'telegram' | 'qq' | 'wechat') || 'feishu',
+    botId: b.botId ?? null,
   };
   useCustomModel.value = !!b.modelOverride;
   formError.value = '';
   loadProviders();
   loadMachines();
   loadModels();
+  loadBots(form.value.platform);
   showModal.value = true;
 }
 
 async function handleSubmit() {
   formError.value = '';
+  // v1.1.14：先校验必须选了 Bot
+  if (!form.value.botId) {
+    formError.value = '请选择机器人（先选平台再选 Bot）';
+    return;
+  }
   formLoading.value = true;
   try {
     let res;
     if (modalMode.value === 'create') {
       res = await post('/api/bind', {
-        ...form.value,
+        processName: form.value.processName,
+        cliKind: form.value.cliKind,
+        providerId: form.value.providerId,
+        modelId: form.value.modelId,
         modelOverride: useCustomModel.value ? form.value.modelOverride : undefined,
+        effort: form.value.effort,
+        machineId: form.value.machineId,
+        botId: form.value.botId,
       });
     } else if (modalMode.value === 'mount') {
       res = await post('/api/bind/mount', {
-        ...form.value,
+        processName: form.value.processName,
+        cliKind: form.value.cliKind,
+        providerId: form.value.providerId,
+        modelId: form.value.modelId,
         modelOverride: useCustomModel.value ? form.value.modelOverride : undefined,
+        effort: form.value.effort,
+        machineId: form.value.machineId,
+        botId: form.value.botId,
       });
     } else {
       res = await post('/api/edit', {
         id: editId.value,
-        feishuAppId: form.value.feishuAppId,
-        feishuAppSecret: form.value.feishuAppSecret,
+        botId: form.value.botId,
         providerId: form.value.providerId,
         modelId: form.value.modelId,
         modelOverride: useCustomModel.value ? form.value.modelOverride : (form.value.modelOverride || undefined),

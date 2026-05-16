@@ -57,6 +57,10 @@ export interface Binding {
   effort: string | null;
   machineId: number | null;
   machineName: string | null;
+  /** v1.1.14：关联 bacs_bots 表 */
+  botId: number | null;
+  botName: string | null;
+  botPlatform: string | null;
   feishuAppId: string | null;
   feishuAppSecret: string | null;
   status: 'online' | 'offline';
@@ -152,8 +156,10 @@ export interface CreateBindingRequest {
   modelOverride: string | null;
   effort: string | null;
   machineId?: number | null;
-  feishuAppId: string;
-  feishuAppSecret: string;
+  /** v1.1.14：优先通过 botId 关联 bacs_bots（推荐）；旧字段兼容期保留 */
+  botId?: number | null;
+  feishuAppId?: string;
+  feishuAppSecret?: string;
 }
 
 /** 服务商创建请求 */

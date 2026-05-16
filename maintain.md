@@ -1,3 +1,34 @@
+## v1.1.14 - 2026-05-16
+### 变更内容
+- 新建/编辑绑定改造为「先选平台 → 再选 Bot」关联关系
+  - 之前：绑定弹窗里手填 飞书 App ID + App Secret，与 v1.1.10 引入的 bacs_bots 表割裂
+  - 现在：弹窗第一步选平台（feishu / telegram / qq / wechat，后三者 disabled），第二步从该平台已有 Bot 中选择
+  - 列表第二列由「飞书 App ID」改为「平台 / Bot 名称」（裸 App ID 移到 title tooltip）
+- 数据模型变更
+  - bindings 表新增 `bot_id INTEGER REFERENCES bacs_bots(id) ON DELETE SET NULL`（v1.1.10 注释里规划的字段正式落地）
+  - 老库通过 ensureBindingBotIdColumn（PRAGMA + ALTER TABLE）兜底自动加列
+  - 启动一次性回填：runBindingBotIdBackfillOnce 按 bindings.feishu_app_id 匹配 bacs_bots.app_id 写入 bot_id；幂等键 `app_settings.bindingBotIdMigrationDone`
+- 后端 API 改造
+  - 新增辅助函数 resolveBotCredentials：优先 botId 查 bots 表拿凭据，回退旧字段（兼容期）
+  - /api/bind /api/bind/mount /api/edit 入参支持 botId；旧字段 feishuAppId/Secret 仍兼容
+  - /api/edit 中 botId 变更会触发 ws 重启（与凭据变更等价）
+  - /api/status 返回值新增 botId / botName / botPlatform
+- 保留 bindings.feishu_app_id / feishu_app_secret 字段作为冗余存储
+  - 写入时由 bot 关联推导填充，ws-client.ts / state.ts 不动，零联动风险
+
+### 影响范围
+- 数据库：bindings 表新增 bot_id 列
+- API：/api/bind /api/bind/mount /api/edit /api/status
+- 文件：src/server/db/schema.ts, src/server/db/index.ts, src/server/routes/bindings.ts, src/shared/types.ts, src/client/views/BindingsView.vue
+- package.json 1.1.13 → 1.1.14
+
+### 功能列表
+- 通过下拉关联 Bot 创建/编辑绑定，避免重复填写飞书凭据
+- 历史绑定自动按 App ID 关联到对应 Bot
+- 同一 Bot 可被多个绑定关联（场景：多 CLI 进程共用一套飞书凭据）
+
+---
+
 ## v1.1.13 - 2026-05-16
 ### 变更内容
 - Bots 工具栏 3 个 UI 问题修复
