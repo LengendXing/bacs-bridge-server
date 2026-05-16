@@ -1,3 +1,20 @@
+## v1.1.22 - 2026-05-16
+### 变更内容
+- 首页 Timeline 卡片高度 680 → 640px（用户反馈再缩 40px）
+  - HomeView.vue `.tl-body` `height: 680px` → `height: 640px`
+- 确认版本号来源统一为单一源（无代码变更，仅确认现状）
+  - `package.json.version` → `vite.config.ts` `define: __APP_VERSION__` → `LayoutView.vue` `appVersion` → UI 两处展示（top header + left sidebar）
+  - 后端、scripts 无任何硬编码版本
+
+### 影响范围
+- 仅 HomeView.vue 一行
+
+### 功能列表
+- Timeline 卡片可见高度从 680px 调整为 640px
+- 版本号管理：以后只改 package.json，所有 UI 展示位置自动同步
+
+---
+
 ## v1.1.21 - 2026-05-16
 ### 变更内容
 - 首页 Timeline 卡片高度 760 → 680px（用户反馈先砍 60 再缩 20，共砍 80px）
