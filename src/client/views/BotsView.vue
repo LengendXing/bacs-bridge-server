@@ -6,12 +6,17 @@
 
     <!-- 工具栏：左侧 Tabbar，右侧 搜索/新增 -->
     <div class="bots-toolbar">
-      <!-- 滑块式 Tabbar -->
-      <div class="seg-tabs" :style="{ '--seg-count': platforms.length, '--seg-active': activeIndex }">
-        <span class="seg-indicator" aria-hidden="true" />
+      <!-- 滑块式 Tabbar（每个 tab 按文字宽度撑开，滑块自适应宽度） -->
+      <div ref="segTabsEl" class="seg-tabs">
+        <span
+          class="seg-indicator"
+          aria-hidden="true"
+          :style="{ left: indicatorLeft + 'px', width: indicatorWidth + 'px' }"
+        />
         <button
           v-for="(p, i) in platforms"
           :key="p.id"
+          :ref="(el) => setSegTabRef(el, i)"
           type="button"
           class="seg-tab"
           :class="{ active: activeIndex === i }"
@@ -26,8 +31,7 @@
       <div class="bots-toolbar-actions">
         <input
           v-model="searchInput"
-          class="input-mac input-mac-sm"
-          style="width: 180px"
+          class="input-mac input-mac-sm bots-search-input"
           placeholder="搜索 Name / AppID / 备注"
           @keyup.enter="applySearch"
         />
@@ -220,9 +224,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue';
-import { Bot, Send, MessageCircle, Smartphone } from 'lucide-vue-next';
+import { ref, computed, reactive, onMounted, nextTick, watch, h } from 'vue';
+import type { FunctionalComponent } from 'vue';
 import { useApi } from '../composables/useApi';
+
+/* ─────────────────────────────────────────────────────────────
+ * 平台 Logo（inline SVG，单色 currentColor，简洁风）
+ * 通过 functional component 形式声明，可直接传给 <component :is>
+ * ──────────────────────────────────────────────────────────── */
+interface LogoProps {
+  size?: number | string;
+}
+function makeLogo(viewBox: string, path: string): FunctionalComponent<LogoProps> {
+  const C: FunctionalComponent<LogoProps> = (props) =>
+    h(
+      'svg',
+      {
+        xmlns: 'http://www.w3.org/2000/svg',
+        width: props.size ?? 16,
+        height: props.size ?? 16,
+        viewBox,
+        fill: 'currentColor',
+        'aria-hidden': 'true',
+      },
+      [h('path', { d: path })],
+    );
+  C.props = ['size'];
+  return C;
+}
+
+// 飞书（Feishu / Lark）—— 简化版「F」标志
+const FeishuLogo = makeLogo(
+  '0 0 24 24',
+  'M3.5 4h13a1 1 0 0 1 1 1v3.2H9.4v3.1h6.5v3.2H9.4V20H6.2V5a1 1 0 0 1-2.7-1Z M19 7.5c1.4 0 2.5 1 2.5 2.5s-1.1 2.5-2.5 2.5S16.5 11.4 16.5 10 17.6 7.5 19 7.5Z',
+);
+// Telegram 纸飞机
+const TelegramLogo = makeLogo(
+  '0 0 24 24',
+  'M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42Z',
+);
+// QQ 企鹅（简化版）
+const QQLogo = makeLogo(
+  '0 0 24 24',
+  'M12 2c-3.5 0-6 2.5-6 6 0 1.5.4 2.9 1.2 4.1-.7 1.4-1.4 3.1-1.4 4.4 0 .8.5 1.1 1.1 1.1.5 0 1.3-.3 1.9-.8.3.3.8.6 1.4.9-.4.5-.7 1-.7 1.5 0 .9.9 1.3 2.5 1.3s2.5-.4 2.5-1.3c0-.5-.3-1-.7-1.5.6-.3 1.1-.6 1.4-.9.6.5 1.4.8 1.9.8.6 0 1.1-.3 1.1-1.1 0-1.3-.7-3-1.4-4.4C17.6 10.9 18 9.5 18 8c0-3.5-2.5-6-6-6Zm-2 5c.55 0 1 .67 1 1.5S10.55 10 10 10s-1-.67-1-1.5S9.45 7 10 7Zm4 0c.55 0 1 .67 1 1.5s-.45 1.5-1 1.5-1-.67-1-1.5.45-1.5 1-1.5Z',
+);
+// WeChat 微信对话气泡
+const WeChatLogo = makeLogo(
+  '0 0 24 24',
+  'M8.69 4C5 4 2 6.46 2 9.5c0 1.71 1 3.22 2.52 4.21L4 16l2.43-1.3c.6.15 1.23.24 1.86.27-.05-.32-.07-.65-.07-.97 0-3.27 3.13-5.95 7-5.95.27 0 .54.01.81.04C15.45 5.55 12.36 4 8.69 4Zm-2.3 3.5a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7Zm4.6 0a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7ZM15.4 9.43c-3.21 0-5.81 2.13-5.81 4.77 0 2.63 2.6 4.77 5.81 4.77.62 0 1.22-.08 1.79-.23L19 20l-.55-1.74c1.27-.86 2.1-2.17 2.1-3.66 0-2.64-2.6-4.77-5.79-4.77ZM13.6 12.3a.7.7 0 1 1 0 1.4.7.7 0 0 1 0-1.4Zm3.8 0a.7.7 0 1 1 0 1.4.7.7 0 0 1 0-1.4Z',
+);
 
 interface BotItem {
   id: number;
@@ -235,10 +285,10 @@ interface BotItem {
 }
 
 const platforms = [
-  { id: 'feishu' as const, label: '飞书', icon: Bot },
-  { id: 'telegram' as const, label: 'Telegram', icon: Send },
-  { id: 'qq' as const, label: 'QQ', icon: MessageCircle },
-  { id: 'wechat' as const, label: '微信', icon: Smartphone },
+  { id: 'feishu' as const, label: '飞书', icon: FeishuLogo },
+  { id: 'telegram' as const, label: 'Telegram', icon: TelegramLogo },
+  { id: 'qq' as const, label: 'QQ', icon: QQLogo },
+  { id: 'wechat' as const, label: '微信', icon: WeChatLogo },
 ];
 
 type Platform = (typeof platforms)[number]['id'];
@@ -273,6 +323,37 @@ const currentPlatform = computed(() =>
 const activeIndex = computed(() =>
   platforms.findIndex((p) => p.id === activePlatform.value),
 );
+
+/* ─── 滑块指示器：根据 active tab 的实际宽度/位置动态计算 ─── */
+const segTabsEl = ref<HTMLElement | null>(null);
+const segTabRefs: HTMLElement[] = [];
+const indicatorLeft = ref(3);
+const indicatorWidth = ref(0);
+
+function setSegTabRef(el: unknown, i: number) {
+  if (el instanceof HTMLElement) segTabRefs[i] = el;
+}
+
+function updateIndicator() {
+  const idx = activeIndex.value;
+  const el = segTabRefs[idx];
+  const wrap = segTabsEl.value;
+  if (!el || !wrap) return;
+  // offsetLeft 已经是相对父容器（content-box 起点），padding 自然被包含
+  indicatorLeft.value = el.offsetLeft;
+  indicatorWidth.value = el.offsetWidth;
+}
+
+watch(activeIndex, () => nextTick(updateIndicator));
+onMounted(() => {
+  nextTick(updateIndicator);
+  // 字体加载/窗口尺寸变化都重新测量一次
+  if (typeof ResizeObserver !== 'undefined' && segTabsEl.value) {
+    const ro = new ResizeObserver(() => updateIndicator());
+    ro.observe(segTabsEl.value);
+  }
+  window.addEventListener('resize', updateIndicator);
+});
 
 const filteredBots = computed(() => {
   const kw = searchKeyword.value.trim().toLowerCase();
@@ -401,25 +482,31 @@ watch(activePlatform, () => {
 </script>
 
 <style scoped>
-/* ===== 工具栏 ===== */
+/* ===== 工具栏：支持窄屏 wrap，避免搜索框被挤掉 ===== */
 .bots-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
 }
 .bots-toolbar-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: nowrap;
+}
+.bots-search-input {
+  width: 220px;
+  min-width: 160px;
 }
 
-/* ===== 滑块式 Tabbar（对齐项目主题变量） ===== */
+/* ===== 滑块式 Tabbar：每个 tab 按内容宽度撑开，滑块用 JS 测量位置 ===== */
 .seg-tabs {
   position: relative;
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -431,16 +518,16 @@ watch(activePlatform, () => {
   position: absolute;
   top: 3px;
   bottom: 3px;
-  left: 3px;
-  width: calc((100% - 6px) / var(--seg-count));
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transform: translateX(calc(var(--seg-active) * 100%));
-  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+  transition: left 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    width 0.22s cubic-bezier(0.32, 0.72, 0, 1),
     background-color 0.3s ease, border-color 0.3s ease;
   pointer-events: none;
+  /* 初始隐藏，避免首次渲染时跳一下 */
+  will-change: left, width;
 }
 .seg-tab {
   position: relative;
@@ -448,8 +535,8 @@ watch(activePlatform, () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 5px 14px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -459,7 +546,6 @@ watch(activePlatform, () => {
   border-radius: 6px;
   white-space: nowrap;
   transition: color 0.22s ease;
-  flex: 1 1 0;
 }
 .seg-tab:hover {
   color: var(--text);
