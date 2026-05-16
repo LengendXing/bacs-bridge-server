@@ -1,3 +1,20 @@
+## v1.1.16 - 2026-05-16
+### 变更内容
+- 首页 Timeline 面板高度撑满视口（feat/home-timeline-height）
+  - `src/client/views/HomeView.vue` `.tl-body` `max-height: 480px` → `max-height: calc(100vh - 240px); min-height: 360px;`
+  - 顶部偏移 240px = Layout header + 内边距 + 4 个统计卡片 + mt-6 间距
+  - 小屏保底 360px，避免视口太矮时被压扁
+
+### 影响范围
+- 仅 HomeView.vue 一处样式
+- 移动端/小屏：min-height 兜底；桌面端：跟随视口自适应高度
+- 视觉行为：Timeline 列表在大屏上完整展示更多条目，无需固定 480px 上限
+
+### 功能列表
+- 与截图标注一致：Timeline 面板高度跟随主视口自动撑满，不再被固定上限截断
+
+---
+
 ## v1.1.15 - 2026-05-16
 ### 变更内容
 - 依赖安全升级（fix/security-deps）
