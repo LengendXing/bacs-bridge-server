@@ -1,3 +1,19 @@
+## v1.1.17 - 2026-05-16
+### 变更内容
+- 首页 Timeline 改用 flex 布局真正撑满视口（v1.1.16 calc 方案视觉上未铺满）
+  - HomeView.vue 模板根 `<div>` 加 class `home-root`：`display:flex; flex-direction:column; min-height: calc(100vh - 120px);`
+  - Timeline 卡 `.glass-card` 加 class `tl-card`：`flex:1; display:flex; flex-direction:column; min-height:0;`
+  - `.tl-body` `max-height: calc(100vh - 240px)` → `flex: 1`，配合外层 flex 链路自适应撑满
+  - 保留 `min-height: 360px` 小屏保底
+
+### 影响范围
+- 仅 HomeView.vue 一个文件，模板 2 处 class + CSS 1 处替换 + 2 块新增
+
+### 功能列表
+- Timeline 列表区域真正撑到视口底部，列表多时滚动，少时也不再有大块底部空白
+
+---
+
 ## v1.1.16 - 2026-05-16
 ### 变更内容
 - 首页 Timeline 面板高度撑满视口（feat/home-timeline-height）

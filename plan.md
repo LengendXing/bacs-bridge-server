@@ -6,3 +6,4 @@
 - [x] 绑定改为关联 Bot - 新建/编辑绑定弹窗改为「先选平台再选 Bot」，bindings 表加 bot_id 外键，历史数据按 app_id 自动回填关联（v1.1.14 ✅ 2026-05-16）
 - [x] 依赖安全升级 - bcrypt 5→6 / drizzle-orm 0.38→0.45.2 / vite 6→7 / vitest 2→3 / @vitejs/plugin-vue 5→6 / drizzle-kit 0.30→0.31 + esbuild overrides，audit 从 10 (8 moderate + 2 high) 降到仅剩 2 high（axios via larksuite，受上游 SDK 限制本轮维持）（v1.1.15 ✅ 2026-05-16）
 - [x] 首页 Timeline 面板高度撑满视口 - HomeView.vue `.tl-body` max-height 480px → calc(100vh - 240px) + min-height 360px 保底（v1.1.16 ✅ 2026-05-16）
+- [x] 首页 Timeline 真铺满（v1.1.16 calc 方案视觉上未铺满）- HomeView 改 flex 布局：.home-root flex col + .tl-card flex:1 + .tl-body flex:1（v1.1.17 ✅ 2026-05-16）
