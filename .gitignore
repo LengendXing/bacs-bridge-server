@@ -20,3 +20,6 @@ clod.sh
 cc1.sh
 # Local work-in-progress notes (temporary)
 .*-work-context.md
+# Claude Code local workspace + screenshot scratchpad
+.claude/
+bba/
