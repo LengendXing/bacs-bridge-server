@@ -415,16 +415,17 @@ watch(activePlatform, () => {
   gap: 8px;
 }
 
-/* ===== 滑块式 Tabbar ===== */
+/* ===== 滑块式 Tabbar（对齐项目主题变量） ===== */
 .seg-tabs {
   position: relative;
   display: inline-flex;
   align-items: center;
-  background: var(--surface-2, rgba(0, 0, 0, 0.04));
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 3px;
   gap: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 .seg-indicator {
   position: absolute;
@@ -432,11 +433,13 @@ watch(activePlatform, () => {
   bottom: 3px;
   left: 3px;
   width: calc((100% - 6px) / var(--seg-count));
-  background: var(--surface, #fff);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   transform: translateX(calc(var(--seg-active) * 100%));
-  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.3s ease, border-color 0.3s ease;
   pointer-events: none;
 }
 .seg-tab {
@@ -473,7 +476,8 @@ watch(activePlatform, () => {
   font-size: 12px;
   font-weight: 500;
   text-align: center;
-  background: var(--surface-2, rgba(0, 0, 0, 0.06));
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
 }
@@ -481,41 +485,48 @@ watch(activePlatform, () => {
   color: var(--text-secondary);
 }
 
-/* ===== 危险按钮 ===== */
+/* ===== 危险按钮（使用主题 --danger 变量） ===== */
 .btn-mac.btn-danger {
-  color: #d23f31;
-  border-color: rgba(210, 63, 49, 0.3);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 .btn-mac.btn-danger:hover:not(:disabled) {
-  background: rgba(210, 63, 49, 0.08);
-  border-color: rgba(210, 63, 49, 0.5);
+  background: var(--danger);
+  color: #fff;
 }
 
-/* ===== 警告框（删除弹窗用） ===== */
+/* ===== 警告框（删除弹窗用，light/dark 自适应） ===== */
 .warning-box {
   padding: 10px 12px;
-  background: rgba(210, 63, 49, 0.06);
-  border: 1px solid rgba(210, 63, 49, 0.2);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--danger);
   border-radius: 6px;
-  color: #d23f31;
+  color: var(--danger);
   font-size: 13px;
 }
+.dark .warning-box {
+  background: rgba(248, 113, 113, 0.12);
+}
 
-/* ===== 弹窗（沿用项目惯例） ===== */
+/* ===== 弹窗（对齐项目其他 View 的样式） ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
 }
 .modal-card {
-  background: var(--surface);
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
-  width: 420px;
+  width: 460px;
   max-width: 90vw;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
