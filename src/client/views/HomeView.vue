@@ -199,7 +199,7 @@ onUnmounted(() => {
 }
 
 .tl-body {
-  height: 440px;
+  height: 760px;
   overflow-y: auto;
   padding: 8px 0;
 }

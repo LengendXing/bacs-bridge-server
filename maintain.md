@@ -1,3 +1,17 @@
+## v1.1.20 - 2026-05-16
+### 变更内容
+- 首页 Timeline 卡片高度 440 → 760px（用户反馈 +320px）
+  - HomeView.vue `.tl-body` `height: 440px` → `height: 760px`
+
+### 影响范围
+- 仅 HomeView.vue 一行
+- 视觉：Timeline 卡片可见高度提升，超出仍内部滚动
+
+### 功能列表
+- Timeline 卡片可见高度从 440px 提升到 760px
+
+---
+
 ## v1.1.19 - 2026-05-16
 ### 变更内容
 - 首页 Timeline 改回固定高度卡片 + 内部滚动（feat/home-timeline-fixed-scroll）
