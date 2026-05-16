@@ -1,3 +1,20 @@
+## v1.1.19 - 2026-05-16
+### 变更内容
+- 首页 Timeline 改回固定高度卡片 + 内部滚动（feat/home-timeline-fixed-scroll）
+  - 撤掉 v1.1.17 的 flex 拉伸方案（`.home-root` flex col / `.tl-card` flex:1）
+  - HomeView.vue 模板根去掉 `home-root` class、Timeline 卡去掉 `tl-card` class
+  - `.tl-body` 改为 `height: 440px; overflow-y: auto;`，按 bba 样图固定卡片尺寸
+  - 内容超出 440px 在卡片内部滚动，不跟随视口尺寸变化
+
+### 影响范围
+- 仅 HomeView.vue
+- 视觉：Timeline 卡片在任何视口下都是固定 440px 高度，与样图一致
+
+### 功能列表
+- Timeline 列表区域为固定 440px 卡片，超出条目内部滚动
+
+---
+
 ## v1.1.18 - 2026-05-16
 ### 变更内容
 - 顶部标题下展示当前系统版本号（feat/home-version-display）
