@@ -1,3 +1,19 @@
+## v1.1.13 - 2026-05-16
+### 变更内容
+- Bots 工具栏 3 个 UI 问题修复
+  - 滑块 Tabbar：之前 4 个 tab 强制等宽（flex 1）导致 Telegram 文字被挤；改为每个 tab 按内容宽度撑开，滑块用 ResizeObserver 测量 active tab 的 offsetLeft / offsetWidth 动态驱动 left / width，过渡仍为 0.22s ease 缓动
+  - 搜索输入框：之前 inline width 180 + 工具栏 nowrap 在窄屏被挤掉；改为 class `bots-search-input`（220px / min 160px），工具栏外层 flex-wrap，操作区 nowrap 整体下移
+  - 平台图标：之前用 lucide `Smartphone`（手机图标）代替微信，4 个平台全无真实 logo；改为 4 个 inline SVG functional component（Feishu / Telegram / QQ / WeChat），单色 currentColor，可被滑块文字色继承
+- 实现细节
+  - `makeLogo(viewBox, path)` 工厂返回 FunctionalComponent，统一签名 `{ size? }`，使用 `<component :is>` 无侵入接入
+  - ResizeObserver + window resize 双保险，字体加载完成后会重新测量
+
+### 影响范围
+- src/client/views/BotsView.vue（template + script + style 全部调整）
+- package.json 1.1.12 → 1.1.13
+
+---
+
 ## v1.1.12 - 2026-05-16
 ### 变更内容
 - 修复 Bots 模块 UI 配色，对齐项目主题变量（解决 dark 模式下颜色不对劲的问题）
