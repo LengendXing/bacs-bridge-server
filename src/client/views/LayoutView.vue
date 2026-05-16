@@ -7,16 +7,47 @@
         <span class="sidebar-title">笨迪桥接</span>
       </div>
       <nav class="sidebar-nav">
-        <button
-          v-for="tab in tabs"
-          :key="tab.path"
-          class="sidebar-btn"
-          :class="{ active: isTabActive(tab) }"
-          @click="router.push(tab.path)"
-        >
-          <component :is="tab.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
-          <span class="sidebar-label">{{ tab.label }}</span>
-        </button>
+        <template v-for="item in menuItems" :key="item.label">
+          <!-- 单层菜单项 -->
+          <button
+            v-if="!item.children"
+            class="sidebar-btn"
+            :class="{ active: isItemActive(item.path!) }"
+            @click="router.push(item.path!)"
+          >
+            <component :is="item.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
+            <span class="sidebar-label">{{ item.label }}</span>
+          </button>
+          <!-- 分组（含 children） -->
+          <template v-else>
+            <button
+              class="sidebar-btn sidebar-group-btn"
+              :class="{ 'group-active': isGroupActive(item) }"
+              @click="toggleGroup(item.label)"
+            >
+              <component :is="item.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
+              <span class="sidebar-label">{{ item.label }}</span>
+              <component
+                :is="expandedGroups.has(item.label) ? ChevronDown : ChevronRight"
+                :size="14"
+                :stroke-width="1.5"
+                class="sidebar-chevron"
+              />
+            </button>
+            <div v-show="expandedGroups.has(item.label)" class="sidebar-children">
+              <button
+                v-for="child in item.children"
+                :key="child.path"
+                class="sidebar-btn sidebar-child-btn"
+                :class="{ active: isItemActive(child.path) }"
+                @click="router.push(child.path)"
+              >
+                <component :is="child.icon" class="sidebar-icon" :size="16" :stroke-width="1.5" />
+                <span class="sidebar-label">{{ child.label }}</span>
+              </button>
+            </div>
+          </template>
+        </template>
       </nav>
       <div class="sidebar-footer">
         <button class="sidebar-btn" @click="auth.logout(); router.push('/login')">
@@ -45,17 +76,34 @@
           </div>
         </header>
 
-        <div class="tab-bar mx-6">
-          <button
-            v-for="tab in tabs"
-            :key="tab.path"
-            class="tab-btn"
-            :class="{ active: isTabActive(tab) }"
-            @click="router.push(tab.path)"
-          >
-            <component :is="tab.icon" :size="16" :stroke-width="1.5" />
-            <span>{{ tab.label }}</span>
-          </button>
+        <!-- 顶部模式：两级 Tab -->
+        <div class="mx-6 mb-6">
+          <!-- 一级菜单 -->
+          <div class="tab-bar" style="margin-bottom: 8px">
+            <button
+              v-for="item in menuItems"
+              :key="item.label"
+              class="tab-btn"
+              :class="{ active: isTopLevelActive(item) }"
+              @click="onTopLevelClick(item)"
+            >
+              <component :is="item.icon" :size="16" :stroke-width="1.5" />
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
+          <!-- 二级菜单（仅在当前一级菜单有 children 时显示） -->
+          <div v-if="activeTopChildren.length > 0" class="tab-bar" style="background: transparent; border-color: transparent; padding: 0">
+            <button
+              v-for="child in activeTopChildren"
+              :key="child.path"
+              class="tab-btn tab-btn-child"
+              :class="{ active: isItemActive(child.path) }"
+              @click="router.push(child.path)"
+            >
+              <component :is="child.icon" :size="14" :stroke-width="1.5" />
+              <span>{{ child.label }}</span>
+            </button>
+          </div>
         </div>
       </template>
 
@@ -80,24 +128,74 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuth } from '../composables/useAuth';
 import BacsLogo from '../components/BacsLogo.vue';
-import { Home, Link, Server, Cloud, FileText, Settings, LogOut, Moon, Sun } from 'lucide-vue-next';
+import {
+  Home,
+  Link,
+  Server,
+  Cloud,
+  FileText,
+  Settings,
+  LogOut,
+  Moon,
+  Sun,
+  Bot,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-vue-next';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
 
-const tabs = [
+interface MenuLeaf {
+  path: string;
+  label: string;
+  icon: any;
+}
+interface MenuItem {
+  label: string;
+  icon: any;
+  path?: string;
+  children?: MenuLeaf[];
+}
+
+/**
+ * 菜单结构（v1.1.10 起两级化）
+ * - 「运维中心」聚合机器管理相关
+ * - 「绑定管理」聚合服务商 / 绑定 / Bots 管理
+ */
+const menuItems: MenuItem[] = [
   { path: '/', label: '首页', icon: Home },
-  { path: '/machines', label: '机器', icon: Server },
-  { path: '/providers', label: '服务商', icon: Cloud },
-  { path: '/bindings', label: '绑定', icon: Link },
+  {
+    label: '运维中心',
+    icon: Wrench,
+    children: [{ path: '/machines', label: '机器', icon: Server }],
+  },
+  {
+    label: '绑定管理',
+    icon: Link,
+    children: [
+      { path: '/providers', label: '服务商', icon: Cloud },
+      { path: '/bindings', label: '绑定', icon: Link },
+      { path: '/bots', label: 'Bots 管理', icon: Bot },
+    ],
+  },
   { path: '/logs', label: '日志', icon: FileText },
   { path: '/settings', label: '设置', icon: Settings },
 ];
+
+const expandedGroups = ref<Set<string>>(new Set(['运维中心', '绑定管理']));
+function toggleGroup(label: string) {
+  const next = new Set(expandedGroups.value);
+  if (next.has(label)) next.delete(label);
+  else next.add(label);
+  expandedGroups.value = next;
+}
 
 const menuLayout = ref<'top' | 'left'>(
   (localStorage.getItem('menuLayout') as 'top' | 'left') || 'top'
@@ -118,10 +216,36 @@ setInterval(() => {
   }
 }, 300);
 
-function isTabActive(tab: { path: string }): boolean {
-  if (tab.path === '/') return route.path === '/';
-  return route.path === tab.path || route.path.startsWith(tab.path + '/');
+function isItemActive(path: string): boolean {
+  if (path === '/') return route.path === '/';
+  return route.path === path || route.path.startsWith(path + '/');
 }
+
+function isGroupActive(item: MenuItem): boolean {
+  if (item.path) return isItemActive(item.path);
+  return item.children?.some((c) => isItemActive(c.path)) ?? false;
+}
+
+/** 顶部一级菜单：当前是否激活（用于叶子节点或包含激活子项的分组） */
+function isTopLevelActive(item: MenuItem): boolean {
+  return isGroupActive(item);
+}
+
+/** 顶部一级点击：叶子节点跳转；分组节点跳到第一个子项 */
+function onTopLevelClick(item: MenuItem) {
+  if (item.path) {
+    router.push(item.path);
+    return;
+  }
+  const first = item.children?.[0];
+  if (first) router.push(first.path);
+}
+
+/** 顶部模式下当前激活分组的二级菜单（叶子节点对应空数组，不显示二级栏） */
+const activeTopChildren = computed<MenuLeaf[]>(() => {
+  const active = menuItems.find((item) => isTopLevelActive(item));
+  return active?.children ?? [];
+});
 
 function toggleTheme() {
   document.documentElement.classList.toggle('dark');
@@ -210,6 +334,35 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
 .sidebar-footer {
   padding: 8px;
   border-top: 1px solid var(--border);
+}
+/* 两级菜单 — 分组节点 */
+.sidebar-group-btn {
+  font-weight: 500;
+}
+.sidebar-btn.group-active {
+  color: var(--text);
+}
+.sidebar-chevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.sidebar-children {
+  margin: 2px 0 4px 12px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+.sidebar-child-btn {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+/* 顶部模式 — 二级 Tab */
+.tab-btn-child {
+  padding: 4px 10px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.tab-btn-child.active {
+  opacity: 1;
 }
 
 /* 顶部模式标题 */

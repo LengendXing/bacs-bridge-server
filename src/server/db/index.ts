@@ -64,6 +64,13 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
   // 运行时确保 app_settings 表存在（drizzle 迁移之外的 KV 表）
   ensureAppSettingsTable(sqlite);
 
+  // 运行时确保 bacs_bots 表存在（v1.1.10 引入）
+  ensureBacsBotsTable(sqlite);
+
+  // 一次性迁移：把 bindings 中的飞书机器人凭据导入 bacs_bots
+  // 通过 app_settings.botsMigrationDone 标记保证只执行一次
+  runBotsMigrationOnce(sqlite);
+
   // Seed 默认本机记录
   seedLocalMachine(sqlite);
 
@@ -81,6 +88,82 @@ function ensureAppSettingsTable(sqlite: Database.Database): void {
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
+}
+
+/**
+ * 兼容老库：确保 bacs_bots 表存在（v1.1.10 引入）
+ *
+ * 不走 drizzle 迁移文件（保持与 ensureAppSettingsTable 一致的运行时建表风格），
+ * 避免老库升级时遗漏。
+ */
+function ensureBacsBotsTable(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bacs_bots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL DEFAULT 'feishu',
+      name TEXT NOT NULL,
+      app_id TEXT,
+      secret TEXT,
+      remark TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS bacs_bots_platform_name_idx
+      ON bacs_bots (platform, name)
+  `);
+}
+
+/**
+ * 一次性迁移：把现有 bindings 中的飞书机器人凭据迁移到 bacs_bots
+ *
+ * 幂等：通过 app_settings.key = 'botsMigrationDone' 标记，已迁移则直接返回。
+ * 字段映射：
+ *   - bindings.process_name    → bacs_bots.name
+ *   - bindings.feishu_app_id   → bacs_bots.app_id
+ *   - bindings.feishu_app_secret → bacs_bots.secret
+ *   - bacs_bots.remark         → NULL（用户后续手动填写）
+ *
+ * v1.1.10 引入。后续版本：bindings 通过 bot_id 关联此表，本迁移废弃。
+ */
+function runBotsMigrationOnce(sqlite: Database.Database): void {
+  const done = sqlite
+    .prepare(`SELECT value FROM app_settings WHERE key = 'botsMigrationDone'`)
+    .get() as { value: string } | undefined;
+  if (done) return;
+
+  type Row = { process_name: string; feishu_app_id: string | null; feishu_app_secret: string | null };
+  const rows = sqlite
+    .prepare(
+      `SELECT process_name, feishu_app_id, feishu_app_secret
+       FROM bindings
+       WHERE feishu_app_id IS NOT NULL AND feishu_app_id != ''`
+    )
+    .all() as Row[];
+
+  const insert = sqlite.prepare(`
+    INSERT INTO bacs_bots (platform, name, app_id, secret, remark)
+    VALUES ('feishu', ?, ?, ?, NULL)
+    ON CONFLICT(platform, name) DO NOTHING
+  `);
+
+  let inserted = 0;
+  for (const r of rows) {
+    if (!r.process_name) continue;
+    const result = insert.run(r.process_name, r.feishu_app_id, r.feishu_app_secret);
+    if (result.changes > 0) inserted++;
+  }
+
+  sqlite
+    .prepare(
+      `INSERT INTO app_settings (key, value) VALUES ('botsMigrationDone', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+    )
+    .run(new Date().toISOString());
+
+  // eslint-disable-next-line no-console
+  console.log(`[Bots 迁移] 扫描 ${rows.length} 条飞书绑定，新增 ${inserted} 条 Bot 记录`);
 }
 
 /**
