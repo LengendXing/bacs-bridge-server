@@ -2,7 +2,7 @@
  * @module db/schema
  * @description Drizzle ORM 表定义
  *
- * 定义全部 8 张数据表：
+ * 定义全部 9 张数据表：
  * 1. users         — 管理员账户
  * 2. trusted_devices — 2FA 信任设备
  * 3. providers     — 服务商（API 网关）
@@ -11,6 +11,7 @@
  * 6. bindings      — 绑定关系（进程 ↔ 飞书应用 ↔ 服务商/模型）
  * 7. audit_logs    — 审计日志
  * 8. app_settings  — 应用级 KV 设置（如对外服务地址）
+ * 9. bacs_bots     — 多平台机器人凭据统一管理（v1.1.10 引入）
  */
 
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
@@ -318,3 +319,43 @@ export const appSettings = sqliteTable('app_settings', {
   /** 更新时间 */
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),
 });
+
+// ════════════════════════════════════════════════════════════════════
+// 9. bacs_bots — 多平台机器人凭据统一管理（v1.1.10 引入）
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * 机器人凭据表（业务前缀 bacs_）
+ * 统一存储各平台机器人凭据。当前仅 feishu 平台有实际数据，
+ * Telegram / QQ / 微信 为后续扩展占位。
+ *
+ * 启动时会一次性把现有 bindings 中的飞书机器人凭据迁移到此表
+ * （幂等：app_settings.botsMigrationDone 标记位）。
+ *
+ * 后续版本规划：新建绑定时不再内嵌 feishuAppId/Secret，
+ * 改为通过 botId 关联本表。
+ */
+export const bots = sqliteTable('bacs_bots', {
+  /** 自增主键 */
+  id: integer('id').primaryKey({ autoIncrement: true }),
+
+  /** 平台：'feishu' | 'telegram' | 'qq' | 'wechat' */
+  platform: text('platform').notNull().default('feishu'),
+
+  /** 机器人名称（同 platform 下唯一），迁移时取 binding.processName */
+  name: text('name').notNull(),
+
+  /** 机器人 AppID（飞书：app_id） */
+  appId: text('app_id'),
+
+  /** 机器人 Secret/密钥（飞书：app_secret） */
+  secret: text('secret'),
+
+  /** 备注（用户自定义） */
+  remark: text('remark'),
+
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+}, (table) => ({
+  platformNameIdx: uniqueIndex('bacs_bots_platform_name_idx').on(table.platform, table.name),
+}));

@@ -18,3 +18,5 @@ data/
 ai*.sh
 clod.sh
 cc1.sh
+# Local work-in-progress notes (temporary)
+.*-work-context.md
