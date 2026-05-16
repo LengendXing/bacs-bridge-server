@@ -4,7 +4,10 @@
     <aside v-if="menuLayout === 'left'" class="sidebar">
       <div class="sidebar-header">
         <BacsLogo :size="28" />
-        <span class="sidebar-title">笨迪桥接</span>
+        <div class="sidebar-title-wrap">
+          <span class="sidebar-title">笨迪桥接</span>
+          <span class="sidebar-version">v{{ appVersion }}</span>
+        </div>
       </div>
       <nav class="sidebar-nav">
         <template v-for="item in menuItems" :key="item.label">
@@ -67,7 +70,10 @@
               <BacsLogo :size="32" />
               <span class="header-title">笨迪桥接</span>
             </div>
-            <p class="text-sm mt-1" style="color: var(--text-secondary)">Bridge Admin Control System</p>
+            <p class="text-sm mt-1" style="color: var(--text-secondary)">
+              Bridge Admin Control System
+              <span class="version-badge">v{{ appVersion }}</span>
+            </p>
           </div>
           <div class="flex items-center gap-2">
             <Moon :size="16" :stroke-width="1.5" />
@@ -151,6 +157,7 @@ import {
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
+const appVersion = __APP_VERSION__;
 
 interface MenuLeaf {
   path: string;
@@ -293,6 +300,30 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   color: var(--text);
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+.sidebar-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sidebar-version {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.version-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
 }
 .sidebar-nav {
   flex: 1;

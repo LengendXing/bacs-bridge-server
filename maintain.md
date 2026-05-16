@@ -1,3 +1,22 @@
+## v1.1.18 - 2026-05-16
+### 变更内容
+- 顶部标题下展示当前系统版本号（feat/home-version-display）
+  - `vite.config.ts` 新增 `define: { __APP_VERSION__: JSON.stringify(pkg.version) }`，构建期注入版本号
+  - 新增 `src/client/env.d.ts` 声明 `__APP_VERSION__` 类型 + 引入 `vite/client` 类型
+  - `LayoutView.vue`
+    - top 模式 header：「Bridge Admin Control System」同行追加 `v1.1.x` 版本徽章（圆角灰底）
+    - left 模式 sidebar-header：「笨迪桥接」下方加一行小号版本号
+  - 版本号在 build 时硬编码进 bundle，零运行时开销，无需调用接口
+
+### 影响范围
+- vite.config.ts、src/client/env.d.ts（新增）、src/client/views/LayoutView.vue
+- 视觉：所有页面顶部都能看到当前系统版本
+
+### 功能列表
+- 顶部标题区域常驻版本号显示，发版后用户/运维直观知道当前在跑哪个版本
+
+---
+
 ## v1.1.17 - 2026-05-16
 ### 变更内容
 - 首页 Timeline 改用 flex 布局真正撑满视口（v1.1.16 calc 方案视觉上未铺满）
