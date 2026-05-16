@@ -1,3 +1,25 @@
+## v1.1.15 - 2026-05-16
+### 变更内容
+- 依赖安全升级（fix/security-deps）
+  - `bcrypt` ^5.1.1 → ^6.0.0（API 兼容，密码哈希/校验回归通过）
+  - `drizzle-orm` ^0.38.0 → ^0.45.2（修复 SQL 注入 GHSA；schema/查询代码无破坏，54/54 测试通过）
+  - `vite` ^6.0.0 → ^7.3.3、`vitest` ^2.1.0 → ^3.2.4、`@vitejs/plugin-vue` ^5.2.0 → ^6.0.7、`drizzle-kit` ^0.30.0 → ^0.31.10（dev 链）
+  - 新增 `overrides.esbuild = ^0.25.10` 强制全树替换被 `@esbuild-kit/esm-loader` 拽下来的旧 esbuild
+- audit 结果：10 vulnerabilities (8 moderate + 2 high) → **仅剩 2 high**（axios via `@larksuiteoapi/node-sdk`，官方修复版仅在 1.57.0-beta，无法上 beta，本轮维持现状）
+- 验收
+  - `npm run build` ✅（client 12s / server tsc 通过）
+  - `npm test` ✅ 54/54
+  - lint 失败属历史问题（eslint v9 缺 eslint.config.js），未在本轮范围内
+
+### 影响范围
+- 仅 package.json / package-lock.json
+- 运行时行为零变更：bcrypt hashSync/compareSync 同名 API；drizzle-orm 0.45 在我们当前查询模式（基础 select/insert/update + sqlite-core）下兼容；esbuild override 仅影响构建工具
+
+### 功能列表
+- 安全态势：高危漏洞从 2 个外部来源 + drizzle-orm 自身 SQL 注入 + esbuild dev server 信息泄露 全面清理，剩余 axios 链条受上游 SDK 限制
+
+---
+
 ## v1.1.14 - 2026-05-16
 ### 变更内容
 - 新建/编辑绑定改造为「先选平台 → 再选 Bot」关联关系
