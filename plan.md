@@ -11,3 +11,4 @@
 - [x] Timeline 改回固定高度 + 内部滚动（按 bba 样图）- 撤掉 v1.1.17 flex 拉伸，.tl-body height: 440px overflow:auto（v1.1.19 ✅ 2026-05-16）
 - [x] Timeline 高度 +320px（440 → 760px）- HomeView .tl-body height 调整（v1.1.20 ✅ 2026-05-16）
 - [x] Timeline 高度砍 80px（760 → 680px）- HomeView .tl-body height 微调（v1.1.21 ✅ 2026-05-16）
+- [x] Timeline 高度再缩 40px（680 → 640px）+ 确认版本号统一来源（package.json → vite define → LayoutView）（v1.1.22 ✅ 2026-05-16）
