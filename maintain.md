@@ -1,3 +1,28 @@
+## v1.1.11 - 2026-05-16
+### 变更内容
+- Bots 模块 UI 升级
+  - 顶部改为短小靠左的滑块式 Tabbar（飞书 / Telegram / QQ / 微信，带图标，切换有滑动动效）
+  - 工具栏右侧新增搜索框 + 搜索按钮 + 新增按钮
+  - table 取消行内备注编辑，操作列改为「编辑 / 删除」按钮，均走弹窗
+  - 列表新增「关联绑定」计数列
+- DELETE /api/bots/:id 改为级联删除
+  - 删除 Bot 时找出所有 platform=feishu 且 feishu_app_id 匹配的关联绑定
+  - 依次：停 channel → 杀对应 tmux/CLI 会话 → 删 binding → 最后删 Bot
+  - 返回包含 cascadedBindings 计数 + killResults 明细
+  - 审计日志记录 bot_delete 动作
+- PUT /api/bots/:id 禁止修改 AppID（避免破坏关联关系，提示删除后新建）
+- 菜单
+  - 「Bots 管理」改名为「Bots」
+  - 绑定管理子菜单顺序调整为：Bots → 服务商 → 绑定
+
+### 影响范围
+- src/server/routes/bots.ts（DELETE 级联 + GET 加 bindingCount + PUT 校验）
+- src/client/views/BotsView.vue（重写：滑块 Tabbar + 工具栏 + 编辑/删除弹窗）
+- src/client/views/LayoutView.vue（菜单文案 + 顺序）
+- package.json 1.1.10 → 1.1.11
+
+---
+
 ## v1.1.10 - 2026-05-16
 ### 变更内容
 - 左侧/顶部菜单两级化：原扁平菜单重构为分组结构
