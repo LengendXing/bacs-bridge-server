@@ -199,7 +199,8 @@ onUnmounted(() => {
 }
 
 .tl-body {
-  max-height: 480px;
+  max-height: calc(100vh - 240px);
+  min-height: 360px;
   overflow-y: auto;
   padding: 8px 0;
 }
