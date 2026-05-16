@@ -1,3 +1,19 @@
+## v1.1.12 - 2026-05-16
+### 变更内容
+- 修复 Bots 模块 UI 配色，对齐项目主题变量（解决 dark 模式下颜色不对劲的问题）
+  - 滑块 Tabbar：容器 `--surface-2`（不存在）→ `var(--bg)`；滑块 `--surface`（不存在）→ `var(--card)` + 1px border
+  - 弹窗：mask 加 `backdrop-filter: blur(4px)`；卡片 `--surface`（不存在）→ `var(--card)` + 边框
+  - 危险按钮：硬编码 `#d23f31` → `var(--danger)`，hover 改为实心填充风格
+  - 警告框：硬编码红色 → `var(--danger)` + light/dark 双适配背景
+  - 关联绑定计数徽章：硬编码 `rgba(0,0,0,0.06)` → `var(--bg) + 1px var(--border)`
+- 根因：v1.1.11 误用了项目中不存在的 CSS 变量（`--surface`/`--surface-2`/`--primary`），fallback 颜色在 dark 模式下错误
+
+### 影响范围
+- src/client/views/BotsView.vue（仅 `<style scoped>` 区块）
+- package.json 1.1.11 → 1.1.12
+
+---
+
 ## v1.1.11 - 2026-05-16
 ### 变更内容
 - Bots 模块 UI 升级
