@@ -12,3 +12,4 @@
 - [x] Timeline 高度 +320px（440 → 760px）- HomeView .tl-body height 调整（v1.1.20 ✅ 2026-05-16）
 - [x] Timeline 高度砍 80px（760 → 680px）- HomeView .tl-body height 微调（v1.1.21 ✅ 2026-05-16）
 - [x] Timeline 高度再缩 40px（680 → 640px）+ 确认版本号统一来源（package.json → vite define → LayoutView）（v1.1.22 ✅ 2026-05-16）
+- [x] BotsView QQ 图标重写（鬼 → 企鹅）+ 5 处按钮文案统一为「新增/挂载/测试」+ 飞书决策弹窗双向交互修复（卡片加按钮 + card.action.trigger 回调 + 回执卡片升级）（v1.1.23 ✅ 2026-05-17）

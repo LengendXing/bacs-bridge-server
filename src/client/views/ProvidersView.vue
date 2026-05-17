@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-lg font-semibold" style="color: var(--text)">服务商管理</h2>
       <div class="flex items-center gap-2">
-        <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新建服务商</button>
+        <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
         <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">刷新</button>
       </div>
     </div>
@@ -93,7 +93,7 @@
     <!-- 新建/编辑弹窗 -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-card">
-        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ isEdit ? '编辑服务商' : '新建服务商' }}</h3>
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ isEdit ? '编辑服务商' : '新增' }}</h3>
         <form @submit.prevent="handleSubmit">
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">名称</label>
           <input v-model="form.name" type="text" class="input-mac mb-3" placeholder="如：Anthropic 官方" required />
