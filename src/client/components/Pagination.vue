@@ -124,6 +124,7 @@ function onSizeChange(e: Event) {
   font-size: 12px;
 }
 .pagination-size {
+  width: auto;
   margin-left: 8px;
   height: 28px;
   font-size: 12px;
