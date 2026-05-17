@@ -3,7 +3,7 @@
     <!-- Top bar -->
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-lg font-semibold" style="color: var(--text)">机器管理</h2>
-      <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">添加机器</button>
+      <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
     </div>
 
     <!-- Machines table -->
@@ -24,7 +24,7 @@
             <td colspan="6" class="text-center" style="color: var(--text-secondary)">加载中...</td>
           </tr>
           <tr v-else-if="pagedMachines.length === 0">
-            <td colspan="6" class="text-center" style="color: var(--text-secondary)">暂无机器，点击「添加机器」注册远程服务器</td>
+            <td colspan="6" class="text-center" style="color: var(--text-secondary)">暂无机器，点击「新增」注册远程服务器</td>
           </tr>
           <tr v-for="m in pagedMachines" :key="m.id">
             <td style="font-weight: 500">
@@ -42,7 +42,7 @@
               <div v-else class="flex items-center gap-1">
                 <button class="btn-mac btn-mac-sm" @click="openEdit(m)">编辑</button>
                 <button class="btn-mac btn-mac-sm" :disabled="testingId === m.id" @click="testConn(m)">
-                  {{ testingId === m.id ? '测试中...' : '测试连接' }}
+                  {{ testingId === m.id ? '测试中...' : '测试' }}
                 </button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmDelete(m)">删除</button>
               </div>
@@ -80,7 +80,7 @@
     <!-- 添加/编辑弹窗 -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-card" style="width: 460px">
-        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ editId ? '编辑机器' : '添加机器' }}</h3>
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ editId ? '编辑机器' : '新增' }}</h3>
         <form @submit.prevent="handleSubmit">
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">名称</label>
           <input v-model="form.name" type="text" class="input-mac mb-3" placeholder="如：生产服务器" required />

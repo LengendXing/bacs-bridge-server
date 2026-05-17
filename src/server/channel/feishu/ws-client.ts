@@ -83,6 +83,34 @@ interface FeishuMessageEvent {
   sender?: FeishuSender;
 }
 
+/**
+ * 卡片按钮点击回调事件
+ *
+ * 飞书 v2 SDK 在 EventDispatcher 中将 card.action.trigger 事件标准化后传入。
+ * 我们关心 action.value（构卡时塞入的业务参数）+ operator（点击者）+ open_chat_id。
+ */
+interface CardActionEvent {
+  event_type: 'card.action.trigger';
+  /** 卡片按钮的业务参数（buildAwaitingCard 中 button.value） */
+  action?: {
+    value?: {
+      action?: string;
+      processName?: string;
+      optionIndex?: number;
+      [k: string]: unknown;
+    };
+  };
+  /** 点击操作者 */
+  operator?: {
+    open_id?: string;
+    union_id?: string;
+  };
+  /** 卡片所在的聊天 ID（用于回执路由） */
+  open_chat_id?: string;
+  /** 卡片消息 ID（用于回执路由 reply） */
+  open_message_id?: string;
+}
+
 /** SDK logger 接口 */
 interface SdkLogger {
   info: (...args: unknown[]) => void;
@@ -109,6 +137,8 @@ const KNOWN_EVENTS = [
   'im.chat.member.bot.deleted_v1',
   'im.chat.disbanded_v1',
   'im.chat.updated_v1',
+  // 卡片按钮回调（飞书 v2 SDK 卡片交互事件）
+  'card.action.trigger',
 ];
 
 // ── 内部函数 ────────────────────────────────────────────────────────────
@@ -192,6 +222,92 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
  * @param binding - 绑定记录
  * @param event   - 飞书消息事件
  */
+/**
+ * 处理卡片按钮点击回调
+ *
+ * 用户在飞书侧点击决策卡片的按钮时触发：
+ * 1. 校验 action.value.action === 'cc_choice'
+ * 2. 查会话当前 awaiting，比对 processName
+ * 3. 用 button.value.optionIndex 模拟"用户回复了 1/2/..."调 sendChoice
+ * 4. 发回执卡片（绿色）
+ */
+function handleCardAction(binding: BindingRecord, event: CardActionEvent): void {
+  const { processName } = binding;
+  const value = event?.action?.value;
+  if (!value || value.action !== 'cc_choice') {
+    logger.log('info', `[CardAction] 非决策回调，忽略 action=${value?.action}`);
+    return;
+  }
+  if (value.processName !== processName) {
+    logger.log('warn', `[CardAction] 进程名不匹配: button=${value.processName} binding=${processName}`);
+    return;
+  }
+  const optionIndex = Number(value.optionIndex);
+  if (!Number.isFinite(optionIndex) || optionIndex < 1) {
+    logger.log('warn', `[CardAction] optionIndex 无效: ${value.optionIndex}`);
+    return;
+  }
+  const session = getSession(processName);
+  if (!session || !session.awaiting) {
+    // 用户可能在 awaiting 已被解除后再点按钮，给出友好提示
+    const chatId = event.open_chat_id;
+    if (chatId && binding.feishuAppId && binding.feishuAppSecret) {
+      sender
+        .sendText(
+          binding.feishuAppId,
+          binding.feishuAppSecret,
+          'chat_id',
+          chatId,
+          `ℹ️ 当前已无待决策项（可能已超时或被其他渠道回复）`,
+        )
+        .catch((e: Error) => logger.log('error', '发送过期提示失败', e.message));
+    }
+    return;
+  }
+  const panel = session.awaiting.panel;
+  const targetType: 'chat_id' | 'open_id' = event.open_chat_id ? 'chat_id' : 'open_id';
+  const targetId = event.open_chat_id || event.operator?.open_id || '';
+  if (!targetId || !binding.feishuAppId || !binding.feishuAppSecret) {
+    logger.log('warn', '[CardAction] 缺少回执路由信息');
+    return;
+  }
+  // 拿到 executor + adapter（与 handleIncomingMessage 一致：远程绑定走 SSH，本地走 local）
+  const adapter = getAdapter(binding.cliKind);
+  const sessionName = `${adapter.sessionPrefix}-${processName}`;
+  // 直接用 String(optionIndex) 作为用户回复送入 sendChoice，其内部会按数字索引精确匹配
+  getExecutor(binding.machineId ?? null)
+    .then((executor) => adapter.sendChoice(sessionName, String(optionIndex), panel, executor))
+    .then((r) => {
+      if (!r.ok) {
+        sender
+          .sendCard(
+            binding.feishuAppId!,
+            binding.feishuAppSecret!,
+            targetType,
+            targetId,
+            sender.buildChoiceUnrecognizedCard(processName, `按钮点击 #${optionIndex}`, panel.options),
+          )
+          .catch((e: Error) => logger.log('error', '发送卡片回调失败提示失败', e.message));
+        return;
+      }
+      const chosenLabel = (panel.options[optionIndex - 1] || `第 ${optionIndex} 项`)
+        .replace(/^\s*\d+\.\s*/, '')
+        .trim();
+      sender
+        .sendCard(
+          binding.feishuAppId!,
+          binding.feishuAppSecret!,
+          targetType,
+          targetId,
+          sender.buildChoiceAckCard(processName, chosenLabel, optionIndex),
+        )
+        .catch((e: Error) => logger.log('error', '发送卡片回调回执失败', e.message));
+      session.awaiting = null;
+      logger.log('info', `[CardAction] ${processName} 选择 ${optionIndex}. ${chosenLabel}`);
+    })
+    .catch((e: Error) => logger.log('error', '卡片回调 sendChoice 异常', e.message));
+}
+
 function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent): void {
   const { processName } = binding;
   const feishuAppId = binding.feishuAppId;
@@ -278,29 +394,32 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
           executor,
         );
         if (!r.ok) {
+          // 识别失败：发"无法识别"提示卡（保持 awaiting，用户可重发）
           sender
-            .sendText(
+            .sendCard(
               feishuAppId,
               feishuAppSecret,
               targetType,
               targetId,
-              `❌ 选择失败：${r.error || '未识别的回复'}\n请回复选项序号（1/2/...）或关键词（yes/no/是/否）`,
+              sender.buildChoiceUnrecognizedCard(processName, msgText, panel.options),
             )
-            .catch((e: Error) => logger.log('error', '发送选择失败提示失败', e.message));
+            .catch((e: Error) => logger.log('error', '发送选择失败卡片失败', e.message));
           return;
         }
-        const chosen = r.chosenIndex
-          ? panel.options.find((o) => o.startsWith(`${r.chosenIndex}.`)) || `第 ${r.chosenIndex} 项`
+        const chosenIdx = r.chosenIndex || 0;
+        const chosenLabel = chosenIdx
+          ? (panel.options[chosenIdx - 1] || `第 ${chosenIdx} 项`).replace(/^\s*\d+\.\s*/, '').trim()
           : '已发送';
+        // 识别成功：发绿色回执卡片
         sender
-          .sendText(
+          .sendCard(
             feishuAppId,
             feishuAppSecret,
             targetType,
             targetId,
-            `✅ 已转发选择：${chosen}\n等待 cc 后续输出...`,
+            sender.buildChoiceAckCard(processName, chosenLabel, chosenIdx),
           )
-          .catch((e: Error) => logger.log('error', '发送选择确认失败', e.message));
+          .catch((e: Error) => logger.log('error', '发送选择确认卡片失败', e.message));
         // 清掉 awaiting，由轮询继续判断 cc 后续状态（idle / 又一个面板 / working）
         existing.awaiting = null;
         logger.log('info', `已转发选择到 ${processName}: idx=${r.chosenIndex}`);
@@ -462,6 +581,11 @@ export async function start(binding: BindingRecord): Promise<void> {
     const b = feishuAppId ? getBindingByAppId(feishuAppId) : null;
     if (!b) {
       logger.log('warn', `[WSEvent] 未找到绑定: app_id=${feishuAppId}`);
+      return;
+    }
+    // 卡片按钮点击回调：与普通消息不同，evt 结构包含 action.value
+    if (event?.event_type === 'card.action.trigger') {
+      handleCardAction(b, event as unknown as CardActionEvent);
       return;
     }
     if (event?.event_type === 'im.message.receive_v1') {

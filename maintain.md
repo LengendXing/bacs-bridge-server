@@ -1,3 +1,40 @@
+## v1.1.23 - 2026-05-17
+### 变更内容
+**模块 1 · QQ 图标修正**
+- `BotsView.vue:267` QQ 平台 logo SVG 重写：从"鬼"形改为更接近企鹅的圆头+圆身+双眼+双脚轮廓
+
+**模块 2 · 5 处按钮文案统一**
+- `ProvidersView.vue` L7 按钮 + L96 弹窗标题：「新建服务商」→「新增」
+- `BindingsView.vue` L10/L11 按钮：「新建绑定」「挂载已有」→「新增」「挂载」；L403/L404 弹窗标题：「新建绑定」「挂载已有进程」→「新增」「挂载进程」
+- `MachinesView.vue` L6 按钮「添加机器」→「新增」；L27 空态文案同步；L45「测试连接」→「测试」；L83 弹窗标题「添加机器」→「新增」
+
+**模块 3 · 决策弹窗双向交互修复（核心）**
+- **路径 A（文本回退升级）**`ws-client.ts` handleMessage awaiting 分支：
+  - 选择成功的回执从 sendText 升级为 sendCard（绿色「决策已转发」卡片，醒目）
+  - 选择失败的提示从误导性的"正在处理上一条"改为 sendCard「无法识别您的选择」卡片（含可选项清单，保持 awaiting 状态等用户重发）
+- **路径 B（卡片按钮 + 卡片回调）：**
+  - `sender.ts` 扩展 InteractiveCard 类型：新增 ButtonElement/ActionElement
+  - `sender.ts buildAwaitingCard` 在卡片下方追加 actions 块，每个选项渲染为一个按钮（默认项 ⭐ + primary 样式）
+  - `sender.ts` 新增 `buildChoiceAckCard` 和 `buildChoiceUnrecognizedCard` 两个卡片构造函数
+  - `ws-client.ts` KNOWN_EVENTS 加 `card.action.trigger`
+  - `ws-client.ts` 新增 `CardActionEvent` 类型 + `handleCardAction` 函数：识别 `action.value.action === 'cc_choice'`、校验 processName、调 sendChoice 并发回执
+  - 在 handler 顶部加 `event_type === 'card.action.trigger'` 分支路由
+
+**模块 3 单元测试补充**
+- `cc-adapter.test.ts` 新增 5 条 v1.1.23 回归测试：中文面板识别、4 选项面板边界、嵌入工具调用后的面板、飞书按钮模拟（精确数字索引）、飞书按钮第 1 项无方向键
+
+### 影响范围
+- 前端：BotsView / ProvidersView / BindingsView / MachinesView 共 4 个视图，10+ 处文案 + 1 处 SVG
+- 后端：sender.ts（类型扩展 + 3 处卡片构造）、ws-client.ts（KNOWN_EVENTS + 卡片回调路由 + 回执升级）、cc-adapter.test.ts（新增 5 条测试）
+- audit 高危 2 项（axios via @larksuiteoapi）— 沿用 v1.1.15 政策保持（上游 SDK 限制，定制 SDK 引入 cardAction 支持，不能轻易升级）
+
+### 功能列表
+- 飞书侧用户终于能直接点决策卡片上的按钮回复 cc，不再需要打字
+- 即便打字回复也能用更友好的卡片回执（成功绿色 / 失败橙色 + 可选项提示）
+- 卡片回调路径接通飞书 v2 SDK `card.action.trigger` 事件（需用户在飞书机器人后台开通该事件订阅，未开通时 A 路径仍可用）
+- UI 按钮文案统一为「新增/挂载/测试」短词，减少视觉噪声
+- QQ 图标从"鬼"修正为"企鹅"，对齐其他平台 logo 风格
+
 ## v1.1.22 - 2026-05-16
 ### 变更内容
 - 首页 Timeline 卡片高度 680 → 640px（用户反馈再缩 40px）
