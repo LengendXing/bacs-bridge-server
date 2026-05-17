@@ -648,9 +648,9 @@ export function replyToCardElements(md: string): CardElement[] {
 // ── 卡片构建 ────────────────────────────────────────────────────────────
 
 /**
- * 构建"处理中"工作卡片（替代 buildProgressCard）
+ * 构建"处理中"工作卡片
  *
- * 展示当前工具调用 + 中断按钮，让用户知道 cc 在做什么。
+ * 展示耗时 + 中断按钮。工具调用仅在确认来自当前对话时展示。
  */
 export function buildWorkingCard(
   processName: string,
@@ -665,6 +665,7 @@ export function buildWorkingCard(
     ? userQuestion.length > 50 ? userQuestion.slice(0, 50) + '...' : userQuestion
     : '未知问题';
 
+  // 工具调用信息仅在有内容时展示（已由调用方确保只取当前对话的工具调用）
   let toolMd = '';
   if (toolCalls.length > 0) {
     toolMd = '\n**当前操作：**\n' + toolCalls.map(t => `  ○ ${t}`).join('\n');

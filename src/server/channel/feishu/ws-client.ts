@@ -144,6 +144,17 @@ const KNOWN_EVENTS = [
 
 // ── 内部函数 ────────────────────────────────────────────────────────────
 
+/** 只取 pane 中最后一个 ❯ 提示符之后的部分，避免统计到旧对话的工具调用 */
+function extractRecentPane(raw: string): string {
+  if (!raw) return raw;
+  const lines = raw.split(/\r?\n/);
+  let lastPromptIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^\s*❯\s/.test(lines[i])) { lastPromptIdx = i; break; }
+  }
+  return lastPromptIdx >= 0 ? lines.slice(lastPromptIdx).join('\n') : raw;
+}
+
 /**
  * 查询绑定记录：根据飞书 App ID 查找绑定
  *
@@ -184,7 +195,9 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
   const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
   const adapter = getAdapter(cliKind);
   const timing = adapter.extractTiming(session.accumulated);
-  const toolCount = adapter.extractToolCount(session.accumulated);
+  // 只统计当前对话的工具调用次数（取最后 ❯ 之后的部分）
+  const recentPane = extractRecentPane(session.accumulated);
+  const toolCount = adapter.extractToolCount(recentPane);
 
   // 创建计费记录
   try {

@@ -121,6 +121,10 @@ export function startOutputPolling(
   const stableMs = Math.max(3, (config.bridge.pollInterval || 2) * 2) * 1000;
   let lastLength = 0;
   const pollInterval = config.bridge.pollInterval * 1000;
+  // 周期性 detectState 检查计数器：每 N 次轮询主动检测一次终态
+  // 避免输出长度不变时 tryFinish 永远不被触发，导致必须等硬超时
+  let pollCount = 0;
+  const stateCheckEvery = Math.max(3, Math.round(10 / (config.bridge.pollInterval || 2)));
 
   let _executor: RemoteExecutor | null = null;
   async function getEx(): Promise<RemoteExecutor> {
@@ -155,8 +159,8 @@ export function startOutputPolling(
 
         session.accumulated = res.output;
 
-        // 提取工具调用信息
-        session.lastToolCalls = adapter.extractToolCalls(res.output);
+        // 提取工具调用信息——只取最后一个 ❯ 之后的部分，避免把旧对话的工具调用捞出来
+        session.lastToolCalls = extractRecentToolCalls(adapter, res.output);
 
         // 优先：决策面板探测——一旦面板出现立刻推送，不必等 stable
         const panel = adapter.extractChoicePanel(res.output);
@@ -182,12 +186,18 @@ export function startOutputPolling(
           // 触发 stable 重新计时（输出已经在变化）
         }
 
+        pollCount++;
+
         if (res.output.length > lastLength || res.output.length < lastLength * 0.5) {
           lastLength = res.output.length;
           if (session.stableTimer) clearTimeout(session.stableTimer);
           session.stableTimer = setTimeout(() => {
             tryFinish(session, adapter, handlers);
           }, stableMs);
+        } else if (pollCount % stateCheckEvery === 0) {
+          // 输出长度没变化，但已经轮询了 N 次 → 主动 detectState
+          // 防止 CC 已回到 idle 但 pane 长度不变导致 tryFinish 永远不触发
+          tryFinish(session, adapter, handlers);
         }
         lastLength = res.output.length;
       })
@@ -200,6 +210,20 @@ export function startOutputPolling(
   }, pollInterval);
 
   setTimeout(() => tryFinish(session, adapter, handlers), 7000);
+}
+
+/** 只提取最后一个 ❯ 提示符之后的工具调用，避免把旧对话的工具调用捞出来 */
+function extractRecentToolCalls(adapter: CliAdapter, raw: string): string[] {
+  if (!raw) return [];
+  const lines = raw.split(/\r?\n/);
+  // 找最后一个 ❯ 行（用户输入提示符）
+  let lastPromptIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^\s*❯\s/.test(lines[i])) { lastPromptIdx = i; break; }
+  }
+  // 如果找不到 ❯，用整个 pane（兼容首次启动等场景）
+  const recent = lastPromptIdx >= 0 ? lines.slice(lastPromptIdx).join('\n') : raw;
+  return adapter.extractToolCalls(recent);
 }
 
 function tryFinish(
