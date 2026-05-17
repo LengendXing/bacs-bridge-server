@@ -193,6 +193,98 @@ describe('cc-adapter.extractReply', () => {
   });
 });
 
+describe('cc-adapter.extractToolCalls', () => {
+  it('提取标准工具调用行', () => {
+    const pane = `● Bash(git push origin main)
+● Read(auth.py)
+● Edit(config.json)
+❯ `;
+    const calls = adapter.extractToolCalls(pane);
+    expect(calls).toEqual(['Bash(git push origin main)', 'Read(auth.py)', 'Edit(config.json)']);
+  });
+
+  it('默认只取最近 3 个（从下往上）', () => {
+    const pane = `● Glob(*.ts)
+● Grep(pattern)
+● Bash(cmd1)
+● Read(file.py)
+● Edit(fix.ts)`;
+    const calls = adapter.extractToolCalls(pane);
+    expect(calls).toHaveLength(3);
+    expect(calls).toEqual(['Bash(cmd1)', 'Read(file.py)', 'Edit(fix.ts)']);
+  });
+
+  it('超长参数截断为 20 字符 + ...', () => {
+    const longArg = 'a'.repeat(50);
+    const pane = `● Bash(${longArg})`;
+    const calls = adapter.extractToolCalls(pane);
+    expect(calls[0].length).toBeLessThan(30);
+    expect(calls[0]).toContain('...');
+  });
+
+  it('无工具调用时返回空数组', () => {
+    expect(adapter.extractToolCalls('')).toEqual([]);
+    expect(adapter.extractToolCalls('no tools here')).toEqual([]);
+    expect(adapter.extractToolCalls('❯ hello')).toEqual([]);
+  });
+
+  it('maxItems 可自定义', () => {
+    const pane = `● A(x)
+● B(y)
+● C(z)
+● D(w)`;
+    expect(adapter.extractToolCalls(pane, 2)).toHaveLength(2);
+  });
+});
+
+describe('cc-adapter.extractTiming', () => {
+  it('识别 ✻ Brewed for 5s', () => {
+    const pane = `● 回复内容
+✻ Brewed for 5s
+❯ `;
+    expect(adapter.extractTiming(pane)).toBe(5);
+  });
+
+  it('识别 ✻ Cooked for 2m 25s（分+秒格式）', () => {
+    const pane = `✻ Cooked for 2m 25s`;
+    expect(adapter.extractTiming(pane)).toBe(145);
+  });
+
+  it('识别 ✻ Sautéed for 34s', () => {
+    const pane = `✻ Sautéed for 34s`;
+    expect(adapter.extractTiming(pane)).toBe(34);
+  });
+
+  it('无耗时行时返回 0', () => {
+    expect(adapter.extractTiming('')).toBe(0);
+    expect(adapter.extractTiming('no timing here')).toBe(0);
+  });
+
+  it('多行时取最近一条', () => {
+    const pane = `✻ Brewed for 5s
+...
+✻ Cooked for 1m 30s`;
+    expect(adapter.extractTiming(pane)).toBe(90);
+  });
+});
+
+describe('cc-adapter.extractToolCount', () => {
+  it('统计各工具调用次数', () => {
+    const pane = `● Bash(git push)
+● Read(auth.py)
+● Edit(config.json)
+● Bash(npm test)
+● Read(utils.ts)`;
+    const count = adapter.extractToolCount(pane);
+    expect(count).toEqual({ Bash: 2, Read: 2, Edit: 1 });
+  });
+
+  it('无工具调用返回空对象', () => {
+    expect(adapter.extractToolCount('')).toEqual({});
+    expect(adapter.extractToolCount('no tools')).toEqual({});
+  });
+});
+
 describe('cc-adapter.sendChoice', () => {
   function makeExecutor() {
     const calls: { keys: string[]; betweenMs?: number }[] = [];
@@ -495,7 +587,7 @@ describe('cc-adapter.sendChoice — inline format', () => {
     const r = await adapter.sendChoice('cc-test', '1', inlinePanel, executor);
     expect(r.ok).toBe(true);
     expect(r.chosenIndex).toBe(1);
-    expect(calls[0]).toEqual(['C-m']);
+    expect(calls[0].keys).toEqual(['C-m']);
   });
 
   it('inline 面板选 Reject → 发 Escape', async () => {
@@ -503,21 +595,21 @@ describe('cc-adapter.sendChoice — inline format', () => {
     const r = await adapter.sendChoice('cc-test', '2', inlinePanel, executor);
     expect(r.ok).toBe(true);
     expect(r.chosenIndex).toBe(2);
-    expect(calls[0]).toEqual(['Escape']);
+    expect(calls[0].keys).toEqual(['Escape']);
   });
 
   it('inline 面板回复 yes → 发 Enter', async () => {
     const { calls, executor } = makeExecutor();
     const r = await adapter.sendChoice('cc-test', 'yes', inlinePanel, executor);
     expect(r.chosenIndex).toBe(1);
-    expect(calls[0]).toEqual(['C-m']);
+    expect(calls[0].keys).toEqual(['C-m']);
   });
 
   it('inline 面板回复 reject → 发 Escape', async () => {
     const { calls, executor } = makeExecutor();
     const r = await adapter.sendChoice('cc-test', 'reject', inlinePanel, executor);
     expect(r.chosenIndex).toBe(2);
-    expect(calls[0]).toEqual(['Escape']);
+    expect(calls[0].keys).toEqual(['Escape']);
   });
 
   it('inline 面板无法识别的回复 → ok:false', async () => {

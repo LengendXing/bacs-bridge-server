@@ -44,7 +44,22 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'logs',
         name: 'logs',
-        component: () => import('../views/LogsView.vue'),
+        redirect: '/logs/realtime',
+      },
+      {
+        path: 'logs/realtime',
+        name: 'logs-realtime',
+        component: () => import('../views/LogsRealtimeView.vue'),
+      },
+      {
+        path: 'logs/audit',
+        name: 'logs-audit',
+        component: () => import('../views/LogsAuditView.vue'),
+      },
+      {
+        path: 'logs/billing',
+        name: 'logs-billing',
+        component: () => import('../views/LogsBillingView.vue'),
       },
       {
         path: 'settings',

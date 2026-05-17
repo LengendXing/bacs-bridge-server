@@ -14,7 +14,7 @@
  * 9. bacs_bots     — 多平台机器人凭据统一管理（v1.1.10 引入）
  */
 
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // ════════════════════════════════════════════════════════════════════
@@ -364,3 +364,57 @@ export const bots = sqliteTable('bacs_bots', {
 }, (table) => ({
   platformNameIdx: uniqueIndex('bacs_bots_platform_name_idx').on(table.platform, table.name),
 }));
+
+// ════════════════════════════════════════════════════════════════════
+// 10. bacs_billing_records — 计费主表（v1.1.25 引入）
+// ════════════════════════════════════════════════════════════════════
+
+export const billingRecords = sqliteTable('bacs_billing_records', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  processName: text('process_name').notNull(),
+  cliKind: text('cli_kind').notNull().default('cc'),
+  modelId: text('model_id'),
+  providerId: integer('provider_id'),
+  machineId: integer('machine_id'),
+  userMessage: text('user_message'),
+  replySnippet: text('reply_snippet'),
+  elapsedSec: integer('elapsed_sec').notNull().default(0),
+  toolCallsJson: text('tool_calls_json'),
+  costUsd: real('cost_usd'),
+  costUsdEstimated: real('cost_usd_estimated'),
+  costSource: text('cost_source').notNull().default('estimated'),
+  sessionId: text('session_id'),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 11. bacs_billing_details — 计费明细表（v1.1.25 引入）
+// ════════════════════════════════════════════════════════════════════
+
+export const billingDetails = sqliteTable('bacs_billing_details', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  billingId: integer('billing_id').notNull().references(() => billingRecords.id, { onDelete: 'cascade' }),
+  stage: text('stage').notNull(),
+  toolName: text('tool_name'),
+  toolArg: text('tool_arg'),
+  durationSec: integer('duration_sec').default(0),
+  tokenIn: integer('token_in'),
+  tokenOut: integer('token_out'),
+  costUsd: real('cost_usd'),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 12. bacs_conversation_billing — 对话关联计费表（v1.1.25 引入）
+// ════════════════════════════════════════════════════════════════════
+
+export const conversationBilling = sqliteTable('bacs_conversation_billing', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  billingId: integer('billing_id').notNull().references(() => billingRecords.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull().default('feishu'),
+  targetId: text('target_id'),
+  timelineId: integer('timeline_id'),
+  userMessageFull: text('user_message_full'),
+  replySent: integer('reply_sent', { mode: 'boolean' }).default(false),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+});

@@ -120,12 +120,23 @@ interface ActionElement {
   actions: ButtonElement[];
 }
 
+/** 卡片元素联合类型（前向声明，供 CollapsiblePanelElement 使用） */
+type CardElement = MarkdownElement | HrElement | NoteElement | TableElement | CollapsiblePanelElement;
+
+/** 可折叠面板元素 */
+interface CollapsiblePanelElement {
+  tag: 'collapsible_panel';
+  expanded: boolean;
+  header: { title: { tag: 'plain_text'; content: string } };
+  elements: CardElement[];
+}
+
 /** 飞书交互式卡片 */
 interface InteractiveCard {
   /** 卡片头部 */
   header: CardHeader;
   /** 卡片元素列表 */
-  elements: Array<MarkdownElement | HrElement | NoteElement | TableElement | ActionElement>;
+  elements: Array<MarkdownElement | HrElement | NoteElement | TableElement | ActionElement | CollapsiblePanelElement>;
 }
 
 /** 回复卡片选项 */
@@ -140,6 +151,12 @@ export interface ReplyCardOptions {
   elapsed: number;
   /** 是否超时兜底 */
   isTimeout: boolean;
+  /** 工具调用统计，如 { Bash: 2, Edit: 1 } */
+  toolCount?: Record<string, number>;
+  /** cc 自报耗时（秒） */
+  timing?: number;
+  /** 估算费用（美元） */
+  costUsdEstimated?: number;
 }
 
 // ── Token 缓存 ──────────────────────────────────────────────────────────
@@ -444,9 +461,6 @@ export function parseBoxDrawingTable(tblLines: string[]): TableElement | null {
 
 // ── Markdown → 飞书卡片元素 ────────────────────────────────────────────
 
-/** 卡片元素联合类型 */
-type CardElement = MarkdownElement | HrElement | NoteElement | TableElement;
-
 /**
  * 将 Markdown 文本转换为飞书卡片 elements 数组
  *
@@ -459,6 +473,8 @@ type CardElement = MarkdownElement | HrElement | NoteElement | TableElement;
  * @param md - 原始 Markdown 文本
  * @returns 飞书卡片元素数组
  */
+const COLLAPSE_THRESHOLD = 1500;
+
 export function replyToCardElements(md: string): CardElement[] {
   if (!md) return [];
   const lines = md.split('\n');
@@ -561,34 +577,98 @@ export function replyToCardElements(md: string): CardElement[] {
   }
 
   flushText();
+
+  // 长回复折叠：超过阈值时，前部分保持可见，后半放入 collapsible_panel
+  if (elements.length > 1) {
+    let totalChars = 0;
+    for (const el of elements) {
+      if (el.tag === 'markdown') totalChars += (el as MarkdownElement).content.length;
+      else if (el.tag === 'table') totalChars += JSON.stringify((el as TableElement).rows).length;
+    }
+    if (totalChars > COLLAPSE_THRESHOLD) {
+      // 找到第一个 hr（通常在问题信息和回复正文之间），其后的元素为可折叠内容
+      let hrIdx = elements.findIndex((el) => el.tag === 'hr');
+      if (hrIdx < 0) hrIdx = 0;
+
+      // 计算可见部分字符数，保持前 COLLAPSE_THRESHOLD 字符可见
+      let visibleCount = 0;
+      let splitIdx = elements.length;
+      for (let j = hrIdx + 1; j < elements.length; j++) {
+        const el = elements[j];
+        let charCount = 0;
+        if (el.tag === 'markdown') charCount = (el as MarkdownElement).content.length;
+        else if (el.tag === 'table') charCount = JSON.stringify((el as TableElement).rows).length;
+        else if (el.tag === 'hr') charCount = 0;
+        else charCount = 50;
+
+        if (visibleCount + charCount > COLLAPSE_THRESHOLD && j > hrIdx + 1) {
+          splitIdx = j;
+          break;
+        }
+        visibleCount += charCount;
+      }
+
+      if (splitIdx < elements.length) {
+        // 去掉末尾的 hr + note，它们属于底部区域
+        let lastHrIdx = -1;
+        for (let j = elements.length - 1; j >= 0; j--) {
+          if (elements[j].tag === 'hr') { lastHrIdx = j; break; }
+        }
+
+        const visibleElements = elements.slice(0, splitIdx);
+        // 折叠区域：从 splitIdx 到最后的 hr 之前
+        const collapsedElements = lastHrIdx > splitIdx
+          ? elements.slice(splitIdx, lastHrIdx)
+          : elements.slice(splitIdx);
+
+        if (collapsedElements.length > 0) {
+          const lineCount = collapsedElements.reduce(
+            (acc, el) => acc + (el.tag === 'markdown' ? (el as MarkdownElement).content.split('\n').length : 1), 0,
+          );
+          visibleElements.push({
+            tag: 'collapsible_panel',
+            expanded: false,
+            header: { title: { tag: 'plain_text', content: `详细内容（约 ${lineCount} 行）` } },
+            elements: collapsedElements,
+          } as CollapsiblePanelElement);
+        }
+
+        // 保留底部 hr + note
+        if (lastHrIdx >= 0) {
+          visibleElements.push(...elements.slice(lastHrIdx));
+        }
+        return visibleElements;
+      }
+    }
+  }
+
   return elements;
 }
 
 // ── 卡片构建 ────────────────────────────────────────────────────────────
 
 /**
- * 构建进度卡片
+ * 构建"处理中"工作卡片（替代 buildProgressCard）
  *
- * 在 CLI 处理过程中定期发送，告知用户当前耗时和问题摘要。
- *
- * @param processName  - 进程名
- * @param elapsed      - 已耗时（秒）
- * @param userQuestion - 用户问题原文
- * @returns 交互式卡片对象
+ * 展示当前工具调用 + 中断按钮，让用户知道 cc 在做什么。
  */
-export function buildProgressCard(
+export function buildWorkingCard(
   processName: string,
   elapsed: number,
   userQuestion: string,
+  toolCalls: string[] = [],
 ): InteractiveCard {
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timeStr = minutes > 0 ? `${minutes}m${seconds}s` : `${seconds}s`;
   const question = userQuestion
-    ? userQuestion.length > 50
-      ? userQuestion.slice(0, 50) + '...'
-      : userQuestion
+    ? userQuestion.length > 50 ? userQuestion.slice(0, 50) + '...' : userQuestion
     : '未知问题';
+
+  let toolMd = '';
+  if (toolCalls.length > 0) {
+    toolMd = '\n**当前操作：**\n' + toolCalls.map(t => `  ○ ${t}`).join('\n');
+  }
 
   return {
     header: {
@@ -598,8 +678,16 @@ export function buildProgressCard(
     elements: [
       {
         tag: 'markdown',
-        content: `**进程：** ${processName}\n**问题：** ${question}\n**已耗时：** ${timeStr}`,
+        content: `**进程：** ${processName}\n**问题：** ${question}\n**已耗时：** ${timeStr}${toolMd}`,
       },
+      { tag: 'action', actions: [
+        {
+          tag: 'button',
+          text: { tag: 'plain_text', content: '中断' },
+          type: 'danger',
+          value: { action: 'cc_interrupt', processName },
+        },
+      ]},
       { tag: 'hr' },
       {
         tag: 'note',
@@ -740,6 +828,68 @@ export function buildChoiceUnrecognizedCard(
   };
 }
 
+/** 构建中断确认卡片 */
+export function buildInterruptAckCard(processName: string): InteractiveCard {
+  return {
+    header: {
+      title: { tag: 'plain_text', content: '🔔 【通知】已中断' },
+      template: 'green',
+    },
+    elements: [
+      {
+        tag: 'markdown',
+        content: `进程 **${processName}** 已发送中断指令（Escape）。`,
+      },
+      { tag: 'hr' },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: 'cc 将停止当前操作，回到空闲状态' }] },
+    ],
+  };
+}
+
+/** 构建进程状态看板卡片 */
+export function buildStatusCard(
+  processName: string,
+  rows: Array<{ process: string; state: string; elapsed: number }>,
+): InteractiveCard {
+  if (rows.length === 0) {
+    return {
+      header: { title: { tag: 'plain_text', content: '📊 进程看板' }, template: 'blue' },
+      elements: [{ tag: 'markdown', content: '当前没有活跃进程' }],
+    };
+  }
+  const tableMd = rows.map(r => {
+    const elapsed = r.elapsed > 0 ? `${Math.floor(r.elapsed / 60)}m${r.elapsed % 60}s` : '-';
+    return `| ${r.process} | ${r.state} | ${elapsed} |`;
+  }).join('\n');
+  const md = `| 进程 | 状态 | 耗时 |\n| --- | --- | --- |\n${tableMd}`;
+  return {
+    header: { title: { tag: 'plain_text', content: '📊 进程看板' }, template: 'blue' },
+    elements: [
+      { tag: 'markdown', content: `**当前进程：** ${processName}\n\n${md}` },
+      { tag: 'hr' },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '使用 /status 刷新 · /interrupt 中断' }] },
+    ],
+  };
+}
+
+/** 构建帮助卡片 */
+export function buildHelpCard(processName: string): InteractiveCard {
+  return {
+    header: { title: { tag: 'plain_text', content: '📖 /命令帮助' }, template: 'blue' },
+    elements: [
+      {
+        tag: 'markdown',
+        content:
+          `**进程：** ${processName}\n\n` +
+          `| 命令 | 功能 |\n| --- | --- |\n` +
+          `| /status | 查看所有进程状态 |\n| /interrupt | 中断当前执行 |\n| /model \\<id\\> | 切换模型（重启 cc） |\n| /effort \\<level\\> | 调整 effort（重启 cc） |`,
+      },
+      { tag: 'hr' },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '命令不区分大小写 · 非 / 开头消息照常发给 cc' }] },
+    ],
+  };
+}
+
 export function buildTimeoutCard(processName: string, elapsed: number): InteractiveCard {
   const mm = Math.floor(elapsed / 60);
   return {
@@ -777,7 +927,7 @@ export function sendReplyCard(
   receiveId: string,
   opts: ReplyCardOptions,
 ): Promise<FeishuApiResponse> {
-  const { processName, userQuestion, reply, elapsed, isTimeout } = opts;
+  const { processName, userQuestion, reply, elapsed, isTimeout, toolCount, timing, costUsdEstimated } = opts;
 
   const elapsedStr =
     elapsed != null
@@ -800,7 +950,15 @@ export function sendReplyCard(
   ];
 
   // 回复正文：表格转原生 table 元素，文字转 markdown 元素
-  elements.push(...replyToCardElements(reply || ''));
+  const replyElements = replyToCardElements(reply || '');
+  elements.push(...replyElements);
+
+  // 底部统计 note
+  const timingStr = timing ? ` · ⏱ cc ${timing}s` : '';
+  const toolStr = toolCount
+    ? Object.entries(toolCount).map(([k, v]) => `${k}×${v}`).join(' · ')
+    : '';
+  const costStr = costUsdEstimated ? ` · 💰 ≈$${costUsdEstimated.toFixed(4)}` : '';
 
   elements.push({ tag: 'hr' });
   elements.push({
@@ -808,7 +966,7 @@ export function sendReplyCard(
     elements: [
       {
         tag: 'plain_text',
-        content: `Claude Code · ${new Date().toLocaleString('zh-CN')}`,
+        content: `⏱ 总计 ${elapsedStr}${timingStr}${toolStr ? ' · 🔧 ' + toolStr : ''}${costStr} · ${new Date().toLocaleString('zh-CN')}`,
       },
     ],
   });

@@ -74,6 +74,9 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
   // 运行时确保 bindings.bot_id 列存在（v1.1.14 引入）
   ensureBindingBotIdColumn(sqlite);
 
+  // 运行时确保计费相关表存在（v1.1.25 引入）
+  ensureBillingTables(sqlite);
+
   // 一次性回填：bindings.feishu_app_id → bindings.bot_id（按 bacs_bots.app_id 匹配）
   // 通过 app_settings.bindingBotIdMigrationDone 标记保证只执行一次
   runBindingBotIdBackfillOnce(sqlite);
@@ -257,6 +260,64 @@ function ensureMachineColumns(sqlite: Database.Database): void {
   if (!names.has('builtin')) {
     sqlite.exec(`ALTER TABLE machines ADD COLUMN builtin INTEGER NOT NULL DEFAULT 0`);
   }
+}
+
+/**
+ * 运行时确保计费相关表存在（v1.1.25 引入）
+ */
+function ensureBillingTables(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bacs_billing_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      process_name TEXT NOT NULL,
+      cli_kind TEXT NOT NULL DEFAULT 'cc',
+      model_id TEXT,
+      provider_id INTEGER,
+      machine_id INTEGER,
+      user_message TEXT,
+      reply_snippet TEXT,
+      elapsed_sec INTEGER NOT NULL DEFAULT 0,
+      tool_calls_json TEXT,
+      cost_usd REAL,
+      cost_usd_estimated REAL,
+      cost_source TEXT NOT NULL DEFAULT 'estimated',
+      session_id TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_billing_process ON bacs_billing_records (process_name)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_billing_model ON bacs_billing_records (model_id)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_billing_created ON bacs_billing_records (created_at)`);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bacs_billing_details (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      billing_id INTEGER NOT NULL REFERENCES bacs_billing_records(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      tool_name TEXT,
+      tool_arg TEXT,
+      duration_sec INTEGER DEFAULT 0,
+      token_in INTEGER,
+      token_out INTEGER,
+      cost_usd REAL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_billing_detail_billing ON bacs_billing_details (billing_id)`);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS bacs_conversation_billing (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      billing_id INTEGER NOT NULL REFERENCES bacs_billing_records(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL DEFAULT 'feishu',
+      target_id TEXT,
+      timeline_id INTEGER,
+      user_message_full TEXT,
+      reply_sent INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_conv_billing_billing ON bacs_conversation_billing (billing_id)`);
 }
 
 /**

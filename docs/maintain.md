@@ -1,5 +1,20 @@
 # 迭代日志 · BACS Bridge Server
 
+## v1.1.25 - 2026-05-17
+### 变更内容
+- **工具调用实时状态卡片**：处理中卡片显示最近 3 个工具调用名称（如 `Bash(git push)`），底部增加「中断」按钮
+- **耗时与工具统计**：回复卡片底部 note 显示 cc 自报耗时 + 工具调用统计（如 `Bash×2 Edit×1`）+ 估算费用
+- **可折叠长回复**：回复内容 > 1500 字符时后半部分自动放入 collapsible_panel 折叠
+- **/命令快捷交互**：支持 /status（进程看板）、/interrupt（中断执行）、/model（切换模型）、/effort（调整 effort），未知命令返回帮助卡片
+- **中断按钮回调**：handleCardAction 支持 cc_interrupt 动作，点击中断按钮发 Escape 到 cc
+- **计费服务**：新增 bacs_billing_records / bacs_billing_details / bacs_conversation_billing 三张表 + 计费 API
+- **扣费日志页面**：日志升级为一级菜单（实时日志 / 审计日志 / 扣费日志），扣费日志含汇总卡片 + 分页表格 + 详情弹窗
+- **cc-adapter 扩展**：新增 extractToolCalls / extractTiming / extractToolCount 三个解析函数 + 14 个单元测试
+
+### 影响范围
+- 改动：cc-adapter.ts（+3 函数）、types.ts（+3 接口方法）、codex-adapter.ts（+3 空实现）、state.ts（+lastToolCalls）、sender.ts（+5 卡片构建函数 + collapsible_panel）、ws-client.ts（+/命令路由 + cc_interrupt + 计费集成）、schema.ts（+3 表）、db/index.ts（+ensureBillingTables）、index.ts（+billing 路由）、router/index.ts（+3 日志路由）、LayoutView.vue（菜单改造）
+- 新增：billing/service.ts、routes/billing.ts、LogsRealtimeView.vue、LogsAuditView.vue、LogsBillingView.vue
+
 ## v1.1.8 - 2026-05-15
 ### 变更内容
 - **编辑绑定自动重连 CLI 进程**：编辑绑定时若 providerId / modelId / modelOverride / effort / machineId 任一变更，自动 kill 旧 tmux 进程 → 断开飞书 WS → 按新配置重启 CLI → 重连 WS；仅飞书凭据变更时仍走原有 WS 重启逻辑

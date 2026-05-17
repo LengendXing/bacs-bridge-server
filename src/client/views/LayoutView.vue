@@ -152,6 +152,9 @@ import {
   Wrench,
   ChevronDown,
   ChevronRight,
+  Activity,
+  Shield,
+  DollarSign,
 } from 'lucide-vue-next';
 
 const router = useRouter();
@@ -192,11 +195,19 @@ const menuItems: MenuItem[] = [
       { path: '/bindings', label: '绑定', icon: Link },
     ],
   },
-  { path: '/logs', label: '日志', icon: FileText },
+  {
+    label: '日志',
+    icon: FileText,
+    children: [
+      { path: '/logs/realtime', label: '实时日志', icon: Activity },
+      { path: '/logs/audit', label: '审计日志', icon: Shield },
+      { path: '/logs/billing', label: '扣费日志', icon: DollarSign },
+    ],
+  },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
-const expandedGroups = ref<Set<string>>(new Set(['运维中心', '绑定管理']));
+const expandedGroups = ref<Set<string>>(new Set(['运维中心', '绑定管理', '日志']));
 function toggleGroup(label: string) {
   const next = new Set(expandedGroups.value);
   if (next.has(label)) next.delete(label);

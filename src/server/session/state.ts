@@ -21,6 +21,8 @@ export interface SessionState {
     panelKey: string;
     pushedAt: number;
   };
+  /** 最近一次轮询检测到的工具调用列表 */
+  lastToolCalls: string[];
 }
 
 export interface SessionContext {
@@ -56,6 +58,7 @@ export function createSession(ctx: SessionContext): SessionState {
     replied: false,
     ctx,
     awaiting: null,
+    lastToolCalls: [],
   };
   sessions.set(ctx.processName, session);
   return session;
@@ -151,6 +154,9 @@ export function startOutputPolling(
         }
 
         session.accumulated = res.output;
+
+        // 提取工具调用信息
+        session.lastToolCalls = adapter.extractToolCalls(res.output);
 
         // 优先：决策面板探测——一旦面板出现立刻推送，不必等 stable
         const panel = adapter.extractChoicePanel(res.output);
