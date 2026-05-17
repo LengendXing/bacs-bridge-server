@@ -282,13 +282,15 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
  * @param event   - 飞书消息事件
  */
 /** /命令路由处理 */
-function handleSlashCommand(
+function handleBridgeCommand(
   input: string,
   binding: BindingRecord,
   targetId: string,
   targetType: string,
 ): void {
-  const parts = input.slice(1).trim().split(/\s+/);
+  // 前缀 "!bacs-" 后的部分，如 "!bacs-status" → "status"
+  const body = input.slice('!bacs-'.length).trim();
+  const parts = body.split(/\s+/);
   const cmd = (parts[0] || '').toLowerCase();
   const { processName, feishuAppId, feishuAppSecret, cliKind, machineId } = binding;
   const adapter = getAdapter(cliKind);
@@ -553,16 +555,11 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
   const targetType = chatId ? 'chat_id' : 'open_id';
   if (!targetId) return;
 
-  // /命令路由：仅拦截 bridge 自有命令（status/interrupt/model/effort），
-  // 其余 / 命令（如 /new /clear /compact 等 cc 内置命令）透传给 cc 进程
-  if (msgText.startsWith('/')) {
-    const bridgeCmds = ['status', 'interrupt', 'model', 'effort'];
-    const cmd = msgText.slice(1).trim().split(/\s+/)[0]?.toLowerCase() || '';
-    if (bridgeCmds.includes(cmd)) {
-      handleSlashCommand(msgText, binding, targetId, targetType);
-      return;
-    }
-    // 不认识的 / 命令 → 正常转发给 cc（走下面的消息路由）
+  // bridge 命令路由：以 "!bacs-" 开头的消息由 bridge 本地处理
+  // 其余所有消息（含 / 开头的 cc 内置命令）正常转发给 cc 进程
+  if (msgText.startsWith('!bacs-')) {
+    handleBridgeCommand(msgText, binding, targetId, targetType);
+    return;
   }
 
   const adapter = getAdapter(cliKind);

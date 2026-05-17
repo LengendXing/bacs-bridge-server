@@ -876,17 +876,17 @@ export function buildStatusCard(
 /** 构建帮助卡片 */
 export function buildHelpCard(processName: string): InteractiveCard {
   return {
-    header: { title: { tag: 'plain_text', content: '📖 /命令帮助' }, template: 'blue' },
+    header: { title: { tag: 'plain_text', content: '📖 Bridge 命令帮助' }, template: 'blue' },
     elements: [
       {
         tag: 'markdown',
         content:
           `**进程：** ${processName}\n\n` +
           `| 命令 | 功能 |\n| --- | --- |\n` +
-          `| /status | 查看所有进程状态 |\n| /interrupt | 中断当前执行 |\n| /model \\<id\\> | 切换模型（重启 cc） |\n| /effort \\<level\\> | 调整 effort（重启 cc） |`,
+          `| !bacs-status | 查看所有进程状态 |\n| !bacs-interrupt | 中断当前执行 |\n| !bacs-model \\<id\\> | 切换模型（重启 cc） |\n| !bacs-effort \\<level\\> | 调整 effort（重启 cc） |`,
       },
       { tag: 'hr' },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: '命令不区分大小写 · 非 / 开头消息照常发给 cc' }] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: 'Bridge 命令以 !bacs- 开头 · 其余消息（含 / 开头）照常发给 cc' }] },
     ],
   };
 }
