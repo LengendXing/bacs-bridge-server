@@ -349,4 +349,123 @@ describe('cc-adapter.extractChoicePanel', () => {
   it('空输入 → 返回 null', () => {
     expect(adapter.extractChoicePanel('')).toBeNull();
   });
+
+  // ─── v1.1.23 新增：飞书决策弹窗双向交互修复相关回归测试 ───
+
+  it('识别中文标题决策面板', () => {
+    const pane = `╭───────────────────────────────╮
+│ 是否允许执行命令？             │
+│                               │
+│ ❯ 1. 允许                     │
+│   2. 拒绝                     │
+╰───────────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(2);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别 4 个选项面板（v1.1.23 卡片最多渲染 5 个按钮的边界）', () => {
+    const pane = `╭──────────────────────────────╮
+│ Pick an option              │
+│                              │
+│   1. Alpha                   │
+│ ❯ 2. Bravo                   │
+│   3. Charlie                 │
+│   4. Delta                   │
+╰──────────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(4);
+    expect(panel!.defaultIndex).toBe(2);
+  });
+
+  it('多余空白和制表符不影响面板识别', () => {
+    const pane = `   ╭───────────╮
+   │ Confirm?  │
+   │           │
+   │ ❯ 1. Yes  │
+   │   2. No   │
+   ╰───────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(2);
+  });
+
+  it('面板嵌入在工具调用输出后也能识别（典型权限弹窗场景）', () => {
+    const pane = `● 调用工具 Bash
+● 命令：rm /tmp/test
+╭──────────────────────────────────────╮
+│ Allow Bash command?                  │
+│                                       │
+│ ❯ 1. Yes                              │
+│   2. No, and tell Claude what to do  │
+╰──────────────────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Allow Bash command/);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+});
+
+describe('cc-adapter.sendChoice — v1.1.23 飞书按钮模拟回归', () => {
+  function makeExecutor() {
+    const calls: { keys: string[]; betweenMs?: number }[] = [];
+    return {
+      calls,
+      executor: {
+        kind: 'local' as const,
+        machineId: null,
+        async exec() { return { stdout: '', stderr: '', exitCode: 0, ok: true }; },
+        async sessionExists() { return true; },
+        async listSessionsByPrefix() { return []; },
+        async capturePane() { return { output: '' }; },
+        async sendInput() { return { ok: true }; },
+        async sendKeys(_session: string, keys: string[], betweenMs?: number) {
+          calls.push({ keys, betweenMs });
+          return { ok: true };
+        },
+        async killSession() {},
+      },
+    };
+  }
+
+  it('飞书卡片按钮回调用 String(optionIndex) 输入应精确匹配序号 → 不走关键词匹配', async () => {
+    // 模拟用户点击决策卡上的 "2." 按钮
+    const { calls, executor } = makeExecutor();
+    const panel = {
+      title: 'Allow?',
+      options: ['1. Yes', '2. No'],
+      defaultIndex: 1,
+    };
+    const r = await adapter.sendChoice('cc-test', '2', panel, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(2);
+    // 默认 1 → 选 2 应该是 Down + C-m
+    expect(calls[0].keys).toEqual(['Down', 'C-m']);
+  });
+
+  it('飞书按钮模拟选第 1 项时不发任何方向键（已在默认项）', async () => {
+    const { calls, executor } = makeExecutor();
+    const panel = {
+      title: 'Allow?',
+      options: ['1. Yes', '2. No'],
+      defaultIndex: 1,
+    };
+    const r = await adapter.sendChoice('cc-test', '1', panel, executor);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0].keys).toEqual(['C-m']);
+  });
+
+  it('飞书文本回复"是"应识别为默认 Yes（兜底路径）', async () => {
+    const { executor } = makeExecutor();
+    const panel = {
+      title: '允许？',
+      options: ['1. 允许', '2. 拒绝'],
+      defaultIndex: 1,
+    };
+    const r = await adapter.sendChoice('cc-test', '是', panel, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(1);
+  });
 });

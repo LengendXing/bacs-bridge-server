@@ -7,8 +7,8 @@
       </h2>
       <div class="flex items-center gap-2">
         <template v-if="activeTab === 'list'">
-          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新建绑定</button>
-          <button class="btn-mac btn-mac-sm" @click="openMount">挂载已有</button>
+          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
+          <button class="btn-mac btn-mac-sm" @click="openMount">挂载</button>
           <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">刷新</button>
         </template>
         <template v-else>
@@ -400,8 +400,8 @@ const formLoading = ref(false);
 const formError = ref('');
 
 const modalTitle = computed(() =>
-  modalMode.value === 'create' ? '新建绑定' :
-  modalMode.value === 'mount' ? '挂载已有进程' : '编辑绑定'
+  modalMode.value === 'create' ? '新增' :
+  modalMode.value === 'mount' ? '挂载进程' : '编辑绑定'
 );
 
 const submitLabel = computed(() =>

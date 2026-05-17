@@ -98,12 +98,34 @@ interface CardHeader {
   template: string;
 }
 
+/** 按钮元素文本 */
+interface ButtonText {
+  tag: 'plain_text';
+  content: string;
+}
+
+/** 卡片按钮元素 */
+interface ButtonElement {
+  tag: 'button';
+  text: ButtonText;
+  /** 按钮主题：primary / default / danger */
+  type: 'primary' | 'default' | 'danger';
+  /** 点击时回传给服务端的业务数据 */
+  value: Record<string, string | number>;
+}
+
+/** 一行按钮组（actions 元素） */
+interface ActionElement {
+  tag: 'action';
+  actions: ButtonElement[];
+}
+
 /** 飞书交互式卡片 */
 interface InteractiveCard {
   /** 卡片头部 */
   header: CardHeader;
   /** 卡片元素列表 */
-  elements: Array<MarkdownElement | HrElement | NoteElement | TableElement>;
+  elements: Array<MarkdownElement | HrElement | NoteElement | TableElement | ActionElement>;
 }
 
 /** 回复卡片选项 */
@@ -624,7 +646,25 @@ export function buildAwaitingCard(
     `**进程：** ${processName}` +
     (question ? `\n**原问题：** ${question}` : '') +
     `\n**待决策：** ${title}\n\n${optList}\n\n` +
-    `请直接回复：**选项序号**（如 \`1\`、\`2\`）或关键词（\`yes\`/\`no\`/\`是\`/\`否\`）`;
+    `点击下方按钮直接选择，或回复 **序号**（\`1\`/\`2\`）/ 关键词（\`yes\`/\`no\`/\`是\`/\`否\`）`;
+  // 按钮组：每个选项一个按钮，最多 5 个（飞书 actions 单行容量限制）
+  const buttons: ButtonElement[] = options.slice(0, 5).map((opt, i) => {
+    const idx = i + 1;
+    const isDefault = idx === defaultIndex;
+    // 标签精简：去掉前面的"1. "之类前缀，限制长度
+    const label = opt.replace(/^\s*\d+\.\s*/, '').trim();
+    const display = label.length > 16 ? label.slice(0, 16) + '…' : label;
+    return {
+      tag: 'button',
+      text: { tag: 'plain_text', content: `${idx}. ${display}${isDefault ? ' ⭐' : ''}` },
+      type: isDefault ? 'primary' : 'default',
+      value: {
+        action: 'cc_choice',
+        processName,
+        optionIndex: idx,
+      },
+    };
+  });
   return {
     header: {
       title: { tag: 'plain_text', content: '⚠️ 【告警】Claude Code 等待你的决策' },
@@ -632,8 +672,70 @@ export function buildAwaitingCard(
     },
     elements: [
       { tag: 'markdown', content: md },
+      { tag: 'action', actions: buttons },
       { tag: 'hr' },
       { tag: 'note', elements: [{ tag: 'plain_text', content: '回复后将转发到 cc 会话；超时未回复保持等待' }] },
+    ],
+  };
+}
+
+/**
+ * 构建「决策已转发」回执卡片
+ *
+ * sendChoice 成功后发送，告知用户选择已注入 cc 进程，等待后续输出。
+ */
+export function buildChoiceAckCard(
+  processName: string,
+  chosenLabel: string,
+  optionIndex: number,
+): InteractiveCard {
+  return {
+    header: {
+      title: { tag: 'plain_text', content: '🔔 【通知】决策已转发' },
+      template: 'green',
+    },
+    elements: [
+      {
+        tag: 'markdown',
+        content:
+          `**进程：** ${processName}\n` +
+          `**已选择：** ${optionIndex}. ${chosenLabel}\n\n` +
+          `已注入 Claude Code 会话，正在等待后续输出...`,
+      },
+      { tag: 'hr' },
+      {
+        tag: 'note',
+        elements: [{ tag: 'plain_text', content: '处理完成后将自动返回结果' }],
+      },
+    ],
+  };
+}
+
+/**
+ * 构建「决策回复无法识别」提示卡片
+ *
+ * sendChoice 失败（识别不出用户回复内容）时发送，列出当前可选项让用户重发。
+ */
+export function buildChoiceUnrecognizedCard(
+  processName: string,
+  userReply: string,
+  options: string[],
+): InteractiveCard {
+  const optList = options.map((o, i) => `${i + 1}. ${o.replace(/^\s*\d+\.\s*/, '').trim()}`).join('\n');
+  return {
+    header: {
+      title: { tag: 'plain_text', content: '⚠️ 【告警】无法识别您的选择' },
+      template: 'orange',
+    },
+    elements: [
+      {
+        tag: 'markdown',
+        content:
+          `**进程：** ${processName}\n` +
+          `**您的回复：** \`${userReply.length > 30 ? userReply.slice(0, 30) + '…' : userReply}\`\n\n` +
+          `当前可选项：\n${optList}\n\n` +
+          `请回复 **序号**（如 \`1\`）或 **关键词**（\`yes\`/\`no\`/\`是\`/\`否\`）重新选择`,
+      },
     ],
   };
 }
