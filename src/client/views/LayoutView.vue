@@ -5,12 +5,12 @@
       <div class="sidebar-header">
         <BacsLogo :size="28" />
         <div class="sidebar-title-wrap">
-          <span class="sidebar-title">笨迪桥接</span>
+          <span class="sidebar-title">{{ t('header.appName') }}</span>
           <span class="sidebar-version">v{{ appVersion }}</span>
         </div>
       </div>
       <nav class="sidebar-nav">
-        <template v-for="item in menuItems" :key="item.label">
+        <template v-for="item in menuItems" :key="item.labelKey">
           <!-- 单层菜单项 -->
           <button
             v-if="!item.children"
@@ -19,25 +19,25 @@
             @click="router.push(item.path!)"
           >
             <component :is="item.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
-            <span class="sidebar-label">{{ item.label }}</span>
+            <span class="sidebar-label">{{ t(item.labelKey) }}</span>
           </button>
           <!-- 分组（含 children） -->
           <template v-else>
             <button
               class="sidebar-btn sidebar-group-btn"
               :class="{ 'group-active': isGroupActive(item) }"
-              @click="toggleGroup(item.label)"
+              @click="toggleGroup(item.labelKey)"
             >
               <component :is="item.icon" class="sidebar-icon" :size="18" :stroke-width="1.5" />
-              <span class="sidebar-label">{{ item.label }}</span>
+              <span class="sidebar-label">{{ t(item.labelKey) }}</span>
               <component
-                :is="expandedGroups.has(item.label) ? ChevronDown : ChevronRight"
+                :is="expandedGroups.has(item.labelKey) ? ChevronDown : ChevronRight"
                 :size="14"
                 :stroke-width="1.5"
                 class="sidebar-chevron"
               />
             </button>
-            <div v-show="expandedGroups.has(item.label)" class="sidebar-children">
+            <div v-show="expandedGroups.has(item.labelKey)" class="sidebar-children">
               <button
                 v-for="child in item.children"
                 :key="child.path"
@@ -46,7 +46,7 @@
                 @click="router.push(child.path)"
               >
                 <component :is="child.icon" class="sidebar-icon" :size="16" :stroke-width="1.5" />
-                <span class="sidebar-label">{{ child.label }}</span>
+                <span class="sidebar-label">{{ t(child.labelKey) }}</span>
               </button>
             </div>
           </template>
@@ -55,7 +55,7 @@
       <div class="sidebar-footer">
         <button class="sidebar-btn" @click="auth.logout(); router.push('/login')">
           <LogOut class="sidebar-icon" :size="18" :stroke-width="1.5" />
-          <span class="sidebar-label">退出</span>
+          <span class="sidebar-label">{{ t('nav.logout') }}</span>
         </button>
       </div>
     </aside>
@@ -68,17 +68,24 @@
           <div>
             <div class="flex items-center gap-3">
               <BacsLogo :size="32" />
-              <span class="header-title">笨迪桥接</span>
+              <span class="header-title">{{ t('header.appName') }}</span>
             </div>
             <p class="text-sm mt-1" style="color: var(--text-secondary)">
-              Bridge Admin Control System
+              {{ t('header.appSubtitle') }}
               <span class="version-badge">v{{ appVersion }}</span>
             </p>
           </div>
-          <div class="flex items-center gap-2">
-            <Moon :size="16" :stroke-width="1.5" />
-            <div class="theme-toggle" @click="toggleTheme"></div>
-            <Sun :size="16" :stroke-width="1.5" />
+          <div class="flex items-center gap-3">
+            <button class="icon-btn" @click="toggleLocale" :title="t('header.switchLang')">
+              <Languages :size="20" :stroke-width="1.5" />
+            </button>
+            <button class="icon-btn" @click="toggleTheme" :title="isDark ? t('header.switchLight') : t('header.switchDark')">
+              <Sun v-if="isDark" :size="20" :stroke-width="1.5" />
+              <Moon v-else :size="20" :stroke-width="1.5" />
+            </button>
+            <button class="icon-btn" @click="router.push('/help')" :title="t('header.helpTitle')">
+              <Info :size="20" :stroke-width="1.5" />
+            </button>
           </div>
         </header>
 
@@ -88,16 +95,16 @@
           <div class="tab-bar" style="margin-bottom: 8px">
             <button
               v-for="item in menuItems"
-              :key="item.label"
+              :key="item.labelKey"
               class="tab-btn"
               :class="{ active: isTopLevelActive(item) }"
               @click="onTopLevelClick(item)"
             >
               <component :is="item.icon" :size="16" :stroke-width="1.5" />
-              <span>{{ item.label }}</span>
+              <span>{{ t(item.labelKey) }}</span>
             </button>
           </div>
-          <!-- 二级菜单（仅在当前一级菜单有 children 时显示） -->
+          <!-- 二级菜单 -->
           <div v-if="activeTopChildren.length > 0" class="tab-bar" style="background: transparent; border-color: transparent; padding: 0">
             <button
               v-for="child in activeTopChildren"
@@ -107,22 +114,30 @@
               @click="router.push(child.path)"
             >
               <component :is="child.icon" :size="14" :stroke-width="1.5" />
-              <span>{{ child.label }}</span>
+              <span>{{ t(child.labelKey) }}</span>
             </button>
           </div>
         </div>
       </template>
 
-      <!-- 左侧模式：简化顶栏（仅主题切换） -->
+      <!-- 左侧模式：简化顶栏 -->
       <header v-if="menuLayout === 'left'" class="flex items-center justify-end mb-6 px-6 pt-6">
-        <div class="flex items-center gap-2">
-          <Moon :size="16" :stroke-width="1.5" />
-          <div class="theme-toggle" @click="toggleTheme"></div>
-          <Sun :size="16" :stroke-width="1.5" />
+        <div class="flex items-center gap-3">
+          <button class="icon-btn" @click="toggleLocale" :title="t('header.switchLang')">
+            <Languages :size="20" :stroke-width="1.5" />
+          </button>
+          <button class="icon-btn" @click="toggleTheme" :title="isDark ? t('header.switchLight') : t('header.switchDark')">
+            <Sun v-if="isDark" :size="20" :stroke-width="1.5" />
+            <Moon v-else :size="20" :stroke-width="1.5" />
+          </button>
+          <button class="icon-btn" @click="router.push('/help')" :title="t('header.helpTitle')">
+            <Info :size="20" :stroke-width="1.5" />
+          </button>
         </div>
       </header>
 
       <div class="px-6 pb-6">
+        <Breadcrumb />
         <router-view v-slot="{ Component }">
           <keep-alive include="BindingsView">
             <component :is="Component" />
@@ -134,10 +149,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAuth } from '../composables/useAuth';
 import BacsLogo from '../components/BacsLogo.vue';
+import Breadcrumb from '../components/Breadcrumb.vue';
 import {
   Home,
   Link,
@@ -155,63 +172,73 @@ import {
   Activity,
   Shield,
   DollarSign,
+  Languages,
+  Info,
 } from 'lucide-vue-next';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
+const { t, locale } = useI18n();
 const appVersion = __APP_VERSION__;
 
 interface MenuLeaf {
   path: string;
-  label: string;
+  labelKey: string;
   icon: any;
 }
 interface MenuItem {
-  label: string;
+  labelKey: string;
   icon: any;
   path?: string;
   children?: MenuLeaf[];
 }
 
-/**
- * 菜单结构（v1.1.10 起两级化）
- * - 「运维中心」聚合机器管理相关
- * - 「绑定管理」聚合服务商 / 绑定 / Bots 管理
- */
 const menuItems: MenuItem[] = [
-  { path: '/', label: '首页', icon: Home },
+  { path: '/', labelKey: 'nav.home', icon: Home },
   {
-    label: '运维中心',
+    labelKey: 'nav.ops',
     icon: Wrench,
-    children: [{ path: '/machines', label: '机器', icon: Server }],
+    children: [{ path: '/machines', labelKey: 'nav.machine', icon: Server }],
   },
   {
-    label: '绑定管理',
+    labelKey: 'nav.bindGroup',
     icon: Link,
     children: [
-      { path: '/bots', label: 'Bots', icon: Bot },
-      { path: '/providers', label: '服务商', icon: Cloud },
-      { path: '/bindings', label: '绑定', icon: Link },
+      { path: '/bots', labelKey: 'nav.bots', icon: Bot },
+      { path: '/providers', labelKey: 'nav.providers', icon: Cloud },
+      { path: '/bindings', labelKey: 'nav.bindings', icon: Link },
     ],
   },
   {
-    label: '日志',
+    labelKey: 'nav.logs',
     icon: FileText,
     children: [
-      { path: '/logs/realtime', label: '实时日志', icon: Activity },
-      { path: '/logs/audit', label: '审计日志', icon: Shield },
-      { path: '/logs/billing', label: '扣费日志', icon: DollarSign },
+      { path: '/logs/realtime', labelKey: 'nav.realtimeLogs', icon: Activity },
+      { path: '/logs/audit', labelKey: 'nav.auditLogs', icon: Shield },
+      { path: '/logs/billing', labelKey: 'nav.billingLogs', icon: DollarSign },
     ],
   },
-  { path: '/settings', label: '设置', icon: Settings },
+  { path: '/settings', labelKey: 'nav.settings', icon: Settings },
 ];
 
-const expandedGroups = ref<Set<string>>(new Set(['运维中心', '绑定管理', '日志']));
-function toggleGroup(label: string) {
+// R6: 侧边栏只展开当前路由所在分组
+const expandedGroups = ref<Set<string>>(new Set());
+
+function autoExpandForRoute(path: string) {
+  const next = new Set<string>();
+  if (path.startsWith('/machines')) next.add('nav.ops');
+  if (path.startsWith('/bots') || path.startsWith('/providers') || path.startsWith('/bindings')) next.add('nav.bindGroup');
+  if (path.startsWith('/logs')) next.add('nav.logs');
+  expandedGroups.value = next;
+}
+
+watch(() => route.path, (p) => autoExpandForRoute(p), { immediate: true });
+
+function toggleGroup(labelKey: string) {
   const next = new Set(expandedGroups.value);
-  if (next.has(label)) next.delete(label);
-  else next.add(label);
+  if (next.has(labelKey)) next.delete(labelKey);
+  else next.add(labelKey);
   expandedGroups.value = next;
 }
 
@@ -244,12 +271,10 @@ function isGroupActive(item: MenuItem): boolean {
   return item.children?.some((c) => isItemActive(c.path)) ?? false;
 }
 
-/** 顶部一级菜单：当前是否激活（用于叶子节点或包含激活子项的分组） */
 function isTopLevelActive(item: MenuItem): boolean {
   return isGroupActive(item);
 }
 
-/** 顶部一级点击：叶子节点跳转；分组节点跳到第一个子项 */
 function onTopLevelClick(item: MenuItem) {
   if (item.path) {
     router.push(item.path);
@@ -259,20 +284,30 @@ function onTopLevelClick(item: MenuItem) {
   if (first) router.push(first.path);
 }
 
-/** 顶部模式下当前激活分组的二级菜单（叶子节点对应空数组，不显示二级栏） */
 const activeTopChildren = computed<MenuLeaf[]>(() => {
   const active = menuItems.find((item) => isTopLevelActive(item));
   return active?.children ?? [];
 });
 
+// R1: 主题切换
+const isDark = ref(document.documentElement.classList.contains('dark'));
+
 function toggleTheme() {
   document.documentElement.classList.toggle('dark');
-  localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  isDark.value = document.documentElement.classList.contains('dark');
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
 }
 
 const saved = localStorage.getItem('theme');
 if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
   document.documentElement.classList.add('dark');
+  isDark.value = true;
+}
+
+// R2: 语言切换
+function toggleLocale() {
+  locale.value = locale.value === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('locale', locale.value);
 }
 </script>
 
@@ -460,31 +495,22 @@ if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dar
   font-weight: 600;
 }
 
-.theme-toggle {
-  position: relative;
-  width: 48px;
-  height: 26px;
-  background: var(--border);
-  border-radius: 13px;
+/* R1: 图标按钮替代滑块开关 */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: all 0.2s ease;
 }
-.theme-toggle::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-.dark .theme-toggle {
-  background: var(--accent);
-}
-.dark .theme-toggle::after {
-  transform: translateX(22px);
+.icon-btn:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
 }
 </style>

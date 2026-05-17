@@ -1,3 +1,33 @@
+## v1.1.26 - 2026-05-17
+### 变更内容
+**UI 国际化 + 帮助页面 + 面包屑导航**
+- R1: 主题切换改为 Sun/Moon 图标按钮（移除滑块开关）
+- R2: 语言切换按钮（zh/en）+ vue-i18n 框架搭建 + 全量 i18n 迁移（13 个 View + 2 套语言包 ~260 key）
+- R3: 帮助按钮（Info 图标）→ /help 帮助页面（飞书接入指引 + Telegram/QQ/微信占位）
+- R4: 全局面包屑导航组件（Breadcrumb.vue + 路由 meta.breadcrumb）
+- R5: 版本号 1.1.25.4 → 1.1.26
+- R6: 侧边栏仅展开当前路由所在分组，不再全部展开
+
+### 影响范围
+- `src/client/i18n/index.ts` — 新建 i18n 配置
+- `src/client/locales/zh.ts` / `en.ts` — 新建完整语言包
+- `src/client/main.ts` — 注册 i18n 插件
+- `src/client/views/LayoutView.vue` — R1/R2/R3/R6 + i18n
+- `src/client/views/LoginView.vue` — i18n 迁移
+- `src/client/views/SettingsView.vue` — i18n 迁移
+- `src/client/views/BotsView.vue` — i18n 迁移
+- `src/client/views/MachinesView.vue` — i18n 迁移
+- `src/client/views/ProvidersView.vue` — i18n 迁移
+- `src/client/views/BindingsView.vue` — i18n 迁移
+- `src/client/views/HomeView.vue` — i18n 迁移
+- `src/client/views/LogsRealtimeView.vue` — i18n 迁移
+- `src/client/views/LogsAuditView.vue` — i18n 迁移
+- `src/client/views/LogsBillingView.vue` — i18n 迁移
+- `src/client/views/HelpView.vue` — 新建帮助页面
+- `src/client/components/Breadcrumb.vue` — 新建面包屑组件
+- `src/client/router/index.ts` — 新增 /help 路由 + meta.breadcrumb
+- `package.json` — 版本号 + vue-i18n 依赖
+
 ## v1.1.24 - 2026-05-17
 ### 变更内容
 **决策面板 cc v2.1.x 内联格式识别修复（关键 Bug）**

@@ -4,33 +4,33 @@
     <div class="grid grid-cols-4 gap-4">
       <div class="glass-card text-center">
         <div class="text-3xl font-bold">{{ stats.total }}</div>
-        <div class="text-xs mt-1" style="color: var(--text-secondary)">总绑定数</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">{{ t('home.totalBindings') }}</div>
       </div>
       <div class="glass-card text-center">
         <div class="text-3xl font-bold" style="color: var(--success)">{{ stats.online }}</div>
-        <div class="text-xs mt-1" style="color: var(--text-secondary)">在线进程</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">{{ t('common.online') }}</div>
       </div>
       <div class="glass-card text-center">
         <div class="text-3xl font-bold" style="color: var(--danger)">{{ stats.offline }}</div>
-        <div class="text-xs mt-1" style="color: var(--text-secondary)">离线进程</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">{{ t('common.offline') }}</div>
       </div>
       <div class="glass-card text-center">
         <div class="text-3xl font-bold" style="color: var(--accent)">{{ stats.sessions }}</div>
-        <div class="text-xs mt-1" style="color: var(--text-secondary)">活跃会话</div>
+        <div class="text-xs mt-1" style="color: var(--text-secondary)">{{ t('home.activeSessions') }}</div>
       </div>
     </div>
 
     <!-- Timeline -->
     <div class="glass-card mt-6" style="padding: 0; overflow: hidden">
       <div class="tl-header">
-        <span class="tl-title">消息时间线</span>
+        <span class="tl-title">{{ t('home.title') }}</span>
         <span class="tl-badge" :class="{ 'tl-badge-live': sseActive }">
-          {{ sseActive ? '● 实时' : '○ 已断开' }}
+          {{ sseActive ? `● ${t('home.realtime')}` : `○ ${t('home.disconnected')}` }}
         </span>
       </div>
 
       <div class="tl-body" ref="tlBody">
-        <div v-if="entries.length === 0" class="tl-empty">暂无消息记录</div>
+        <div v-if="entries.length === 0" class="tl-empty">{{ t('common.noData') }}</div>
 
         <TransitionGroup name="tl-slide" tag="div" class="tl-list">
           <div v-for="entry in entries" :key="entry.id" class="tl-item">
@@ -45,7 +45,7 @@
                 <span class="tl-tag" :style="{ background: platformColor(entry.platform) + '22', color: platformColor(entry.platform) }">
                   {{ platformLabel(entry.platform) }}
                 </span>
-                <span class="tl-ip">{{ entry.targetIp === 'localhost' ? '本机' : entry.targetIp }}</span>
+                <span class="tl-ip">{{ entry.targetIp === 'localhost' ? t('common.local') : entry.targetIp }}</span>
                 <span class="tl-proc">{{ entry.processName }}</span>
                 <span class="tl-time">{{ formatTime(entry.createdAt) }}</span>
               </div>
@@ -62,9 +62,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useApi } from '../composables/useApi';
 import { useAuthStore } from '../stores/auth';
 import type { Binding } from '@shared/types';
+
+const { t } = useI18n();
 
 const { get } = useApi();
 const authStore = useAuthStore();
@@ -107,7 +110,7 @@ const tlBody = ref<HTMLElement | null>(null);
 let es: EventSource | null = null;
 
 function platformLabel(platform: string): string {
-  return { feishu: '飞书', telegram: 'Telegram', discord: 'Discord' }[platform] ?? platform;
+  return { feishu: t('home.platform.feishu'), telegram: t('home.platform.telegram'), discord: t('home.platform.discord') }[platform] ?? platform;
 }
 
 function platformColor(platform: string): string {

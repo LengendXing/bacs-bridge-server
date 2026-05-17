@@ -3,22 +3,22 @@
     <!-- Top bar -->
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-lg font-semibold" style="color: var(--text)">
-        {{ activeTab === 'list' ? '进程绑定状态' : 'Terminal' }}
+        {{ activeTab === 'list' ? t('bindings.title') : t('bindings.terminal') }}
       </h2>
       <div class="flex items-center gap-2">
         <template v-if="activeTab === 'list'">
-          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
-          <button class="btn-mac btn-mac-sm" @click="openMount">挂载</button>
-          <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">刷新</button>
+          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">{{ t('bindings.add') }}</button>
+          <button class="btn-mac btn-mac-sm" @click="openMount">{{ t('bindings.mount') }}</button>
+          <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">{{ t('common.refresh') }}</button>
         </template>
         <template v-else>
           <span v-if="terminalSession.bindingId.value" class="text-xs" style="color: var(--text-secondary)">
-            目标: {{ currentBindingName }}
+            {{ t('bindings.target') }}: {{ currentBindingName }}
           </span>
           <button v-if="terminalSession.status.value === 'open' || terminalSession.status.value === 'connecting'"
             class="btn-mac btn-mac-danger btn-mac-sm"
             @click="terminalSession.disconnect()"
-          >断开</button>
+          >{{ t('bindings.disconnect') }}</button>
         </template>
       </div>
     </div>
@@ -32,57 +32,57 @@
       <table class="table-mac">
         <thead>
           <tr>
-            <th>进程名称</th>
-            <th>平台 / 机器人</th>
-            <th>WS 状态</th>
-            <th>状态</th>
-            <th>CLI 类型</th>
-            <th>运行机器</th>
-            <th>服务商</th>
-            <th>模型</th>
-            <th>操作</th>
+            <th>{{ t('bindings.thProcess') }}</th>
+            <th>{{ t('bindings.thBot') }}</th>
+            <th>{{ t('bindings.thWs') }}</th>
+            <th>{{ t('bindings.thStatus') }}</th>
+            <th>{{ t('bindings.thCli') }}</th>
+            <th>{{ t('bindings.thMachine') }}</th>
+            <th>{{ t('bindings.thProvider') }}</th>
+            <th>{{ t('bindings.thModel') }}</th>
+            <th>{{ t('bindings.thAction') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="9" class="text-center" style="color: var(--text-secondary)">加载中...</td>
+            <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
           </tr>
           <tr v-else-if="bindings.length === 0">
-            <td colspan="9" class="text-center" style="color: var(--text-secondary)">暂无绑定数据</td>
+            <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.noData') }}</td>
           </tr>
           <tr v-for="b in bindings" :key="b.id">
             <td style="font-weight: 500">{{ b.processName }}</td>
             <td>
               <div style="display: flex; align-items: center; gap: 6px">
                 <span style="padding: 2px 6px; border-radius: 4px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary)">
-                  {{ b.botPlatform === 'feishu' ? '飞书' : b.botPlatform === 'telegram' ? 'TG' : b.botPlatform === 'qq' ? 'QQ' : b.botPlatform === 'wechat' ? '微信' : '飞书' }}
+                  {{ b.botPlatform === 'feishu' ? t('bindings.platform.feishu') : b.botPlatform === 'telegram' ? t('bindings.platform.telegram') : b.botPlatform === 'qq' ? t('bindings.platform.qq') : b.botPlatform === 'wechat' ? t('bindings.platform.wechat') : t('bindings.platform.feishu') }}
                 </span>
-                <span :title="b.feishuAppId || ''">{{ b.botName || '— 未关联 —' }}</span>
+                <span :title="b.feishuAppId || ''">{{ b.botName || t('bindings.unlinked') }}</span>
               </div>
             </td>
             <td>
               <span :class="b.wsConnected ? 'badge badge-online' : 'badge badge-offline'">
-                {{ b.wsConnected ? '已连接' : '未连接' }}
+                {{ b.wsConnected ? t('bindings.wsConnected') : t('bindings.wsDisconnected') }}
               </span>
             </td>
             <td>
               <span :class="b.status === 'online' ? 'badge badge-online' : 'badge badge-offline'">
-                {{ b.status === 'online' ? '在线' : '离线' }}
+                {{ b.status === 'online' ? t('common.online') : t('common.offline') }}
               </span>
             </td>
             <td>{{ b.cliKind }}</td>
-            <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : '本机' }}</td>
+            <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : t('common.local') }}</td>
             <td style="color: var(--text-secondary)">{{ b.provider?.name || '-' }}</td>
             <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
             <td>
               <div class="flex items-center gap-1">
-                <button class="btn-mac btn-mac-sm" @click="copyAttach(b)" title="复制 tmux attach 命令">Attach</button>
+                <button class="btn-mac btn-mac-sm" @click="copyAttach(b)" :title="t('bindings.attachTitle')">{{ t('bindings.attach') }}</button>
                 <button class="btn-mac btn-mac-sm" :disabled="b.status !== 'online'"
-                  @click="openTerminal(b)" title="在浏览器内打开 tmux 终端">Terminal</button>
-                <button class="btn-mac btn-mac-sm" @click="openEdit(b)">编辑</button>
+                  @click="openTerminal(b)" :title="t('bindings.openTerminalTitle')">{{ t('bindings.openTerminal') }}</button>
+                <button class="btn-mac btn-mac-sm" @click="openEdit(b)">{{ t('bindings.edit') }}</button>
                 <button class="btn-mac btn-mac-sm" :disabled="rebindingMap[b.id] || b.status !== 'online'"
-                  @click="rebind(b)" title="保留配置重启 CLI 进程">{{ rebindingMap[b.id] ? '重启中...' : '刷新' }}</button>
-                <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">解绑</button>
+                  @click="rebind(b)" :title="t('bindings.rebindTitle')">{{ rebindingMap[b.id] ? t('bindings.rebinding') : t('bindings.rebind') }}</button>
+                <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">{{ t('bindings.unbind') }}</button>
               </div>
             </td>
           </tr>
@@ -110,7 +110,7 @@
         @click="setTab('list')"
       >
         <span class="tab-icon">📋</span>
-        <span>绑定列表</span>
+        <span>{{ t('bindings.bindList') }}</span>
       </button>
       <button
         class="tab-btn"
@@ -129,26 +129,26 @@
     <!-- Attach 复制弹窗 -->
     <div v-if="showAttachModal" class="modal-overlay" @click.self="showAttachModal = false">
       <div class="modal-card" style="width: 520px">
-        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">复制 Attach 命令</h3>
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('bindings.copyAttachTitle') }}</h3>
         <div class="flex flex-col gap-3 mb-4">
           <label class="attach-option" :class="{ selected: attachChoice === 'simple' }" @click="attachChoice = 'simple'">
             <input type="radio" name="attachChoice" value="simple" :checked="attachChoice === 'simple'" />
             <div>
-              <div class="text-sm font-medium" style="color: var(--text)">简洁版（本机 / 已登录远程）</div>
+              <div class="text-sm font-medium" style="color: var(--text)">{{ t('bindings.attachSimple') }}</div>
               <code class="attach-cmd">{{ attachSimpleCmd }}</code>
             </div>
           </label>
           <label v-if="attachFullCmd" class="attach-option" :class="{ selected: attachChoice === 'full' }" @click="attachChoice = 'full'">
             <input type="radio" name="attachChoice" value="full" :checked="attachChoice === 'full'" />
             <div>
-              <div class="text-sm font-medium" style="color: var(--text)">完整版（含 SSH）</div>
+              <div class="text-sm font-medium" style="color: var(--text)">{{ t('bindings.attachFull') }}</div>
               <code class="attach-cmd">{{ attachFullCmd }}</code>
             </div>
           </label>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="copyAttachFromModal">复制</button>
-          <button class="btn-mac btn-mac-sm" @click="showAttachModal = false">取消</button>
+          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="copyAttachFromModal">{{ t('common.copy') }}</button>
+          <button class="btn-mac btn-mac-sm" @click="showAttachModal = false">{{ t('common.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -159,96 +159,96 @@
         <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ modalTitle }}</h3>
         <form @submit.prevent="handleSubmit">
           <template v-if="modalMode !== 'edit'">
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">进程名称</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thProcess') }}</label>
             <input v-model="form.processName" type="text" class="input-mac mb-3"
-              :placeholder="modalMode === 'mount' ? '选择已有 tmux 会话' : '如：work'"
+              :placeholder="modalMode === 'mount' ? t('bindings.mountPlaceholder') : t('bindings.processPlaceholder')"
               :readonly="modalMode === 'mount'"
               required
               @focus="modalMode === 'mount' && loadUnboundSessions()"
             />
             <div v-if="modalMode === 'mount' && unboundSessions.length > 0" class="mb-3">
               <select v-model="form.processName" class="input-mac">
-                <option value="" disabled>选择 tmux 会话</option>
+                <option value="" disabled>{{ t('bindings.selectTmuxSession') }}</option>
                 <option v-for="s in unboundSessions" :key="s" :value="s">{{ s }}</option>
               </select>
             </div>
           </template>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">CLI 类型</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thCli') }}</label>
           <select v-model="form.cliKind" class="input-mac mb-3" :disabled="modalMode === 'edit'" @change="onCliOrProviderChange">
             <option value="cc">Claude Code</option>
             <option value="codex">Codex</option>
           </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">运行机器</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thMachine') }}</label>
           <select v-model="form.machineId" class="input-mac mb-3" @change="onMachineChange">
-            <option :value="null">本机（默认）</option>
+            <option :value="null">{{ t('bindings.localDefault') }}</option>
             <option v-for="m in machineList" :key="m.id" :value="m.id">{{ m.name }} ({{ m.host }}:{{ m.port }})</option>
           </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">服务商</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thProvider') }}</label>
           <select v-model="form.providerId" class="input-mac mb-3" @change="onCliOrProviderChange">
-            <option :value="null">本机环境变量</option>
+            <option :value="null">{{ t('bindings.localEnv') }}</option>
             <option v-for="p in providerList" :key="p.id" :value="p.id">{{ p.name }}</option>
           </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">模型</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thModel') }}</label>
           <!-- 探查失败提示 -->
           <p v-if="probeFailed" class="text-xs mb-1" style="color: var(--warning)">
-            服务商不支持模型探查，已展示默认模型；如需其他模型请直接手输 ID
+            {{ t('bindings.probeFailedHint') }}
           </p>
           <div class="flex items-center gap-2 mb-1">
             <select v-model="form.modelId" class="input-mac" style="flex:1" @change="onModelChange">
-              <option :value="null">{{ modelOptions.length ? '默认（不指定模型）' : '暂无可用模型' }}</option>
+              <option :value="null">{{ modelOptions.length ? t('bindings.defaultModel') : t('bindings.noModel') }}</option>
               <option v-for="m in modelOptions" :key="m.id ?? m.modelId" :value="m.id ?? null" :data-model-id="m.modelId">
                 {{ m.displayName || m.modelId }} <span v-if="m.displayName && m.displayName !== m.modelId">({{ m.modelId }})</span>
               </option>
             </select>
-            <button type="button" class="btn-mac btn-mac-sm" @click="useCustomModel = !useCustomModel" :title="useCustomModel ? '切回列表选择' : '手输自定义模型 ID'">
-              {{ useCustomModel ? '列表' : '手输' }}
+            <button type="button" class="btn-mac btn-mac-sm" @click="useCustomModel = !useCustomModel" :title="useCustomModel ? t('bindings.listModelTitle') : t('bindings.customModelTitle')">
+              {{ useCustomModel ? t('bindings.listModel') : t('bindings.customModel') }}
             </button>
           </div>
           <input v-if="useCustomModel" v-model="form.modelOverride" type="text" class="input-mac mb-3"
-            placeholder="如：claude-opus-4-7 或 gpt-5.5（支持任意模型 ID）" />
+            :placeholder="t('bindings.customModelPlaceholder')" />
 
           <!-- effort 选择（仅当选了模型且该模型支持 effort 时显示） -->
           <template v-if="showEffortSelect">
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">Effort（推理力度）</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.effortLabel') }}</label>
             <select v-model="form.effort" class="input-mac mb-3">
-              <option :value="null">默认（不指定）</option>
+              <option :value="null">{{ t('bindings.effortDefault') }}</option>
               <option v-for="e in effortOptions" :key="e" :value="e">{{ e }}</option>
             </select>
           </template>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">平台</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.platformLabel') }}</label>
           <select v-model="form.platform" @change="onPlatformChange" class="input-mac mb-3">
-            <option value="feishu">飞书</option>
-            <option value="telegram" disabled>Telegram（暂未支持）</option>
-            <option value="qq" disabled>QQ（暂未支持）</option>
-            <option value="wechat" disabled>微信（暂未支持）</option>
+            <option value="feishu">{{ t('bindings.platform.feishu') }}</option>
+            <option value="telegram" disabled>{{ t('bindings.telegramNotSupported') }}</option>
+            <option value="qq" disabled>{{ t('bindings.qqNotSupported') }}</option>
+            <option value="wechat" disabled>{{ t('bindings.wechatNotSupported') }}</option>
           </select>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">机器人</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.botLabel') }}</label>
           <template v-if="botList.length > 0">
             <select v-model="form.botId" class="input-mac mb-3" required>
-              <option :value="null" disabled>请选择机器人</option>
+              <option :value="null" disabled>{{ t('bindings.selectBot') }}</option>
               <option v-for="b in botList" :key="b.id" :value="b.id">
-                {{ b.name }}（{{ b.appId.slice(0, 10) }}{{ b.appId.length > 10 ? '...' : '' }}）
+                {{ b.name }} ({{ b.appId.slice(0, 10) }}{{ b.appId.length > 10 ? '...' : '' }})
               </option>
             </select>
           </template>
           <div v-else class="mb-3 p-3 rounded text-xs" style="background: var(--bg-secondary); color: var(--text-secondary)">
-            该平台下暂无机器人，请先到
-            <router-link to="/bots" class="underline" style="color: var(--accent-color)">Bots 页面</router-link>
-            创建后再来绑定
+            {{ t('bindings.noBotsHint') }}
+            <router-link to="/bots" class="underline" style="color: var(--accent-color)">Bots</router-link>
+            {{ t('bindings.noBotsAfterLink') }}
           </div>
 
           <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">{{ formError }}</p>
           <div class="flex items-center gap-2">
             <button type="submit" class="btn-mac btn-mac-primary btn-mac-sm" :disabled="formLoading">
-              {{ formLoading ? '提交中...' : submitLabel }}
+              {{ formLoading ? t('common.submitting') : submitLabel }}
             </button>
-            <button type="button" class="btn-mac btn-mac-sm" @click="showModal = false">取消</button>
+            <button type="button" class="btn-mac btn-mac-sm" @click="showModal = false">{{ t('common.cancel') }}</button>
           </div>
         </form>
       </div>
@@ -258,6 +258,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, onDeactivated, onBeforeUnmount, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
 import TerminalPanel from '../components/TerminalPanel.vue';
@@ -269,6 +270,7 @@ import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '@shared/d
 import type { CliKind } from '@shared/defaultModels';
 
 const { get, post, del } = useApi();
+const { t } = useI18n();
 
 const bindings = ref<Binding[]>([]);
 const loading = ref(false);
@@ -400,13 +402,13 @@ const formLoading = ref(false);
 const formError = ref('');
 
 const modalTitle = computed(() =>
-  modalMode.value === 'create' ? '新增' :
-  modalMode.value === 'mount' ? '挂载进程' : '编辑绑定'
+  modalMode.value === 'create' ? t('bindings.createTitle') :
+  modalMode.value === 'mount' ? t('bindings.mountTitle') : t('bindings.editTitle')
 );
 
 const submitLabel = computed(() =>
-  modalMode.value === 'create' ? '创建并启动' :
-  modalMode.value === 'mount' ? '挂载' : '保存'
+  modalMode.value === 'create' ? t('bindings.createSubmit') :
+  modalMode.value === 'mount' ? t('bindings.mountSubmit') : t('bindings.editSubmit')
 );
 
 async function refresh() {
@@ -563,7 +565,7 @@ async function handleSubmit() {
   formError.value = '';
   // v1.1.14：先校验必须选了 Bot
   if (!form.value.botId) {
-    formError.value = '请选择机器人（先选平台再选 Bot）';
+    formError.value = t('bindings.selectBot');
     return;
   }
   formLoading.value = true;
@@ -606,10 +608,10 @@ async function handleSubmit() {
       showModal.value = false;
       await refresh();
     } else {
-      formError.value = res?.message || '操作失败';
+      formError.value = res?.message || t('common.operationFailed');
     }
   } catch {
-    formError.value = '网络错误，请重试';
+    formError.value = t('common.networkError');
   } finally {
     formLoading.value = false;
   }
@@ -624,17 +626,17 @@ async function rebind(b: Binding) {
     if (res && res.code === 0) {
       await refresh();
     } else {
-      alert(res?.message || '刷新重连失败');
+      alert(res?.message || t('common.operationFailed'));
     }
   } catch {
-    alert('网络错误，请重试');
+    alert(t('common.networkError'));
   } finally {
     delete rebindingMap.value[b.id];
   }
 }
 
 async function confirmUnbind(b: Binding) {
-  const kill = confirm(`确定解绑「${b.processName}」？\n\n勾选确定 = 同时终止 tmux 进程\n取消 = 仅解除绑定，保留进程`);
+  const kill = confirm(t('bindings.unbindConfirm', { name: b.processName }));
   try {
     await post('/api/unbind', { id: b.id, killProcess: kill });
     await refresh();
@@ -672,7 +674,7 @@ function copyAttachFromModal() {
     navigator.clipboard.writeText(cmd).then(() => {
       showAttachModal.value = false;
     }).catch(() => {
-      prompt('复制以下命令并在终端执行:', cmd);
+      prompt(t('bindings.copyCommandPrompt'), cmd);
       showAttachModal.value = false;
     });
   } else {

@@ -5,13 +5,13 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-semibold" style="color: var(--text)">实时日志</h2>
-      <span v-if="connected" class="badge badge-online" style="font-size: 11px">实时</span>
+      <h2 class="text-lg font-semibold" style="color: var(--text)">{{ t('logs.realtime.title') }}</h2>
+      <span v-if="connected" class="badge badge-online" style="font-size: 11px">{{ t('logs.realtime.connected') }}</span>
     </div>
 
     <div class="glass-card" ref="logContainer" style="max-height: 70vh; overflow-y: auto; padding: 16px">
-      <div v-if="systemLogs.length === 0 && !connected" class="text-center py-8" style="color: var(--text-secondary)">连接中...</div>
-      <div v-else-if="systemLogs.length === 0" class="text-center py-8" style="color: var(--text-secondary)">等待日志...</div>
+      <div v-if="systemLogs.length === 0 && !connected" class="text-center py-8" style="color: var(--text-secondary)">{{ t('common.loading') }}</div>
+      <div v-else-if="systemLogs.length === 0" class="text-center py-8" style="color: var(--text-secondary)">{{ t('common.noData') }}</div>
       <div
         v-for="(log, idx) in systemLogs"
         :key="idx"
@@ -27,7 +27,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 
+const { t } = useI18n();
 const logContainer = ref<HTMLElement | null>(null);
 const systemLogs = ref<any[]>([]);
 const connected = ref(false);

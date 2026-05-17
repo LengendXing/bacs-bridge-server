@@ -4,13 +4,13 @@
 -->
 <template>
   <div>
-    <h2 class="text-lg font-semibold mb-6" style="color: var(--text)">设置</h2>
+    <h2 class="text-lg font-semibold mb-6" style="color: var(--text)">{{ t('settings.title') }}</h2>
 
     <!-- 菜单栏布局 -->
     <div class="glass-card mb-6">
-      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">菜单栏布局</h3>
+      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('settings.menuLayout') }}</h3>
       <p class="text-sm mb-4" style="color: var(--text-secondary)">
-        选择菜单栏的位置：顶部（标签页风格）或左侧（传统后台风格）
+        {{ t('settings.menuLayoutHint') }}
       </p>
       <div class="flex items-center gap-3">
         <button
@@ -18,14 +18,14 @@
           :class="{ 'btn-mac-primary': menuLayout === 'top' }"
           @click="setLayout('top')"
         >
-          顶部标签
+          {{ t('settings.layoutTop') }}
         </button>
         <button
           class="btn-mac btn-mac-sm"
           :class="{ 'btn-mac-primary': menuLayout === 'left' }"
           @click="setLayout('left')"
         >
-          左侧菜单
+          {{ t('settings.layoutLeft') }}
         </button>
       </div>
     </div>
@@ -33,13 +33,13 @@
     <!-- 快捷登录（客户端扫码） -->
     <div class="glass-card mb-6">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-base font-semibold" style="color: var(--text)">快捷登录</h3>
+        <h3 class="text-base font-semibold" style="color: var(--text)">{{ t('settings.sectionQr') }}</h3>
         <span v-if="qrCountdown > 0" class="text-xs" style="color: var(--text-secondary)">
-          {{ qrCountdown }} 秒后自动刷新
+          {{ t('settings.qrAutoRefresh', { n: qrCountdown }) }}
         </span>
       </div>
       <p class="text-sm mb-4" style="color: var(--text-secondary)">
-        Android 客户端扫描二维码即可登录，无需手动输入服务器地址或密码。二维码 60 秒有效，过期后自动刷新。
+        {{ t('settings.qrHint') }}
       </p>
       <div class="flex items-start gap-4">
         <div
@@ -49,7 +49,7 @@
         </div>
         <div class="flex-1">
           <p v-if="qrServer" class="text-xs mb-2" style="color: var(--text-secondary)">
-            服务器：<code style="color: var(--text)">{{ qrServer }}</code>
+            {{ t('settings.serverLabel') }}: <code style="color: var(--text)">{{ qrServer }}</code>
           </p>
           <p v-if="qrError" class="text-sm mb-2" style="color: var(--danger)">{{ qrError }}</p>
           <button
@@ -57,7 +57,7 @@
             :disabled="qrLoading"
             @click="refreshQrLogin"
           >
-            {{ qrLoading ? '生成中...' : '手动刷新' }}
+            {{ qrLoading ? t('settings.generating') : t('settings.manualRefresh') }}
           </button>
         </div>
       </div>
@@ -65,20 +65,20 @@
 
     <!-- 对外服务地址 -->
     <div class="glass-card mb-6">
-      <h3 class="text-base font-semibold mb-2" style="color: var(--text)">对外服务地址</h3>
+      <h3 class="text-base font-semibold mb-2" style="color: var(--text)">{{ t('settings.externalUrl') }}</h3>
       <p class="text-sm mb-3" style="color: var(--text-secondary)">
-        用于快捷登录二维码中的 server 字段。留空则按当前请求自动推断（适合内网直连场景）。反向代理或域名场景必须显式填写。
+        {{ t('settings.externalUrlHint') }}
       </p>
       <form @submit.prevent="handleSaveExternalUrl" class="flex items-center gap-2 max-w-xl">
         <input
           v-model="externalUrlInput"
           type="text"
           class="input-mac"
-          placeholder="http://192.168.1.100:3456"
+          :placeholder="t('settings.externalUrlPlaceholder')"
           style="flex: 1"
         />
         <button type="submit" class="btn-mac btn-mac-sm" :disabled="externalUrlSaving">
-          {{ externalUrlSaving ? '保存中...' : '保存' }}
+          {{ externalUrlSaving ? t('settings.saving') : t('settings.save') }}
         </button>
       </form>
       <p v-if="externalUrlError" class="text-sm mt-2" style="color: var(--danger)">{{ externalUrlError }}</p>
@@ -87,34 +87,34 @@
 
     <!-- 账户设置 -->
     <div class="glass-card mb-6">
-      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">账户设置</h3>
+      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('settings.sectionSecurity') }}</h3>
       <form @submit.prevent="handleChangePassword" class="max-w-sm">
-        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">旧密码</label>
+        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('settings.oldPassword') }}</label>
         <input
           v-model="oldPassword"
           type="password"
           class="input-mac mb-3"
-          placeholder="输入旧密码"
+          :placeholder="t('settings.oldPassword')"
           autocomplete="current-password"
           required
         />
 
-        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">新密码</label>
+        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('settings.newPassword') }}</label>
         <input
           v-model="newPassword"
           type="password"
           class="input-mac mb-3"
-          placeholder="输入新密码"
+          :placeholder="t('settings.newPassword')"
           autocomplete="new-password"
           required
         />
 
-        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">确认新密码</label>
+        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('settings.confirmPassword') }}</label>
         <input
           v-model="confirmPassword"
           type="password"
           class="input-mac mb-4"
-          placeholder="再次输入新密码"
+          :placeholder="t('settings.confirmPassword')"
           autocomplete="new-password"
           required
         />
@@ -127,50 +127,50 @@
           class="btn-mac btn-mac-primary btn-mac-sm"
           :disabled="pwdLoading"
         >
-          {{ pwdLoading ? '提交中...' : '修改密码' }}
+          {{ pwdLoading ? t('common.submitting') : t('settings.changePassword') }}
         </button>
       </form>
     </div>
 
     <!-- 两步验证 -->
     <div class="glass-card">
-      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">两步验证</h3>
+      <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('settings.totpEnable') }}</h3>
       <p class="text-sm mb-4" style="color: var(--text-secondary)">
-        启用 TOTP 两步验证后，登录时需要额外输入认证器中的验证码。
+        {{ t('settings.totpHint') }}
       </p>
 
       <!-- 已启用状态 -->
       <template v-if="totpEnabled">
         <div class="flex items-center gap-2 mb-4">
-          <span class="badge badge-online">已启用</span>
+          <span class="badge badge-online">{{ t('settings.enabledBadge') }}</span>
         </div>
         <form @submit.prevent="handleDisableTotp" class="max-w-sm">
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">输入当前密码确认禁用</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('settings.disableConfirmLabel') }}</label>
           <input
             v-model="disablePassword"
             type="password"
             class="input-mac mb-3"
-            placeholder="输入当前密码"
+            :placeholder="t('settings.disablePasswordPlaceholder')"
             autocomplete="current-password"
             required
           />
           <p v-if="disableError" class="text-sm mb-2" style="color: var(--danger)">{{ disableError }}</p>
           <button type="submit" class="btn-mac btn-mac-danger btn-mac-sm" :disabled="disableLoading">
-            {{ disableLoading ? '禁用中...' : '禁用两步验证' }}
+            {{ disableLoading ? t('settings.totpDisabling') : t('settings.totpDisable') }}
           </button>
         </form>
       </template>
 
       <!-- 未启用状态 -->
       <template v-else>
-        <span class="badge badge-offline mb-3" style="display: inline-block">未启用</span>
+        <span class="badge badge-offline mb-3" style="display: inline-block">{{ t('settings.disabledBadge') }}</span>
         <div v-if="!totpQrUrl">
           <button
             class="btn-mac btn-mac-primary btn-mac-sm"
             :disabled="totpLoading"
             @click="handleEnableTotp"
           >
-            {{ totpLoading ? '生成中...' : '启用两步验证' }}
+            {{ totpLoading ? t('settings.totpGenerating') : t('settings.totpEnableBtn') }}
           </button>
           <p v-if="totpError" class="text-sm mt-2" style="color: var(--danger)">{{ totpError }}</p>
         </div>
@@ -178,34 +178,34 @@
           <!-- QR 码展示 -->
           <div class="mb-3">
             <p class="text-sm mb-2" style="color: var(--text-secondary)">
-              使用认证器 App 扫描下方二维码：
+              {{ t('settings.totpScanQr') }}
             </p>
             <canvas ref="qrCanvas" style="width: 180px; height: 180px; border-radius: 8px"></canvas>
             <p class="text-xs mt-2" style="color: var(--text-secondary)">
-              密钥：{{ totpSecret }}
+              {{ t('settings.secretLabel') }}: {{ totpSecret }}
             </p>
           </div>
           <!-- 验证码确认 -->
           <form @submit.prevent="handleConfirmTotp" class="max-w-xs">
             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-              输入 6 位验证码完成绑定
+              {{ t('settings.totpCodeLabel') }}
             </label>
             <input
               v-model="totpCode"
               type="text"
               class="input-mac mb-2 text-center tracking-widest"
-              placeholder="000000"
+              :placeholder="t('settings.totpCodePlaceholder')"
               maxlength="6"
               required
               style="letter-spacing: 0.5em"
             />
             <label class="flex items-center gap-2 mb-3 cursor-pointer text-sm" style="color: var(--text)">
               <input v-model="trustDeviceOnEnable" type="checkbox" />
-              <span>同时信任当前设备（30天免2FA）</span>
+              <span>{{ t('settings.trustDevice30days') }}</span>
             </label>
             <p v-if="totpError" class="text-sm mb-2" style="color: var(--danger)">{{ totpError }}</p>
             <button type="submit" class="btn-mac btn-mac-primary btn-mac-sm" :disabled="totpLoading">
-              {{ totpLoading ? '验证中...' : '确认启用' }}
+              {{ totpLoading ? t('settings.totpVerifying') : t('settings.totpConfirm') }}
             </button>
           </form>
         </div>
@@ -216,11 +216,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useApi } from '../composables/useApi';
 import { useAuth } from '../composables/useAuth';
 import type { TotpSetupResponse } from '@shared/types';
 import QRCode from 'qrcode';
 
+const { t } = useI18n();
 const api = useApi();
 const auth = useAuth();
 
@@ -244,7 +246,7 @@ async function handleChangePassword() {
   pwdError.value = '';
   pwdSuccess.value = '';
   if (newPassword.value !== confirmPassword.value) {
-    pwdError.value = '两次输入的新密码不一致';
+    pwdError.value = t('settings.passwordMismatch');
     return;
   }
   pwdLoading.value = true;
@@ -254,15 +256,15 @@ async function handleChangePassword() {
       newPassword: newPassword.value,
     });
     if (res.code === 0) {
-      pwdSuccess.value = '密码修改成功';
+      pwdSuccess.value = t('settings.passwordSuccess');
       oldPassword.value = '';
       newPassword.value = '';
       confirmPassword.value = '';
     } else {
-      pwdError.value = res.message || '修改失败';
+      pwdError.value = res.message || t('common.operationFailed');
     }
   } catch {
-    pwdError.value = '网络错误，请重试';
+    pwdError.value = t('common.networkError');
   } finally {
     pwdLoading.value = false;
   }
@@ -308,10 +310,10 @@ async function handleEnableTotp() {
       await nextTick();
       renderQr();
     } else {
-      totpError.value = res.message || '生成 QR 码失败';
+      totpError.value = res.message || t('settings.qrError');
     }
   } catch {
-    totpError.value = '网络错误，请重试';
+    totpError.value = t('common.networkError');
   } finally {
     totpLoading.value = false;
   }
@@ -325,7 +327,7 @@ function renderQr() {
       margin: 2,
       color: { dark: '#1d1d1f', light: '#ffffff' },
     }, (err) => {
-      if (err) totpError.value = 'QR 码渲染失败';
+      if (err) totpError.value = t('settings.totpQrFailed');
     });
   }
 }
@@ -345,10 +347,10 @@ async function handleConfirmTotp() {
       totpSecret.value = '';
       totpCode.value = '';
     } else {
-      totpError.value = res.message || '验证码错误';
+      totpError.value = res.message || t('settings.totpCodeError');
     }
   } catch {
-    totpError.value = '网络错误，请重试';
+    totpError.value = t('common.networkError');
   } finally {
     totpLoading.value = false;
   }
@@ -366,10 +368,10 @@ async function handleDisableTotp() {
       totpEnabled.value = false;
       disablePassword.value = '';
     } else {
-      disableError.value = res.message || '禁用失败';
+      disableError.value = res.message || t('common.operationFailed');
     }
   } catch {
-    disableError.value = '网络错误，请重试';
+    disableError.value = t('common.networkError');
   } finally {
     disableLoading.value = false;
   }
@@ -390,7 +392,7 @@ async function refreshQrLogin() {
   try {
     const res = await api.post<{ token: string; server: string; expiresIn: number }>('/api/auth/qr-token', {});
     if (res.code !== 0 || !res.data) {
-      qrError.value = res.message || '生成二维码失败';
+      qrError.value = res.message || t('settings.qrError');
       return;
     }
     const { token, server, expiresIn } = res.data;
@@ -413,7 +415,7 @@ async function refreshQrLogin() {
       }
     }, 1000);
   } catch {
-    qrError.value = '网络错误，请重试';
+    qrError.value = t('common.networkError');
   } finally {
     qrLoading.value = false;
   }
@@ -443,14 +445,14 @@ async function handleSaveExternalUrl() {
       externalUrl: externalUrlInput.value,
     });
     if (res.code === 0) {
-      externalUrlSuccess.value = '已保存，下次刷新二维码生效';
+      externalUrlSuccess.value = t('settings.saved');
       // 立即刷新二维码以应用新地址
       refreshQrLogin();
     } else {
-      externalUrlError.value = res.message || '保存失败';
+      externalUrlError.value = res.message || t('common.operationFailed');
     }
   } catch {
-    externalUrlError.value = '网络错误，请重试';
+    externalUrlError.value = t('common.networkError');
   } finally {
     externalUrlSaving.value = false;
   }

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-semibold" style="color: var(--text)">Bots</h2>
+      <h2 class="text-lg font-semibold" style="color: var(--text)">{{ t('bots.title') }}</h2>
     </div>
 
     <!-- 工具栏：左侧 Tabbar，右侧 搜索/新增 -->
@@ -32,11 +32,11 @@
         <input
           v-model="searchInput"
           class="input-mac input-mac-sm bots-search-input"
-          placeholder="搜索 Name / AppID / 备注"
+          :placeholder="t('bots.searchPlaceholder')"
           @keyup.enter="applySearch"
         />
-        <button class="btn-mac btn-mac-sm" @click="applySearch">搜索</button>
-        <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
+        <button class="btn-mac btn-mac-sm" @click="applySearch">{{ t('common.search') }}</button>
+        <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">{{ t('bots.add') }}</button>
       </div>
     </div>
 
@@ -49,23 +49,23 @@
       <table class="table-mac">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>AppID</th>
-            <th>密钥（脱敏）</th>
-            <th>备注</th>
-            <th style="width: 100px">关联绑定</th>
-            <th style="width: 160px">操作</th>
+            <th>{{ t('bots.thName') }}</th>
+            <th>{{ t('bots.thAppId') }}</th>
+            <th>{{ t('bots.secretLabel') }}</th>
+            <th>{{ t('bots.thRemark') }}</th>
+            <th style="width: 100px">{{ t('bots.thBindingCount') }}</th>
+            <th style="width: 160px">{{ t('bots.thAction') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
             <td colspan="6" class="text-center" style="color: var(--text-secondary); padding: 32px">
-              加载中…
+              {{ t('common.loading') }}
             </td>
           </tr>
           <tr v-else-if="filteredBots.length === 0">
             <td colspan="6" class="text-center" style="color: var(--text-secondary); padding: 32px">
-              {{ bots.length === 0 ? '暂无机器人，可点击「新增」创建' : '未匹配到结果' }}
+              {{ bots.length === 0 ? t('bots.empty') : t('bots.noMatch') }}
             </td>
           </tr>
           <tr v-for="b in filteredBots" :key="b.id">
@@ -82,8 +82,8 @@
             </td>
             <td>
               <div class="flex items-center gap-2">
-                <button class="btn-mac btn-mac-sm" @click="openEdit(b)">编辑</button>
-                <button class="btn-mac btn-mac-sm btn-danger" @click="openDelete(b)">删除</button>
+                <button class="btn-mac btn-mac-sm" @click="openEdit(b)">{{ t('common.edit') }}</button>
+                <button class="btn-mac btn-mac-sm btn-danger" @click="openDelete(b)">{{ t('common.delete') }}</button>
               </div>
             </td>
           </tr>
@@ -103,18 +103,18 @@
         :stroke-width="1.2"
         style="margin: 0 auto 12px"
       />
-      <div>{{ currentPlatform?.label }} 暂未支持</div>
+      <div>{{ currentPlatform?.label }} {{ t('bots.notSupported') }}</div>
     </div>
 
     <!-- 编辑/新增 弹窗 -->
     <div v-if="showFormModal" class="modal-overlay" @click.self="showFormModal = false">
       <div class="modal-card" style="width: 460px">
         <h3 class="text-base font-semibold mb-4" style="color: var(--text)">
-          {{ isEditing ? '编辑机器人' : '新增机器人' }}
+          {{ isEditing ? t('bots.editTitle') : t('bots.createTitle') }}
         </h3>
         <form @submit.prevent="submitForm">
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            平台
+            {{ t('bots.platformLabel') }}
           </label>
           <input
             class="input-mac mb-3"
@@ -123,20 +123,20 @@
           />
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            Name（机器人名称）
+            {{ t('bots.nameLabel') }}
           </label>
           <input
             v-model="form.name"
             type="text"
             class="input-mac mb-3"
-            placeholder="如：feishu-prod-bot"
+            :placeholder="t('bots.nameLabelFull')"
             required
           />
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            AppID
+            {{ t('bots.appIdLabel') }}
             <span v-if="isEditing" style="color: var(--text-secondary); font-weight: normal">
-              （不可修改，如需更换请删除后新建）
+              {{ t('bots.appIdEditHint') }}
             </span>
           </label>
           <input
@@ -148,7 +148,7 @@
           />
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            密钥（{{ isEditing ? '留空表示不修改' : 'App Secret' }}）
+            {{ t('bots.secretLabel') }} ({{ isEditing ? t('bots.secretEditHint') : t('bots.secretCreateHint') }})
           </label>
           <input
             v-model="form.secret"
@@ -158,13 +158,13 @@
           />
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">
-            备注
+            {{ t('bots.remarkLabel') }}
           </label>
           <input
             v-model="form.remark"
             type="text"
             class="input-mac mb-3"
-            placeholder="选填"
+            :placeholder="t('bots.remarkPlaceholder')"
           />
 
           <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">
@@ -177,10 +177,10 @@
               class="btn-mac btn-mac-primary btn-mac-sm"
               :disabled="formLoading"
             >
-              {{ formLoading ? '提交中…' : isEditing ? '保存' : '创建' }}
+              {{ formLoading ? t('common.submitting') : isEditing ? t('common.save') : t('common.creating') }}
             </button>
             <button type="button" class="btn-mac btn-mac-sm" @click="showFormModal = false">
-              取消
+              {{ t('common.cancel') }}
             </button>
           </div>
         </form>
@@ -190,22 +190,22 @@
     <!-- 删除确认弹窗 -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
       <div class="modal-card" style="width: 460px">
-        <h3 class="text-base font-semibold mb-3" style="color: var(--text)">确认删除？</h3>
+        <h3 class="text-base font-semibold mb-3" style="color: var(--text)">{{ t('bots.deleteBotTitle') }}</h3>
         <p class="text-sm mb-3" style="color: var(--text-secondary)">
-          即将删除机器人
+          {{ t('bots.deleteBotMessage') }}
           <span style="color: var(--text); font-weight: 500">{{ deletingBot?.name }}</span>
         </p>
         <div
           v-if="deletingBot && deletingBot.bindingCount > 0"
           class="warning-box mb-4"
         >
-          <strong>⚠️ 此机器人有 {{ deletingBot.bindingCount }} 个关联绑定</strong>
+          <strong>{{ t('bots.deleteBotWarning', { n: deletingBot.bindingCount }) }}</strong>
           <div class="mt-1" style="font-size: 12px">
-            删除会级联清除全部关联绑定 <strong>并杀掉对应 CLI 进程</strong>，操作不可恢复。
+            {{ t('bots.deleteBotCascade') }}
           </div>
         </div>
         <p v-else class="text-sm mb-4" style="color: var(--text-secondary)">
-          当前没有关联绑定，可以安全删除。
+          {{ t('bots.deleteBotSafe') }}
         </p>
 
         <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">
@@ -214,9 +214,9 @@
 
         <div class="flex items-center gap-2">
           <button class="btn-mac btn-mac-sm btn-danger" :disabled="formLoading" @click="confirmDelete">
-            {{ formLoading ? '删除中…' : '确认删除' }}
+            {{ formLoading ? t('common.deleting') : t('common.deleteConfirm') }}
           </button>
-          <button class="btn-mac btn-mac-sm" @click="showDeleteModal = false">取消</button>
+          <button class="btn-mac btn-mac-sm" @click="showDeleteModal = false">{{ t('common.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -227,6 +227,7 @@
 import { ref, computed, reactive, onMounted, nextTick, watch, h } from 'vue';
 import type { FunctionalComponent } from 'vue';
 import { useApi } from '../composables/useApi';
+import { useI18n } from 'vue-i18n';
 
 /* ─────────────────────────────────────────────────────────────
  * 平台 Logo（inline SVG，单色 currentColor，简洁风）
@@ -284,16 +285,17 @@ interface BotItem {
   bindingCount: number;
 }
 
-const platforms = [
-  { id: 'feishu' as const, label: '飞书', icon: FeishuLogo },
-  { id: 'telegram' as const, label: 'Telegram', icon: TelegramLogo },
-  { id: 'qq' as const, label: 'QQ', icon: QQLogo },
-  { id: 'wechat' as const, label: '微信', icon: WeChatLogo },
-];
+const platforms = computed(() => [
+  { id: 'feishu' as const, label: t('bots.platformFeishu'), icon: FeishuLogo },
+  { id: 'telegram' as const, label: t('bots.platformTelegram'), icon: TelegramLogo },
+  { id: 'qq' as const, label: t('bots.platformQQ'), icon: QQLogo },
+  { id: 'wechat' as const, label: t('bots.platformWechat'), icon: WeChatLogo },
+]);
 
-type Platform = (typeof platforms)[number]['id'];
+type Platform = 'feishu' | 'telegram' | 'qq' | 'wechat';
 
 const { get, post, put, del } = useApi();
+const { t } = useI18n();
 const activePlatform = ref<Platform>('feishu');
 const bots = ref<BotItem[]>([]);
 const loading = ref(false);
@@ -317,11 +319,11 @@ const form = reactive({
 });
 
 const currentPlatform = computed(() =>
-  platforms.find((p) => p.id === activePlatform.value),
+  platforms.value.find((p) => p.id === activePlatform.value),
 );
 
 const activeIndex = computed(() =>
-  platforms.findIndex((p) => p.id === activePlatform.value),
+  platforms.value.findIndex((p) => p.id === activePlatform.value),
 );
 
 /* ─── 滑块指示器：根据 active tab 的实际宽度/位置动态计算 ─── */
@@ -414,7 +416,7 @@ function openEdit(b: BotItem) {
 async function submitForm() {
   formError.value = '';
   if (!form.name.trim()) {
-    formError.value = '请填写 Name';
+    formError.value = t('bots.nameRequired');
     return;
   }
   formLoading.value = true;
@@ -427,7 +429,7 @@ async function submitForm() {
       if (form.secret.trim()) body.secret = form.secret.trim();
       const r = await put(`/api/bots/${editingId.value}`, body);
       if (r.code !== 0) {
-        formError.value = r.message || '更新失败';
+        formError.value = r.message || t('common.operationFailed');
         return;
       }
     } else {
@@ -439,7 +441,7 @@ async function submitForm() {
         remark: form.remark.trim() || null,
       });
       if (r.code !== 0) {
-        formError.value = r.message || '创建失败';
+        formError.value = r.message || t('common.operationFailed');
         return;
       }
     }
@@ -462,7 +464,7 @@ async function confirmDelete() {
   try {
     const r = await del(`/api/bots/${deletingBot.value.id}`);
     if (r.code !== 0) {
-      formError.value = r.message || '删除失败';
+      formError.value = r.message || t('common.operationFailed');
       return;
     }
     showDeleteModal.value = false;

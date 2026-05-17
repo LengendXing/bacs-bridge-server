@@ -5,26 +5,26 @@
       <div class="flex items-center gap-3 mb-4">
         <BacsLogo :size="36" />
       </div>
-      <p class="text-sm mb-6" style="color: var(--text-secondary)">请输入账号和密码</p>
+      <p class="text-sm mb-6" style="color: var(--text-secondary)">{{ t('login.title') }}</p>
 
       <!-- 账号密码表单 -->
       <form v-if="!show2fa" @submit.prevent="handleLogin">
-        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">账号</label>
+        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('login.username') }}</label>
         <input
           v-model="username"
           type="text"
           class="input-mac mb-4"
-          placeholder="请输入账号"
+          :placeholder="t('login.username')"
           autocomplete="username"
           required
           autofocus
         />
-        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">密码</label>
+        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('login.password') }}</label>
         <input
           v-model="password"
           type="password"
           class="input-mac mb-6"
-          placeholder="输入密码"
+          :placeholder="t('login.password')"
           required
         />
         <button
@@ -33,7 +33,7 @@
           style="padding: 12px; font-size: 16px"
           :disabled="loading"
         >
-          {{ loading ? '登录中...' : '登录' }}
+          {{ loading ? t('login.logging') : t('login.loginBtn') }}
         </button>
         <p v-if="error" class="text-sm mt-3" style="color: var(--danger)">{{ error }}</p>
       </form>
@@ -42,14 +42,14 @@
       <form v-else @submit.prevent="handleVerify2fa">
         <div class="text-center mb-4">
           <div class="text-3xl mb-2">🔐</div>
-          <h3 class="text-lg font-semibold" style="color: var(--text)">两步验证</h3>
-          <p class="text-sm" style="color: var(--text-secondary)">请输入认证器中的 6 位验证码</p>
+          <h3 class="text-lg font-semibold" style="color: var(--text)">{{ t('login.totpTitle') }}</h3>
+          <p class="text-sm" style="color: var(--text-secondary)">{{ t('login.totpCode') }}</p>
         </div>
         <input
           v-model="totpCode"
           type="text"
           class="input-mac mb-2 text-center text-2xl tracking-widest"
-          placeholder="000000"
+          :placeholder="t('login.totpPlaceholder')"
           maxlength="6"
           required
           autofocus
@@ -57,7 +57,7 @@
         />
         <label class="flex items-center gap-2 mt-3 mb-5 cursor-pointer text-sm" style="color: var(--text)">
           <input v-model="trustDevice" type="checkbox" class="accent-indigo-500" />
-          <span>信任此设备（30天内免验证）</span>
+          <span>{{ t('login.trustDevice') }}</span>
         </label>
         <button
           type="submit"
@@ -65,10 +65,10 @@
           style="padding: 12px; font-size: 16px"
           :disabled="loading"
         >
-          {{ loading ? '验证中...' : '验证' }}
+          {{ loading ? t('login.verifying') : t('login.verifyBtn') }}
         </button>
         <p v-if="error" class="text-sm mt-3" style="color: var(--danger)">{{ error }}</p>
-        <button type="button" class="btn-mac w-full mt-3" @click="show2fa = false">返回</button>
+        <button type="button" class="btn-mac w-full mt-3" @click="show2fa = false">{{ t('login.back') }}</button>
       </form>
     </div>
   </div>
@@ -80,11 +80,13 @@
  * 支持账号密码登录 + TOTP 两步验证
  */
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useAuth } from '../composables/useAuth';
 import BacsLogo from '../components/BacsLogo.vue';
 
 const router = useRouter();
+const { t } = useI18n();
 const { login, verify2fa } = useAuth();
 
 const username = ref('');
@@ -112,10 +114,10 @@ async function handleLogin() {
         router.push('/');
       }
     } else {
-      error.value = res.message || '登录失败';
+      error.value = res.message || t('login.loginFailed');
     }
   } catch (e: any) {
-    error.value = '网络错误，请重试';
+    error.value = t('common.networkError');
   } finally {
     loading.value = false;
   }
@@ -130,10 +132,10 @@ async function handleVerify2fa() {
     if (res.code === 0) {
       router.push('/');
     } else {
-      error.value = res.message || '验证码错误';
+      error.value = res.message || t('login.codeError');
     }
   } catch (e: any) {
-    error.value = '网络错误，请重试';
+    error.value = t('common.networkError');
   } finally {
     loading.value = false;
   }
