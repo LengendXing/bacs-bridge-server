@@ -553,10 +553,16 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
   const targetType = chatId ? 'chat_id' : 'open_id';
   if (!targetId) return;
 
-  // /命令路由：以 / 开头的消息由 bridge 本地处理，不转发给 cc
+  // /命令路由：仅拦截 bridge 自有命令（status/interrupt/model/effort），
+  // 其余 / 命令（如 /new /clear /compact 等 cc 内置命令）透传给 cc 进程
   if (msgText.startsWith('/')) {
-    handleSlashCommand(msgText, binding, targetId, targetType);
-    return;
+    const bridgeCmds = ['status', 'interrupt', 'model', 'effort'];
+    const cmd = msgText.slice(1).trim().split(/\s+/)[0]?.toLowerCase() || '';
+    if (bridgeCmds.includes(cmd)) {
+      handleSlashCommand(msgText, binding, targetId, targetType);
+      return;
+    }
+    // 不认识的 / 命令 → 正常转发给 cc（走下面的消息路由）
   }
 
   const adapter = getAdapter(cliKind);
