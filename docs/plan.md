@@ -2,6 +2,18 @@
 
 ## 待办（按优先级）
 - [ ] 升级 bcrypt 到 v6 解决 6 个间接依赖（@mapbox/node-pre-gyp → tar）安全告警（breaking change，需评估迁移成本）
+- [ ] Claude Code headless 模式集成（stream-json 精确费用 + token 统计）
+
+## v1.1.25 · 2026-05-17
+- [x] extractToolCalls + extractTiming + extractToolCount 解析函数 ✅ 2026-05-17
+- [x] SessionState 扩展 lastToolCalls + 轮询提取 ✅ 2026-05-17
+- [x] buildWorkingCard 替换 buildProgressCard（工具调用 + 中断按钮） ✅ 2026-05-17
+- [x] 回复卡片 note 加 timing + toolCount + costUsdEstimated 统计 ✅ 2026-05-17
+- [x] collapsible_panel 长回复折叠（>1500 字符） ✅ 2026-05-17
+- [x] /命令路由（/status /interrupt /model /effort） ✅ 2026-05-17
+- [x] handleCardAction cc_interrupt 中断按钮回调 ✅ 2026-05-17
+- [x] 计费数据库表 + 计费服务 + API（billing/details/conversation_billing） ✅ 2026-05-17
+- [x] 菜单改造（日志→一级菜单+3二级）+ 扣费日志页面 ✅ 2026-05-17
 
 ## v1.1.6 · 2026-05-14
 - [x] Logo 右侧加「笨迪桥接」文字（left 侧边栏 + top 顶栏） ✅ 2026-05-14

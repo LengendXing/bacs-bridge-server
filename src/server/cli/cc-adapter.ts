@@ -336,6 +336,64 @@ function resolveChoiceIndex(userReply: string, panel: ChoicePanel): number {
   return 0;
 }
 
+/** 从 pane 文本中提取当前可见的工具调用列表（最近 N 个）
+ *  匹配 cc TUI 中的工具调用行格式：
+ *  - ● Bash(git push origin main)
+ *  - ● Read(auth.py)
+ *  - ● Edit(config.json)
+ *  - ● Write(output.txt)
+ *  - ● Glob(*.ts) / Grep(pattern) / List(...) 等
+ */
+export function extractToolCalls(raw: string, maxItems = 3): string[] {
+  if (!raw) return [];
+  const lines = raw.split(/\r?\n/);
+  const toolRe = /●\s+(\w+)\((.*?)\)/;
+  const results: string[] = [];
+  for (let i = lines.length - 1; i >= 0 && results.length < maxItems; i--) {
+    const m = lines[i].match(toolRe);
+    if (m) {
+      const name = m[1];
+      const arg = m[2].length > 20 ? m[2].slice(0, 20) + '...' : m[2];
+      results.unshift(`${name}(${arg})`);
+    }
+  }
+  return results;
+}
+
+/** 从 pane 文本中提取 cc 自报的耗时（秒）
+ *  cc TUI 中会显示：
+ *  - ✻ Brewed for 5s
+ *  - ✻ Cooked for 2m 25s
+ *  - ✻ Sautéed for 34s
+ *  返回最近一条耗时（秒），0 表示未找到
+ */
+export function extractTiming(raw: string): number {
+  if (!raw) return 0;
+  const lines = raw.split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/✻\s+\S+\s+for\s+(?:(\d+)m\s*)?(\d+)s/i);
+    if (m) {
+      const mins = m[1] ? parseInt(m[1], 10) : 0;
+      const secs = parseInt(m[2], 10);
+      return mins * 60 + secs;
+    }
+  }
+  return 0;
+}
+
+/** 从 pane 文本中统计本轮回复中各工具调用次数 */
+export function extractToolCount(raw: string): Record<string, number> {
+  if (!raw) return {};
+  const toolRe = /●\s+(\w+)\(/g;
+  const toolCount: Record<string, number> = {};
+  let m;
+  while ((m = toolRe.exec(raw)) !== null) {
+    const name = m[1];
+    toolCount[name] = (toolCount[name] || 0) + 1;
+  }
+  return toolCount;
+}
+
 function extractReply(raw: string, userMessage: string): string {
   if (!raw) return '';
 
@@ -678,6 +736,12 @@ const ccAdapter: CliAdapter = {
   },
 
   extractReply,
+
+  extractToolCalls,
+
+  extractTiming,
+
+  extractToolCount,
 
   isIdle,
   detectState,

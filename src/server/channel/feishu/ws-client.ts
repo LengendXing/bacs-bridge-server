@@ -37,6 +37,7 @@ import { eq } from 'drizzle-orm';
 import logger from '../../middleware/logger.js';
 import * as sender from './sender.js';
 import { broadcastTimeline } from '../../routes/timeline.js';
+import * as billing from '../../billing/service.js';
 
 // ── 类型定义 ────────────────────────────────────────────────────────────
 
@@ -179,8 +180,51 @@ function getAllBindingsWithFeishu(): BindingRecord[] {
  * @param isTimeout - 是否为超时兜底回复
  */
 function sendReply(session: SessionState, reply: string, isTimeout: boolean): void {
-  const { feishuAppId, feishuAppSecret, targetType, targetId, processName, msgText } = session.ctx;
+  const { feishuAppId, feishuAppSecret, targetType, targetId, processName, msgText, cliKind, machineId } = session.ctx;
   const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
+  const adapter = getAdapter(cliKind);
+  const timing = adapter.extractTiming(session.accumulated);
+  const toolCount = adapter.extractToolCount(session.accumulated);
+
+  // 创建计费记录
+  try {
+    const binding = getBindingByAppId(feishuAppId);
+    billing.createBillingRecord({
+      processName,
+      cliKind,
+      modelId: binding?.modelOverride || null,
+      providerId: binding?.providerId ?? null,
+      machineId,
+      userMessage: msgText,
+      replySnippet: reply,
+      elapsedSec: elapsed,
+      toolCalls: toolCount,
+      timing: timing || undefined,
+      platform: 'feishu',
+      targetId,
+    });
+  } catch (e: any) {
+    logger.log('error', '计费记录写入失败', e.message);
+  }
+
+  // 计算估算费用（用于卡片展示）
+  let costUsdEstimated: number | undefined;
+  try {
+    const MODEL_PRICING: Record<string, { input: number; output: number; inputRate: number; outputRate: number }> = {
+      'claude-opus-4':   { input: 15,  output: 75,  inputRate: 15, outputRate: 8 },
+      'claude-sonnet-4': { input: 3,   output: 15,  inputRate: 40, outputRate: 20 },
+      'claude-haiku-4':  { input: 0.8, output: 4,   inputRate: 80, outputRate: 40 },
+      'default':         { input: 3,   output: 15,  inputRate: 40, outputRate: 20 },
+    };
+    const binding = getBindingByAppId(feishuAppId);
+    const modelId = binding?.modelOverride || '';
+    const modelKey = Object.keys(MODEL_PRICING).find(k => modelId.toLowerCase().includes(k)) || 'default';
+    const pricing = MODEL_PRICING[modelKey];
+    const estInput = elapsed * pricing.inputRate;
+    const estOutput = elapsed * pricing.outputRate * 0.3;
+    costUsdEstimated = (estInput * pricing.input + estOutput * pricing.output) / 1_000_000;
+    if (costUsdEstimated < 0.0001) costUsdEstimated = undefined;
+  } catch { /* ignore */ }
 
   sender
     .sendReplyCard(feishuAppId, feishuAppSecret, targetType, targetId, {
@@ -189,10 +233,12 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
       reply,
       elapsed,
       isTimeout,
+      toolCount: Object.keys(toolCount).length > 0 ? toolCount : undefined,
+      timing: timing || undefined,
+      costUsdEstimated,
     })
     .catch((e: Error) => {
       logger.log('error', '发送回复卡片失败', e.message);
-      // fallback：纯文本发送
       sender
         .sendText(feishuAppId, feishuAppSecret, targetType, targetId, reply)
         .catch((err: Error) =>
@@ -222,6 +268,112 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
  * @param binding - 绑定记录
  * @param event   - 飞书消息事件
  */
+/** /命令路由处理 */
+function handleSlashCommand(
+  input: string,
+  binding: BindingRecord,
+  targetId: string,
+  targetType: string,
+): void {
+  const parts = input.slice(1).trim().split(/\s+/);
+  const cmd = (parts[0] || '').toLowerCase();
+  const { processName, feishuAppId, feishuAppSecret, cliKind, machineId } = binding;
+  const adapter = getAdapter(cliKind);
+
+  switch (cmd) {
+    case 'status':
+      cmdStatus(binding, targetId, targetType);
+      break;
+    case 'interrupt':
+      cmdInterrupt(binding, targetId, targetType);
+      break;
+    case 'model':
+      cmdModel(binding, parts[1], targetId, targetType);
+      break;
+    case 'effort':
+      cmdEffort(binding, parts[1], targetId, targetType);
+      break;
+    default:
+      sender
+        .sendCard(feishuAppId!, feishuAppSecret!, targetType, targetId, sender.buildHelpCard(processName))
+        .catch((e: Error) => logger.log('error', '发送帮助卡片失败', e.message));
+  }
+}
+
+async function cmdStatus(binding: BindingRecord, targetId: string, targetType: string) {
+  const adapter = getAdapter(binding.cliKind);
+  const executor = await getExecutor(binding.machineId ?? null);
+  const sessions = await adapter.listSessions(executor);
+
+  const statusRows = [];
+  for (const name of sessions) {
+    const session = getSession(name);
+    const state = session
+      ? (session.awaiting ? '🔔待决策' : session.replied ? '✅已完成' : '⏳工作中')
+      : '💤空闲';
+    const elapsed = session ? Math.floor((Date.now() - session.startedAt) / 1000) : 0;
+    statusRows.push({ process: name, state, elapsed });
+  }
+
+  sender
+    .sendCard(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, sender.buildStatusCard(binding.processName, statusRows))
+    .catch((e: Error) => logger.log('error', '发送状态卡片失败', e.message));
+}
+
+async function cmdInterrupt(binding: BindingRecord, targetId: string, targetType: string) {
+  const adapter = getAdapter(binding.cliKind);
+  const sessionName = `${adapter.sessionPrefix}-${binding.processName}`;
+  const executor = await getExecutor(binding.machineId ?? null);
+
+  await executor.sendKeys(sessionName, ['Escape']);
+
+  const session = getSession(binding.processName);
+  if (session) session.replied = true;
+
+  sender
+    .sendCard(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, sender.buildInterruptAckCard(binding.processName))
+    .catch((e: Error) => logger.log('error', '发送中断确认卡片失败', e.message));
+}
+
+async function cmdModel(binding: BindingRecord, modelId: string | undefined, targetId: string, targetType: string) {
+  if (!modelId) {
+    const current = binding.modelOverride || '默认';
+    sender
+      .sendText(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, `当前模型：${current}\n用法：/model <模型ID>`)
+      .catch((e: Error) => logger.log('error', '发送模型信息失败', e.message));
+    return;
+  }
+  // 更新绑定配置中的 modelOverride
+  try {
+    const db = getDb();
+    db.update(bindings).set({ modelOverride: modelId, updatedAt: new Date().toISOString() }).where(eq(bindings.id, binding.id)).run();
+    sender
+      .sendText(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, `模型已切换为：${modelId}\n新会话将使用此模型，当前会话需 /interrupt 后生效`)
+      .catch((e: Error) => logger.log('error', '发送模型切换确认失败', e.message));
+  } catch (e: any) {
+    logger.log('error', '切换模型失败', e.message);
+  }
+}
+
+async function cmdEffort(binding: BindingRecord, level: string | undefined, targetId: string, targetType: string) {
+  const validLevels = ['low', 'medium', 'high', 'xhigh', 'max'];
+  if (!level || !validLevels.includes(level.toLowerCase())) {
+    sender
+      .sendText(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, `effort 只支持: ${validLevels.join('/')}\n用法：/effort <level>`)
+      .catch((e: Error) => logger.log('error', '发送 effort 提示失败', e.message));
+    return;
+  }
+  try {
+    const db = getDb();
+    db.update(bindings).set({ effort: level.toLowerCase(), updatedAt: new Date().toISOString() }).where(eq(bindings.id, binding.id)).run();
+    sender
+      .sendText(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, `effort 已切换为：${level.toLowerCase()}\n新会话将使用此设置`)
+      .catch((e: Error) => logger.log('error', '发送 effort 切换确认失败', e.message));
+  } catch (e: any) {
+    logger.log('error', '切换 effort 失败', e.message);
+  }
+}
+
 /**
  * 处理卡片按钮点击回调
  *
@@ -234,8 +386,35 @@ function sendReply(session: SessionState, reply: string, isTimeout: boolean): vo
 function handleCardAction(binding: BindingRecord, event: CardActionEvent): void {
   const { processName } = binding;
   const value = event?.action?.value;
-  if (!value || value.action !== 'cc_choice') {
-    logger.log('info', `[CardAction] 非决策回调，忽略 action=${value?.action}`);
+  if (!value || !value.action) {
+    return;
+  }
+
+  // 中断按钮回调
+  if (value.action === 'cc_interrupt') {
+    if (value.processName !== processName) return;
+    const adapter = getAdapter(binding.cliKind);
+    const sessionName = `${adapter.sessionPrefix}-${processName}`;
+    const targetType: 'chat_id' | 'open_id' = event.open_chat_id ? 'chat_id' : 'open_id';
+    const targetId = event.open_chat_id || event.operator?.open_id || '';
+    if (!targetId || !binding.feishuAppId || !binding.feishuAppSecret) return;
+
+    getExecutor(binding.machineId ?? null)
+      .then((executor) => executor.sendKeys(sessionName, ['Escape']))
+      .then(() => {
+        const session = getSession(processName);
+        if (session) session.replied = true;
+        sender
+          .sendCard(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, sender.buildInterruptAckCard(processName))
+          .catch((e: Error) => logger.log('error', '发送中断确认卡片失败', e.message));
+      })
+      .catch((e: Error) => logger.log('error', '中断操作失败', e.message));
+    return;
+  }
+
+  // 决策按钮回调
+  if (value.action !== 'cc_choice') {
+    logger.log('info', `[CardAction] 非决策回调，忽略 action=${value.action}`);
     return;
   }
   if (value.processName !== processName) {
@@ -361,6 +540,12 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
   const targetType = chatId ? 'chat_id' : 'open_id';
   if (!targetId) return;
 
+  // /命令路由：以 / 开头的消息由 bridge 本地处理，不转发给 cc
+  if (msgText.startsWith('/')) {
+    handleSlashCommand(msgText, binding, targetId, targetType);
+    return;
+  }
+
   const adapter = getAdapter(cliKind);
 
   // All adapter calls now require executor — wrap in async
@@ -477,7 +662,7 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
       // 等待用户决策时不发"处理中"卡片（避免误导）；决策卡片已推送
       if (s.awaiting) return;
       const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
-      const card = sender.buildProgressCard(s.processName, elapsed, s.ctx.msgText);
+      const card = sender.buildWorkingCard(s.processName, elapsed, s.ctx.msgText, s.lastToolCalls);
       sender
         .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
         .catch((e: Error) => logger.log('error', '发送进度卡片失败', e.message));

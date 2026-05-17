@@ -41,6 +41,7 @@ import healthRoutes from './routes/health.js';
 import settingsRoutes from './routes/settings.js';
 import timelineRoutes from './routes/timeline.js';
 import botsRoutes from './routes/bots.js';
+import billingRoutes from './routes/billing.js';
 
 // ── ESM-safe __dirname ────────────────────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +152,9 @@ app.use(timelineRoutes);
 
 // Bots 管理 — v1.1.10 引入
 app.use(botsRoutes);
+
+// Billing 计费 — v1.1.25 引入
+app.use(billingRoutes);
 
 // ── Start server ───────────────────────────────────────────────────────
 

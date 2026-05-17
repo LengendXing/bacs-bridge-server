@@ -130,4 +130,19 @@ export interface CliAdapter {
 
   /** tmux 会话名前缀（如 'cc' / 'codex'） */
   sessionPrefix: string;
+
+  /** 从 pane 文本中提取当前可见的工具调用列表
+   *  @param raw - capturePane 返回的原始输出
+   *  @param maxItems - 最多返回几个（默认 3）
+   */
+  extractToolCalls(raw: string, maxItems?: number): string[];
+
+  /** 从 pane 文本中提取 cc 自报的耗时（秒）
+   *  @param raw - capturePane 返回的原始输出
+   *  @returns 耗时秒数，0 表示未找到
+   */
+  extractTiming(raw: string): number;
+
+  /** 从 pane 文本中统计各工具调用次数 */
+  extractToolCount(raw: string): Record<string, number>;
 }

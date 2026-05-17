@@ -130,6 +130,18 @@ const codexAdapter: CliAdapter = {
   sessionExists(processName: string, executor: RemoteExecutor) {
     return executor.sessionExists(`${SESSION_PREFIX}-${processName}`);
   },
+
+  extractToolCalls(_raw: string, _maxItems?: number): string[] {
+    return [];
+  },
+
+  extractTiming(_raw: string): number {
+    return 0;
+  },
+
+  extractToolCount(_raw: string): Record<string, number> {
+    return {};
+  },
 };
 
 export default codexAdapter;
