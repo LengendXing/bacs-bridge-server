@@ -2,8 +2,8 @@
   <div>
     <!-- Top bar -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-semibold" style="color: var(--text)">机器管理</h2>
-      <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">新增</button>
+      <h2 class="text-lg font-semibold" style="color: var(--text)">{{ t('machines.title') }}</h2>
+      <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">{{ t('machines.add') }}</button>
     </div>
 
     <!-- Machines table -->
@@ -11,40 +11,40 @@
       <table class="table-mac">
         <thead>
           <tr>
-            <th>名称</th>
-            <th>IP:端口</th>
-            <th>系统</th>
-            <th>认证</th>
-            <th>状态</th>
-            <th>操作</th>
+            <th>{{ t('machines.thName') }}</th>
+            <th>{{ t('machines.thHost') }}</th>
+            <th>{{ t('machines.thOs') }}</th>
+            <th>{{ t('machines.thAuth') }}</th>
+            <th>{{ t('machines.thStatus') }}</th>
+            <th>{{ t('machines.thAction') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="6" class="text-center" style="color: var(--text-secondary)">加载中...</td>
+            <td colspan="6" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
           </tr>
           <tr v-else-if="pagedMachines.length === 0">
-            <td colspan="6" class="text-center" style="color: var(--text-secondary)">暂无机器，点击「新增」注册远程服务器</td>
+            <td colspan="6" class="text-center" style="color: var(--text-secondary)">{{ t('machines.empty') }}</td>
           </tr>
           <tr v-for="m in pagedMachines" :key="m.id">
             <td style="font-weight: 500">
               {{ m.name }}
-              <span v-if="m.builtin" class="badge badge-info" style="margin-left: 6px; font-size: 10px">本机</span>
+              <span v-if="m.builtin" class="badge badge-info" style="margin-left: 6px; font-size: 10px">{{ t('common.local') }}</span>
             </td>
             <td style="color: var(--text-secondary)">{{ m.host }}:{{ m.port }}</td>
             <td>{{ m.osVersion || m.osType }}</td>
-            <td>{{ m.builtin ? '-' : (m.authType === 'password' ? '密码' : '密钥') }}</td>
+            <td>{{ m.builtin ? '-' : (m.authType === 'password' ? t('machines.authPassword') : t('machines.authKey')) }}</td>
             <td>
               <span :class="statusClass(m.status)">{{ statusLabel(m.status) }}</span>
             </td>
             <td>
               <span v-if="m.builtin" style="color: var(--text-secondary)">-</span>
               <div v-else class="flex items-center gap-1">
-                <button class="btn-mac btn-mac-sm" @click="openEdit(m)">编辑</button>
+                <button class="btn-mac btn-mac-sm" @click="openEdit(m)">{{ t('common.edit') }}</button>
                 <button class="btn-mac btn-mac-sm" :disabled="testingId === m.id" @click="testConn(m)">
-                  {{ testingId === m.id ? '测试中...' : '测试' }}
+                  {{ testingId === m.id ? t('machines.testing') : t('machines.test') }}
                 </button>
-                <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmDelete(m)">删除</button>
+                <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmDelete(m)">{{ t('common.delete') }}</button>
               </div>
             </td>
           </tr>
@@ -61,40 +61,40 @@
     <!-- 测试结果弹窗 -->
     <div v-if="testResult" class="modal-overlay" @click.self="testResult = null">
       <div class="modal-card" style="width: 400px">
-        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">连接测试结果</h3>
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('machines.testResultTitle') }}</h3>
         <div v-if="testResult.ok" class="mb-3">
-          <p style="color: var(--text-secondary)">状态: <span class="badge badge-online">成功</span></p>
-          <p v-if="testResult.hostname" style="color: var(--text-secondary)">主机名: {{ testResult.hostname }}</p>
-          <p v-if="testResult.os" style="color: var(--text-secondary)">系统: {{ testResult.os }}</p>
-          <p v-if="testResult.tmuxVersion" style="color: var(--text-secondary)">tmux: {{ testResult.tmuxVersion }}</p>
-          <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">延迟: {{ testResult.latencyMs }}ms</p>
+          <p style="color: var(--text-secondary)">{{ t('machines.testStatus') }} <span class="badge badge-online">{{ t('machines.testSuccess') }}</span></p>
+          <p v-if="testResult.hostname" style="color: var(--text-secondary)">{{ t('machines.testHostname') }} {{ testResult.hostname }}</p>
+          <p v-if="testResult.os" style="color: var(--text-secondary)">{{ t('machines.testOs') }} {{ testResult.os }}</p>
+          <p v-if="testResult.tmuxVersion" style="color: var(--text-secondary)">{{ t('machines.testTmux') }} {{ testResult.tmuxVersion }}</p>
+          <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">{{ t('machines.testLatency') }} {{ testResult.latencyMs }}ms</p>
         </div>
         <div v-else>
-          <p style="color: var(--danger)">连接失败: {{ testResult.error }}</p>
-          <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">耗时: {{ testResult.latencyMs }}ms</p>
+          <p style="color: var(--danger)">{{ t('machines.testFailed') }} {{ testResult.error }}</p>
+          <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">{{ t('machines.testElapsed') }} {{ testResult.latencyMs }}ms</p>
         </div>
-        <button class="btn-mac btn-mac-sm mt-4" @click="testResult = null">关闭</button>
+        <button class="btn-mac btn-mac-sm mt-4" @click="testResult = null">{{ t('common.close') }}</button>
       </div>
     </div>
 
     <!-- 添加/编辑弹窗 -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
       <div class="modal-card" style="width: 460px">
-        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ editId ? '编辑机器' : '新增' }}</h3>
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ editId ? t('machines.editTitle') : t('machines.createTitle') }}</h3>
         <form @submit.prevent="handleSubmit">
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">名称</label>
-          <input v-model="form.name" type="text" class="input-mac mb-3" placeholder="如：生产服务器" required />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.thName') }}</label>
+          <input v-model="form.name" type="text" class="input-mac mb-3" :placeholder="t('machines.namePlaceholder')" required />
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">IP / 域名</label>
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.hostLabel') }}</label>
           <input v-model="form.host" type="text" class="input-mac mb-3" placeholder="192.168.1.100" required />
 
           <div class="flex gap-3 mb-3">
             <div class="flex-1">
-              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">端口</label>
+              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.portLabel') }}</label>
               <input v-model.number="form.port" type="number" class="input-mac" min="1" max="65535" />
             </div>
             <div class="flex-1">
-              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">系统类型</label>
+              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.osTypeLabel') }}</label>
               <select v-model="form.osType" class="input-mac">
                 <option value="linux">Linux</option>
                 <option value="mac">Mac</option>
@@ -104,39 +104,39 @@
 
           <div class="flex gap-3 mb-3">
             <div class="flex-1">
-              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">认证方式</label>
+              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.authLabel') }}</label>
               <select v-model="form.authType" class="input-mac">
-                <option value="password">密码</option>
-                <option value="key">密钥</option>
+                <option value="password">{{ t('machines.authPassword') }}</option>
+                <option value="key">{{ t('machines.authKey') }}</option>
               </select>
             </div>
             <div class="flex-1">
-              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">用户名</label>
+              <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.usernameLabel') }}</label>
               <input v-model="form.username" type="text" class="input-mac" placeholder="root" required />
             </div>
           </div>
 
           <template v-if="form.authType === 'password'">
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">密码{{ editId ? '（留空不修改）' : '' }}</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.passwordLabel') }}{{ editId ? t('machines.editHint') : '' }}</label>
             <input v-model="form.password" type="password" class="input-mac mb-3" :required="!editId" />
           </template>
 
           <template v-if="form.authType === 'key'">
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">私钥{{ editId ? '（留空不修改）' : '' }}</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.keyLabel') }}{{ editId ? t('machines.editHint') : '' }}</label>
             <textarea v-model="form.privateKey" class="input-mac mb-3" rows="4" :required="!editId" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" />
-            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">私钥密码（可选）</label>
+            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.passphraseLabel') }}</label>
             <input v-model="form.passphrase" type="password" class="input-mac mb-3" />
           </template>
 
-          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">备注</label>
-          <textarea v-model="form.notes" class="input-mac mb-3" rows="2" placeholder="可选" />
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.notesLabel') }}</label>
+          <textarea v-model="form.notes" class="input-mac mb-3" rows="2" :placeholder="t('machines.notesPlaceholder')" />
 
           <p v-if="formError" class="text-sm mb-3" style="color: var(--danger)">{{ formError }}</p>
           <div class="flex items-center gap-2">
             <button type="submit" class="btn-mac btn-mac-primary btn-mac-sm" :disabled="formLoading">
-              {{ formLoading ? '提交中...' : (editId ? '保存' : '添加') }}
+              {{ formLoading ? t('common.submitting') : (editId ? t('common.save') : t('common.add')) }}
             </button>
-            <button type="button" class="btn-mac btn-mac-sm" @click="showModal = false">取消</button>
+            <button type="button" class="btn-mac btn-mac-sm" @click="showModal = false">{{ t('common.cancel') }}</button>
           </div>
         </form>
       </div>
@@ -146,10 +146,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
 import type { Machine, MachineTestResult } from '@shared/types';
 
+const { t } = useI18n();
 const { get, post, put, del } = useApi();
 
 const machineList = ref<Machine[]>([]);
@@ -187,9 +189,9 @@ function statusClass(status: string) {
 }
 
 function statusLabel(status: string) {
-  if (status === 'online') return '在线';
-  if (status === 'offline') return '离线';
-  return '未知';
+  if (status === 'online') return t('common.online');
+  if (status === 'offline') return t('common.offline');
+  return t('common.unknown');
 }
 
 async function refresh() {
@@ -239,10 +241,10 @@ async function handleSubmit() {
       showModal.value = false;
       await refresh();
     } else {
-      formError.value = res?.message || '操作失败';
+      formError.value = res?.message || t('common.operationFailed');
     }
   } catch {
-    formError.value = '网络错误，请重试';
+    formError.value = t('common.networkError');
   } finally {
     formLoading.value = false;
   }
@@ -262,7 +264,7 @@ async function testConn(m: Machine) {
 }
 
 async function confirmDelete(m: Machine) {
-  if (!confirm(`确定删除机器「${m.name}」？`)) return;
+  if (!confirm(t('machines.deleteConfirm', { name: m.name }))) return;
   try {
     const res = await del(`/api/machines/${m.id}`);
     if (res.code === 1003) {

@@ -14,3 +14,4 @@
 - [x] Timeline 高度再缩 40px（680 → 640px）+ 确认版本号统一来源（package.json → vite define → LayoutView）（v1.1.22 ✅ 2026-05-16）
 - [x] BotsView QQ 图标重写（鬼 → 企鹅）+ 5 处按钮文案统一为「新增/挂载/测试」+ 飞书决策弹窗双向交互修复（卡片加按钮 + card.action.trigger 回调 + 回执卡片升级）（v1.1.23 ✅ 2026-05-17）
 - [x] 决策面板 cc v2.1.x 内联格式识别修复 — extractChoicePanel 新增 ⏵⏵ accept/reject edits + allow once 内联提示识别，sendChoice 对 inline 格式发 Enter/Esc（v1.1.24 ✅ 2026-05-17）
+- [x] UI 国际化（vue-i18n）+ 帮助页面 + 面包屑 + 主题图标 + 侧边栏展开修复（v1.1.26 ✅ 2026-05-17）
