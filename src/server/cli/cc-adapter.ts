@@ -98,6 +98,58 @@ function detectState(processName: string, executor: RemoteExecutor): Promise<Cli
  */
 export function extractChoicePanel(raw: string): ChoicePanel | null {
   if (!raw) return null;
+
+  // ── 优先检测 cc v2.1.x 内联提示格式 ──
+  // ⏵⏵ accept edits on (shift+tab to cycle)
+  // ⏵⏵ reject edits on (shift+tab to cycle)
+  // ⏵⏵ allow once on (shift+tab to cycle)
+  // 此格式无 ╭──╮ 框线，用 ⏵⏵ 标记 + "on (shift+tab to cycle)" 提示
+  const inlineRe = /⏵⏵\s+(.+?)\s+on\s+\(shift\+tab to cycle\)/;
+  const inlineMatch = raw.match(inlineRe);
+  if (inlineMatch) {
+    const action = inlineMatch[1].trim();
+    // 根据当前 action 推断完整选项列表
+    // cc v2.1.x 的 cycle 顺序：accept → reject → edit (for edits)
+    //                         allow once → allow always → deny (for permissions)
+    const isEdits = /accept edits|reject edits|edit in editor/i.test(action);
+    const isPermission = /allow once|allow for session|deny/i.test(action);
+    let title = '';
+    let options: string[] = [];
+    let defaultIndex = 1;
+    if (isEdits) {
+      title = 'cc 提议了代码修改，请确认';
+      if (/accept/i.test(action)) {
+        options = ['1. Accept edits', '2. Reject edits'];
+        defaultIndex = 1;
+      } else if (/reject/i.test(action)) {
+        options = ['1. Accept edits', '2. Reject edits'];
+        defaultIndex = 2;
+      } else {
+        options = ['1. Accept edits', '2. Reject edits', '3. Edit in editor'];
+        defaultIndex = 3;
+      }
+    } else if (isPermission) {
+      title = 'cc 请求权限确认';
+      if (/allow once/i.test(action)) {
+        options = ['1. Allow once', '2. Allow for this session', '3. Deny'];
+        defaultIndex = 1;
+      } else if (/allow for session/i.test(action)) {
+        options = ['1. Allow once', '2. Allow for this session', '3. Deny'];
+        defaultIndex = 2;
+      } else {
+        options = ['1. Allow once', '2. Allow for this session', '3. Deny'];
+        defaultIndex = 3;
+      }
+    } else {
+      // 未知 action，仍生成通用 Accept/Reject 选项
+      title = `cc 等待确认：${action}`;
+      options = ['1. Confirm', '2. Cancel'];
+      defaultIndex = 1;
+    }
+    return { title, options, defaultIndex, format: 'inline' };
+  }
+
+  // ── 传统 ╭──╮ 框格式面板检测 ──
   const lines = raw.split(/\r?\n/);
 
   // 倒序找最近的面板下边界
@@ -106,8 +158,6 @@ export function extractChoicePanel(raw: string): ChoicePanel | null {
     if (/╰[─━]+╯/.test(lines[i])) { bottom = i; break; }
   }
   if (bottom < 0) return null;
-
-  // 向上找配对的上边界
   let top = -1;
   for (let i = bottom - 1; i >= 0; i--) {
     if (/╭[─━]+╮/.test(lines[i])) { top = i; break; }
@@ -200,6 +250,25 @@ export async function sendChoice(
     };
   }
   const keys: string[] = [];
+
+  // inline 格式（⏵⏵ accept edits on 等）用不同的按键策略
+  if (panel.format === 'inline') {
+    // inline 面板只有 2-3 个选项，按键策略：
+    // - 选默认项(1)：Enter 确认
+    // - 选非默认项(2/3)：Escape 取消当前操作（等效于 reject/deny）
+    //   或者用 Shift+Tab 循环到目标项再 Enter
+    // 简化处理：选 1 → Enter；选 2 → Escape（放弃/拒绝）
+    if (idx === 1) {
+      keys.push('C-m'); // Enter = 接受/确认
+    } else {
+      keys.push('Escape'); // Esc = 拒绝/取消
+    }
+    const r = await executor.sendKeys(sessionName, keys, 100);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, chosenIndex: idx };
+  }
+
+  // box 格式（╭──╮ 框）的按键策略
   if (panel.defaultIndex > 0 && idx !== panel.defaultIndex) {
     const diff = idx - panel.defaultIndex;
     const dir = diff > 0 ? 'Down' : 'Up';
@@ -231,8 +300,8 @@ function resolveChoiceIndex(userReply: string, panel: ChoicePanel): number {
   }
 
   // 规则 2：常见 yes/no 词典
-  const yesWords = ['yes', 'y', 'ok', '确认', '同意', '是', '好', '可以', '执行', 'sure'];
-  const noWords = ['no', 'n', '否', '拒绝', '取消', '不', '不要', 'cancel', 'deny'];
+  const yesWords = ['yes', 'y', 'ok', '确认', '同意', '是', '好', '可以', '执行', 'sure', 'accept', '允许', 'allow'];
+  const noWords = ['no', 'n', '否', '拒绝', '取消', '不', '不要', 'cancel', 'deny', 'reject'];
   const isYes = yesWords.some((w) => reply === w || reply.startsWith(w + ' ') || reply.startsWith(w + '，') || reply.startsWith(w + ','));
   const isNo = noWords.some((w) => reply === w || reply.startsWith(w + ' ') || reply.startsWith(w + '，') || reply.startsWith(w + ','));
 
