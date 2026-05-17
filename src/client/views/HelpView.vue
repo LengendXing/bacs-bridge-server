@@ -78,8 +78,8 @@ import type { FunctionalComponent } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { MessageCircle } from 'lucide-vue-next';
 
-const { t } = useI18n();
-const feishuSteps = computed(() => t('help.feishuSteps') as unknown as string[]);
+const { t, tm } = useI18n();
+const feishuSteps = computed(() => tm('help.feishuSteps') as string[]);
 
 /* ── 平台 Logo（复用 BotsView 同款 inline SVG）── */
 interface LogoProps {
