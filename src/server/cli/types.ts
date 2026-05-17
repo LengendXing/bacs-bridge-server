@@ -28,6 +28,11 @@ export interface ChoicePanel {
   options: string[];
   /** 默认/当前高亮的选项序号（1-based），未识别返回 0 */
   defaultIndex: number;
+  /** 面板渲染格式
+   *  - 'box'：cc 传统 ╭──╮ 框格式（含 │ ❯ 1. Yes │ 等）
+   *  - 'inline'：cc v2.1.x 新格式（⏵⏵ accept edits on 等，无框线）
+   */
+  format?: 'box' | 'inline';
 }
 
 /** CLI 进程启动配置 */

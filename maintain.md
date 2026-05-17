@@ -1,3 +1,18 @@
+## v1.1.24 - 2026-05-17
+### 变更内容
+**决策面板 cc v2.1.x 内联格式识别修复（关键 Bug）**
+- `cc-adapter.ts` extractChoicePanel 新增 ⏵⏵ 内联格式识别：cc v2.1.126+ 使用 `⏵⏵ accept edits on (shift+tab to cycle)` 替代 `╭──╮` 框格式
+- 识别 3 种内联类型：代码修改确认（Accept/Reject edits）、权限确认（Allow once/session/Deny）、通用确认（Confirm/Cancel）
+- `cc-adapter.ts` sendChoice 对 `format: 'inline'` 面板发送 Enter（确认）或 Escape（拒绝）
+- `types.ts` ChoicePanel 新增 `format?: 'box' | 'inline'` 字段区分面板渲染格式
+- `resolveChoiceIndex` 新增 accept/reject/allow 关键词支持
+- 新增 9 个单元测试覆盖内联格式面板识别 + sendChoice 按键策略
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — extractChoicePanel + sendChoice + resolveChoiceIndex
+- `src/server/cli/types.ts` — ChoicePanel 接口
+- `src/server/cli/cc-adapter.test.ts` — 新增测试
+
 ## v1.1.23 - 2026-05-17
 ### 变更内容
 **模块 1 · QQ 图标修正**

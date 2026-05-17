@@ -408,6 +408,126 @@ describe('cc-adapter.extractChoicePanel', () => {
   });
 });
 
+describe('cc-adapter.extractChoicePanel — cc v2.1.x inline format (⏵⏵)', () => {
+  it('识别 ⏵⏵ accept edits on (shift+tab to cycle)', () => {
+    const pane = `● Bash(echo hello)
+  ⎿  hello
+
+✻ Brewed for 5s
+
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ accept edits on (shift+tab to cycle)`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.format).toBe('inline');
+    expect(panel!.title).toContain('代码修改');
+    expect(panel!.options).toHaveLength(2);
+    expect(panel!.options[0]).toMatch(/Accept/i);
+    expect(panel!.options[1]).toMatch(/Reject/i);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别 ⏵⏵ reject edits on — defaultIndex 应为 2', () => {
+    const pane = `❯
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ reject edits on (shift+tab to cycle)`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.format).toBe('inline');
+    expect(panel!.defaultIndex).toBe(2);
+  });
+
+  it('识别 ⏵⏵ allow once on — 权限确认类型', () => {
+    const pane = `❯
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ allow once on (shift+tab to cycle)`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.format).toBe('inline');
+    expect(panel!.title).toContain('权限');
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.options[0]).toMatch(/Allow once/i);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('普通 idle 状态（❯ + ? for shortcuts）不应被识别为 inline 面板', () => {
+    const pane = `❯
+────────────────────────────────────────────────────────────────────────────────
+  ? for shortcuts`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).toBeNull();
+  });
+});
+
+describe('cc-adapter.sendChoice — inline format', () => {
+  function makeExecutor() {
+    const calls: { keys: string[]; betweenMs?: number }[] = [];
+    return {
+      calls,
+      executor: {
+        kind: 'local' as const,
+        machineId: null,
+        async exec() { return { stdout: '', stderr: '', exitCode: 0, ok: true }; },
+        async sessionExists() { return true; },
+        async listSessionsByPrefix() { return []; },
+        async capturePane() { return { output: '' }; },
+        async sendInput() { return { ok: true }; },
+        async sendKeys(_session: string, keys: string[], betweenMs?: number) {
+          calls.push({ keys, betweenMs });
+          return { ok: true };
+        },
+        async killSession() {},
+      },
+    };
+  }
+
+  const inlinePanel = {
+    title: 'cc 提议了代码修改，请确认',
+    options: ['1. Accept edits', '2. Reject edits'],
+    defaultIndex: 1,
+    format: 'inline' as const,
+  };
+
+  it('inline 面板选 Accept → 发 Enter', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '1', inlinePanel, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0]).toEqual(['C-m']);
+  });
+
+  it('inline 面板选 Reject → 发 Escape', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '2', inlinePanel, executor);
+    expect(r.ok).toBe(true);
+    expect(r.chosenIndex).toBe(2);
+    expect(calls[0]).toEqual(['Escape']);
+  });
+
+  it('inline 面板回复 yes → 发 Enter', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', 'yes', inlinePanel, executor);
+    expect(r.chosenIndex).toBe(1);
+    expect(calls[0]).toEqual(['C-m']);
+  });
+
+  it('inline 面板回复 reject → 发 Escape', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', 'reject', inlinePanel, executor);
+    expect(r.chosenIndex).toBe(2);
+    expect(calls[0]).toEqual(['Escape']);
+  });
+
+  it('inline 面板无法识别的回复 → ok:false', async () => {
+    const { calls, executor } = makeExecutor();
+    const r = await adapter.sendChoice('cc-test', '不知道选啥', inlinePanel, executor);
+    expect(r.ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('cc-adapter.sendChoice — v1.1.23 飞书按钮模拟回归', () => {
   function makeExecutor() {
     const calls: { keys: string[]; betweenMs?: number }[] = [];
