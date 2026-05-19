@@ -117,9 +117,11 @@ export function extractChoicePanel(raw: string): ChoicePanel | null {
   // ⏵⏵ allow once on (shift+tab to cycle)
   // 此格式无 ╭──╮ 框线，用 ⏵⏵ 标记 + "on (shift+tab to cycle)" 提示
   // 同时兼容单 ⏵ 格式和 ▶▶ / ▸▸ 等变体
-  const inlineRe = /[⏵▶▸][⏵▶▸]?\s+(.+?)\s+on\s+\(shift\+tab to cycle\)/;
-  const inlineMatch = raw.match(inlineRe);
-  if (inlineMatch) {
+  // 取最后一个匹配（连续 inline 面板时，最新的在底部）
+  const inlineRe = /[⏵▶▸][⏵▶▸]?\s+(.+?)\s+on\s+\(shift\+tab to cycle\)/g;
+  const inlineMatches = [...raw.matchAll(inlineRe)];
+  if (inlineMatches.length > 0) {
+    const inlineMatch = inlineMatches[inlineMatches.length - 1];
     const action = inlineMatch[1].trim();
     // 根据当前 action 推断完整选项列表
     // cc v2.1.x 的 cycle 顺序：accept → reject → edit (for edits)

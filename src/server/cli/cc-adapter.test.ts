@@ -827,3 +827,115 @@ describe('cc-adapter.sendChoice — v1.1.23 飞书按钮模拟回归', () => {
     expect(r.chosenIndex).toBe(1);
   });
 });
+
+describe('cc-adapter — consecutive choice panels', () => {
+  it('连续两个 box 格式面板在 pane 中——应找到最新的（底部）', () => {
+    const pane = `╭───────────────────────────────╮
+│ Allow first command?          │
+│                               │
+│ ❯ 1. Yes                      │
+│   2. No                       │
+╰───────────────────────────────╯
+Some output in between
+╭───────────────────────────────╮
+│ Allow second command?         │
+│                               │
+│   1. Yes                      │
+│ ❯ 2. No                       │
+╰───────────────────────────────╯`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Allow second command/);
+    expect(panel!.defaultIndex).toBe(2);
+  });
+
+  it('连续两个 inline 面板在 pane 中——应找到最新的（底部）', () => {
+    const pane = `⏵⏵ accept edits on (shift+tab to cycle)
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ allow once on (shift+tab to cycle)`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toContain('权限');
+    expect(panel!.options[0]).toMatch(/Allow once/i);
+  });
+
+  it('连续两个无边框 Edit 权限面板（不同文件）——第二个应被检测', () => {
+    const pane = `────────────────────────────────────────────────────────────────────────────────
+ Edit file
+ config.json
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ 1 -"old": true
+ 1 +"new": true
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Do you want to make this edit to config.json?
+ ❯ 1. Yes
+   2. Yes, allow all edits during this session (shift+tab)
+   3. No
+
+ Esc to cancel · Tab to amend`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Do you want to make this edit to config\.json/);
+    expect(panel!.options).toHaveLength(3);
+  });
+
+  it('面板消失后 pane 为工作状态——extractChoicePanel 返回 null', () => {
+    const pane = `● Bash(npm install)
+  ⎿  Installed 42 packages
+● Reading file...
+Esc to interrupt`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).toBeNull();
+  });
+
+  it('连续选择后 pane 为 idle——extractReply 应正确提取最终回复', () => {
+    const pane = `❯ 帮我创建两个文件
+● 正在创建 file1.txt...
+✻ Brewed for 5s
+● 正在创建 file2.txt...
+✻ Brewed for 8s
+● 已创建 file1.txt 和 file2.txt。
+✻ Brewed for 12s
+╭───╮
+│ ❯ │
+╰───╯
+  ? for shortcuts`;
+    const reply = adapter.extractReply(pane, '帮我创建两个文件');
+    expect(reply).toContain('已创建 file1.txt 和 file2.txt');
+  });
+
+  it('连续两个相同格式的 Bash 权限面板——第二个应独立检测', () => {
+    // 第一次 Bash 面板（cat）已消失，第二次 Bash 面板（ls）出现
+    const pane = `────────────────────────────────────────────────────────────────────────────────
+ Bash command
+
+   ls -la /tmp
+   List temp directory
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, allow reading from tmp/ from this project
+   3. No
+
+ Esc to cancel · Tab to amend · ctrl+e to explain`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toBe('Do you want to proceed?');
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.options[1]).toMatch(/allow reading from tmp/);
+  });
+
+  it('同一 pane 中连续两个 inline（accept → reject）——应取 reject（最新的）', () => {
+    const pane = `⏵⏵ accept edits on (shift+tab to cycle)
+────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ reject edits on (shift+tab to cycle)`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.format).toBe('inline');
+    expect(panel!.defaultIndex).toBe(2); // reject = index 2
+  });
+});
