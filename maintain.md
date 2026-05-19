@@ -1,3 +1,17 @@
+## v1.1.28.4 - 2026-05-19
+### 变更内容
+**修复决策面板标题丢失 + 回复内容混入决策确认文本**
+- Bug 1 修复：extractBorderlessPanel 标题扫描遇空行 break → CC v2.1.138 面板问题与选项间有空行，标题永远扫不到
+  - 改为跳过空行继续扫描（最多跳 3 行），实测 "要不要回去继续写代码？" 正确提取
+- Bug 2 修复：extractReply 把 `● User answered Claude's questions:` 决策确认文本算进回复
+  - 新增过滤：User answered / Accepted edits / Rejected edits / Allowed Bash / Denied 等CC内部确认行
+  - AI 真实回复（如 "行，真够了。有事再叫我。"）不再被决策确认文本污染
+- 新增 3 条单元测试覆盖空行标题提取 + 决策确认过滤
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — extractBorderlessPanel 标题扫描跳空行 + extractReply 过滤决策确认
+- `src/server/cli/cc-adapter.test.ts` — 新增 3 条测试
+
 ## v1.1.28.3 - 2026-05-19
 ### 变更内容
 **修复决策后无限轮询 — v1.1.28.2 引入的回归 Bug**
