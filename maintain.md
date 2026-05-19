@@ -1,3 +1,18 @@
+## v1.1.26.5 - 2026-05-19
+### 变更内容
+**修复 CC v2.1.126 无边框决策面板识别（v1.1.26.4 修复失败后的二次修复）**
+- `extractBorderlessPanel` 重写核心算法：从 `❯ N.` 行向下扫描收集选项（原代码错误地向上扫描，导致只收集到 1 个选项返回 null）
+- 支持描述子行（如 `affirmative`）：深度缩进 ≥4 空格的非选项行自动跳过
+- 支持分隔线（`──────`）：分隔线后的选项（如选项 4）仍被收集
+- 支持底栏 `Enter to select · ↑/↓ to navigate · Esc to cancel` 提示模式
+- `detectState` 兜底新增 `Enter to select` 和 `↑/↓ to navigate` 模式匹配
+- `extractReply` 和 `parseChoiceOptions` 过滤规则新增 `to navigate` 匹配
+- 新增 5 条单元测试覆盖 CC v2.1.126 实际面板格式（含描述子行 + 分隔线 + 4 选项）
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — extractBorderlessPanel 完全重写 + detectState / extractReply / parseChoiceOptions 模式更新
+- `src/server/cli/cc-adapter.test.ts` — 新增 5 条无边框面板测试
+
 ## v1.1.26.4 - 2026-05-19
 ### 变更内容
 **修复 CC 决策面板检测严重 Bug**
