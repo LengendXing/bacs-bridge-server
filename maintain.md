@@ -1,3 +1,17 @@
+## v1.1.28.5 - 2026-05-19
+### 变更内容
+**修复中断后消息路由完全阻断 — session 未释放**
+- 根因：cc_interrupt 中断处理器只设 `session.replied = true` 但未调 `endSession()`
+  - session 永远留在 Map 中 → `hasActiveSession()` 始终返回 true
+  - 新消息全部命中"正在处理上一条消息"分支，无法路由到 CC
+  - 中断后所有消息和决策卡片回调均失效
+- 修复：中断处理器改用 `endSession(processName)` 替代手动设 `replied=true`
+  - 正确清除 timers + 从 Map 移除 → 后续消息可正常路由
+
+### 影响范围
+- `src/server/channel/feishu/ws-client.ts` — cc_interrupt handler 改用 endSession
+- `src/server/session/state.test.ts` — 补充 endSession 释放验证测试
+
 ## v1.1.28.4 - 2026-05-19
 ### 变更内容
 **修复决策面板标题丢失 + 回复内容混入决策确认文本**

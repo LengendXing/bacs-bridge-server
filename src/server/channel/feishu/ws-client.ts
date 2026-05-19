@@ -423,8 +423,7 @@ function handleCardAction(binding: BindingRecord, event: CardActionEvent): void 
     getExecutor(binding.machineId ?? null)
       .then((executor) => executor.sendKeys(sessionName, ['Escape']))
       .then(() => {
-        const session = getSession(processName);
-        if (session) session.replied = true;
+        endSession(processName);
         sender
           .sendCard(binding.feishuAppId!, binding.feishuAppSecret!, targetType, targetId, sender.buildInterruptAckCard(processName))
           .catch((e: Error) => logger.log('error', '发送中断确认卡片失败', e.message));
