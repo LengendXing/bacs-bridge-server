@@ -27,6 +27,8 @@ export interface SessionState {
   lastProgressNotifiedAt: number;
   /** 用户刚做出决策（handler 已发送 sendChoice），轮询需要用更短间隔检测终态 */
   decisionJustMade: boolean;
+  /** 最近决策的面板指纹，防止决策后面板仍在 pane 中时重复推送 */
+  lastDecidedPanelKey: string | null;
 }
 
 export interface SessionContext {
@@ -65,6 +67,7 @@ export function createSession(ctx: SessionContext): SessionState {
     lastToolCalls: [],
     lastProgressNotifiedAt: Date.now(),
     decisionJustMade: false,
+    lastDecidedPanelKey: null,
   };
   sessions.set(ctx.processName, session);
   return session;
@@ -167,23 +170,30 @@ export function startOutputPolling(
         const panel = adapter.extractChoicePanel(res.output);
         if (panel) {
           const fp = panelFingerprint(panel);
-          // 用户刚做了决策但面板还在 pane 中（CC 尚未处理按键）→ 不重复推送
-          if (!session.decisionJustMade && (!session.awaiting || session.awaiting.panelKey !== fp)) {
+          // 已决策的面板不重复推送（决策后面板仍在 pane 中 fading out 或 scrollback 残留）
+          const isDecidedPanel = session.lastDecidedPanelKey === fp;
+          if (!isDecidedPanel && (!session.awaiting || session.awaiting.panelKey !== fp)) {
             session.awaiting = { panel, panelKey: fp, pushedAt: Date.now() };
             handlers.onAwaiting(session, panel);
           }
-          // 面板出现期间，清掉 stableTimer
-          if (session.stableTimer) {
-            clearTimeout(session.stableTimer);
-            session.stableTimer = null;
+          // decisionJustMade 或已决策面板 → 不 return early，让 decisionJustMade 处理逻辑执行
+          if (!session.decisionJustMade && !isDecidedPanel) {
+            // 正常：用户尚未决策，清除 stable 计时器等待
+            if (session.stableTimer) {
+              clearTimeout(session.stableTimer);
+              session.stableTimer = null;
+            }
+            lastLength = res.output.length;
+            scheduleNext(randomPollMs());
+            return;
           }
-          lastLength = res.output.length;
-          scheduleNext(randomPollMs());
-          return;
+        } else {
+          // 面板消失 → 清除决策面板跟踪
+          session.lastDecidedPanelKey = null;
         }
 
         // 面板消失 → 用户决策已被消化，cc 进入 working/idle
-        if (session.awaiting) {
+        if (session.awaiting && !panel) {
           session.awaiting = null;
           if (session.stableTimer) clearTimeout(session.stableTimer);
           session.stableTimer = setTimeout(() => {
@@ -198,6 +208,9 @@ export function startOutputPolling(
           session.stableTimer = setTimeout(() => {
             tryFinish(session, adapter, handlers);
           }, 5_000);
+          lastLength = res.output.length;
+          scheduleNext(3_000 + Math.random() * 2_000); // 3-5s 快速轮询
+          return;
         }
 
         pollCount++;
@@ -274,12 +287,46 @@ function tryFinish(
 
   getEx()
     .then((executor) => adapter.detectState(processName, executor))
-    .then((state) => {
+    .then(async (state) => {
       if (session.replied) return;
       if (sessions.get(processName) !== session) return;
 
-      // awaiting_choice：交给轮询循环里的面板推送逻辑处理；这里不结束 session
-      if (state === 'awaiting_choice') return;
+      // awaiting_choice：如果 session 不在等决策 → scrollback 旧面板残留误判
+      if (state === 'awaiting_choice') {
+        if (!session.awaiting) {
+          // 用户已做决策，但 detectState 因 scrollback 旧面板误判为 awaiting_choice
+          // 检查 pane 底部是否实际为 idle
+          try {
+            const executor = await getEx();
+            const fresh = await executor.capturePane(`${adapter.sessionPrefix}-${processName}`, 10);
+            if (fresh.error || session.replied) return;
+            if (sessions.get(processName) !== session) return;
+            const lastLines = fresh.output.split(/\r?\n/).slice(-5).join('\n');
+            if (/❯/.test(lastLines) && /\?\s*for shortcuts/.test(lastLines)) {
+              // CC 实际 idle → 走 idle 确认流程
+              state = 'idle';
+            } else {
+              // 还在工作 → 5s 后重试
+              if (!session.stableTimer) {
+                session.stableTimer = setTimeout(() => {
+                  tryFinish(session, adapter, handlers);
+                }, 5_000);
+              }
+              return;
+            }
+          } catch {
+            if (!session.stableTimer) {
+              session.stableTimer = setTimeout(() => {
+                tryFinish(session, adapter, handlers);
+              }, 5_000);
+            }
+            return;
+          }
+        } else {
+          // 真正等待用户决策 → 交给轮询循环处理
+          return;
+        }
+      }
       if (state === 'working') return;
 
       // state === 'idle'：双重确认（500ms 后再 detectState 一次，避免过渡帧误判）

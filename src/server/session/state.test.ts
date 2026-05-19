@@ -49,6 +49,7 @@ describe('session/state — createSession & endSession', () => {
     expect(session.hardDeadlineTimer).toBeNull();
     expect(session.lastProgressNotifiedAt).toBeGreaterThan(0);
     expect(session.decisionJustMade).toBe(false);
+    expect(session.lastDecidedPanelKey).toBeNull();
   });
 });
 
@@ -135,6 +136,49 @@ describe('session/state — consecutive awaiting transitions', () => {
     session.awaiting = null;
     expect(session.ctx.targetType).toBe('chat_id');
     expect(session.ctx.targetId).toBe('oc_group123');
+  });
+
+  it('lastDecidedPanelKey 决策后设置，面板消失后清除', () => {
+    const session = createSession(baseCtx);
+    const panel = { title: 'Allow?', options: ['1. Yes', '2. No'], defaultIndex: 1 };
+    const fp = panelFingerprint(panel);
+
+    // 模拟决策前：面板出现，推送给用户
+    session.awaiting = { panel, panelKey: fp, pushedAt: Date.now() };
+    expect(session.lastDecidedPanelKey).toBeNull();
+
+    // 模拟用户决策：handler 设置 lastDecidedPanelKey
+    session.lastDecidedPanelKey = fp;
+    session.awaiting = null;
+    session.decisionJustMade = true;
+    expect(session.lastDecidedPanelKey).toBe(fp);
+
+    // 模拟面板消失：轮询清除 lastDecidedPanelKey
+    session.lastDecidedPanelKey = null;
+    expect(session.lastDecidedPanelKey).toBeNull();
+  });
+
+  it('lastDecidedPanelKey 防止决策后面板重复推送', () => {
+    const session = createSession(baseCtx);
+    const panel = { title: 'Allow?', options: ['1. Yes', '2. No'], defaultIndex: 1 };
+    const fp = panelFingerprint(panel);
+
+    // 面板出现，推送
+    session.awaiting = { panel, panelKey: fp, pushedAt: Date.now() };
+
+    // 用户决策：handler 记录 lastDecidedPanelKey
+    session.lastDecidedPanelKey = fp;
+    session.awaiting = null;
+    session.decisionJustMade = true;
+
+    // 轮询仍检测到同一面板 → isDecidedPanel=true → 不重复推送
+    const isDecidedPanel = session.lastDecidedPanelKey === fp;
+    expect(isDecidedPanel).toBe(true);
+
+    // 不同面板出现 → isDecidedPanel=false → 可以推送
+    const panel2 = { title: 'Allow B?', options: ['1. Yes', '2. No'], defaultIndex: 1 };
+    const fp2 = panelFingerprint(panel2);
+    expect(session.lastDecidedPanelKey === fp2).toBe(false);
   });
 });
 

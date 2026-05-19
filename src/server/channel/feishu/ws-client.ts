@@ -503,6 +503,7 @@ function handleCardAction(binding: BindingRecord, event: CardActionEvent): void 
           sender.buildChoiceAckCard(processName, chosenLabel, optionIndex),
         )
         .catch((e: Error) => logger.log('error', '发送卡片回调回执失败', e.message));
+      session.lastDecidedPanelKey = session.awaiting?.panelKey ?? null;
       session.awaiting = null;
       session.decisionJustMade = true;
       logger.log('info', `[CardAction] ${processName} 选择 ${optionIndex}. ${chosenLabel}`);
@@ -630,6 +631,7 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
           )
           .catch((e: Error) => logger.log('error', '发送选择确认卡片失败', e.message));
         // 清掉 awaiting，由轮询继续判断 cc 后续状态（idle / 又一个面板 / working）
+        existing.lastDecidedPanelKey = existing.awaiting?.panelKey ?? null;
         existing.awaiting = null;
         existing.decisionJustMade = true;
         logger.log('info', `已转发选择到 ${processName}: idx=${r.chosenIndex}`);
