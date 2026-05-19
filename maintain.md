@@ -1,3 +1,26 @@
+## v1.1.28 - 2026-05-19
+### 变更内容
+**决策后回复丢失修复 + chatId 路由修复 + 轮询机制重构**
+- Bug 1 修复：`state.ts` 面板消失后 `session.awaiting = null` 未重启 stable 计时器，导致决策后 AI 回复无法被捕获转发
+  - 原代码只清了 awaiting 但注释"触发 stable 重新计时"下无实际代码
+  - 现在面板消失后立即启动 20s stable 计时器，确保 tryFinish 被触发
+- Bug 2 修复：`ws-client.ts` handleCardAction 中 targetType/targetId 从 event.open_chat_id 推导，飞书 SDK 不一定填充该字段，回退到 operator.open_id 导致回执发到私聊
+  - 改为使用 session.ctx.targetType 和 session.ctx.targetId（来自原始消息路由），确保决策反馈发到群聊
+  - 中断按钮回调同样修复：优先使用 session.ctx，回退到 event
+- 轮询机制重构：
+  - 固定 setInterval 改为递归 setTimeout + 8～15 秒随机间隔
+  - 进度通知从独立 startProgressTimer 合并到轮询循环：前 10 分钟每 1 分钟，10 分钟后每 10 分钟
+  - 硬超时从 600s（10 分钟）改为 3600s（1 小时），移除 awaiting 状态下跳过硬超时逻辑
+  - stableMs 从 `pollInterval*2` 改为固定 20 秒（适配 8~15s 轮询节奏）
+  - SessionState 接口：`progressTimer` → `pollTimer`，新增 `lastProgressNotifiedAt`
+  - 移除 `startProgressTimer` 函数，进度通知逻辑内联到 PollingHandlers.onProgress
+
+### 影响范围
+- `src/server/session/state.ts` — Bug 1 修复 + 轮询重构 + 接口变更
+- `src/server/channel/feishu/ws-client.ts` — Bug 2 修复 + 移除 startProgressTimer + onProgress 回调
+- `src/server/config.ts` — bridge.timeout 默认值 600 → 3600
+- `config.yaml` — timeout: 600 → 3600
+
 ## v1.1.27 - 2026-05-19
 ### 变更内容
 **CC v2.1.138 全量面板类型测试 + 修复**

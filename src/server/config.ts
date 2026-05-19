@@ -92,7 +92,7 @@ const DEFAULTS: AppConfig = {
   },
   bridge: {
     progressInterval: 60,
-    timeout: 600,
+    timeout: 3600,
     pollInterval: 2,
     maxConcurrent: 4,
   },
