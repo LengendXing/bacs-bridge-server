@@ -7,7 +7,7 @@ import config from '../config.js';
 export interface SessionState {
   processName: string;
   cliKind: string;
-  progressTimer: ReturnType<typeof setInterval> | null;
+  pollTimer: ReturnType<typeof setTimeout> | null;
   stableTimer: ReturnType<typeof setTimeout> | null;
   hardDeadlineTimer: ReturnType<typeof setTimeout> | null;
   accumulated: string;
@@ -23,6 +23,8 @@ export interface SessionState {
   };
   /** 最近一次轮询检测到的工具调用列表 */
   lastToolCalls: string[];
+  /** 上次发送进度通知的时间戳，用于 1min/10min 降级逻辑 */
+  lastProgressNotifiedAt: number;
 }
 
 export interface SessionContext {
@@ -41,7 +43,7 @@ const sessions: Map<string, SessionState> = new Map();
 function clearSessionTimers(processName: string): void {
   const s = sessions.get(processName);
   if (!s) return;
-  if (s.progressTimer) { clearInterval(s.progressTimer); s.progressTimer = null; }
+  if (s.pollTimer) { clearTimeout(s.pollTimer); s.pollTimer = null; }
   if (s.stableTimer) { clearTimeout(s.stableTimer); s.stableTimer = null; }
   if (s.hardDeadlineTimer) { clearTimeout(s.hardDeadlineTimer); s.hardDeadlineTimer = null; }
 }
@@ -50,7 +52,7 @@ export function createSession(ctx: SessionContext): SessionState {
   const session: SessionState = {
     processName: ctx.processName,
     cliKind: ctx.cliKind,
-    progressTimer: null,
+    pollTimer: null,
     stableTimer: null,
     hardDeadlineTimer: null,
     accumulated: '',
@@ -59,6 +61,7 @@ export function createSession(ctx: SessionContext): SessionState {
     ctx,
     awaiting: null,
     lastToolCalls: [],
+    lastProgressNotifiedAt: Date.now(),
   };
   sessions.set(ctx.processName, session);
   return session;
@@ -82,22 +85,11 @@ export function hasActiveSession(processName: string): boolean {
   return sessions.has(processName);
 }
 
-export function startProgressTimer(
-  session: SessionState,
-  onProgress: (session: SessionState) => void,
-): void {
-  const interval = (config.bridge.progressInterval || 60) * 1000;
-  session.progressTimer = setInterval(() => {
-    if (session.replied) return;
-    onProgress(session);
-  }, interval);
-}
-
 export function startHardDeadline(
   session: SessionState,
   onTimeout: (session: SessionState) => void,
 ): void {
-  const timeoutMs = (config.bridge.timeout || 600) * 1000;
+  const timeoutMs = (config.bridge.timeout || 3600) * 1000;
   session.hardDeadlineTimer = setTimeout(() => {
     if (session.replied) return;
     onTimeout(session);
@@ -111,6 +103,8 @@ export interface PollingHandlers {
    *  会被去重：同一个 panelFingerprint 只会触发一次
    */
   onAwaiting: (session: SessionState, panel: ChoicePanel) => void;
+  /** 进度通知回调（前 10 分钟每 1 分钟，之后每 10 分钟） */
+  onProgress?: (session: SessionState) => void;
 }
 
 export function startOutputPolling(
@@ -118,13 +112,16 @@ export function startOutputPolling(
   handlers: PollingHandlers,
 ): void {
   const adapter = getAdapter(session.cliKind);
-  const stableMs = Math.max(3, (config.bridge.pollInterval || 2) * 2) * 1000;
+  const stableMs = 20_000; // 20s — CC 输出稳定阈值
+
   let lastLength = 0;
-  const pollInterval = config.bridge.pollInterval * 1000;
-  // 周期性 detectState 检查计数器：每 N 次轮询主动检测一次终态
-  // 避免输出长度不变时 tryFinish 永远不被触发，导致必须等硬超时
   let pollCount = 0;
-  const stateCheckEvery = Math.max(3, Math.round(10 / (config.bridge.pollInterval || 2)));
+  const stateCheckEvery = 3; // 每 3 次轮询主动检测一次终态
+
+  // 8～15 秒随机轮询间隔
+  function randomPollMs(): number {
+    return (8 + Math.random() * 7) * 1000;
+  }
 
   let _executor: RemoteExecutor | null = null;
   async function getEx(): Promise<RemoteExecutor> {
@@ -132,7 +129,15 @@ export function startOutputPolling(
     return _executor;
   }
 
-  const timerId = setInterval(() => {
+  function scheduleNext(delay: number): void {
+    if (session.replied && !session.awaiting) return;
+    if (sessions.get(session.processName) !== session) return;
+    session.pollTimer = setTimeout(poll, delay);
+  }
+
+  function poll(): void {
+    if (sessions.get(session.processName) !== session) return;
+
     getEx()
       .then((executor) =>
         adapter.capturePane(
@@ -143,23 +148,16 @@ export function startOutputPolling(
       )
       .then((res) => {
         if (res.error) {
-          clearInterval(timerId);
           import('../middleware/logger.js').then((m) =>
             m.default.log('error', '轮询 capturePane 失败，停止轮询', res.error),
           );
           return;
         }
 
-        // 已经回复并结束 → 停轮询；
-        // 但 awaiting_choice 状态下 session.replied=false，要继续轮询直到用户回复后回到 idle
-        if (session.replied && !session.awaiting) {
-          clearInterval(timerId);
-          return;
-        }
+        // 已经回复并结束 → 停轮询
+        if (session.replied && !session.awaiting) return;
 
         session.accumulated = res.output;
-
-        // 提取工具调用信息——只取最后一个 ❯ 之后的部分，避免把旧对话的工具调用捞出来
         session.lastToolCalls = extractRecentToolCalls(adapter, res.output);
 
         // 优先：决策面板探测——一旦面板出现立刻推送，不必等 stable
@@ -170,20 +168,24 @@ export function startOutputPolling(
             session.awaiting = { panel, panelKey: fp, pushedAt: Date.now() };
             handlers.onAwaiting(session, panel);
           }
-          // 面板出现期间，"长度变化驱动 stable→tryFinish" 那套不应触发：清掉 stableTimer
+          // 面板出现期间，清掉 stableTimer
           if (session.stableTimer) {
             clearTimeout(session.stableTimer);
             session.stableTimer = null;
           }
           lastLength = res.output.length;
+          scheduleNext(randomPollMs());
           return;
         }
 
-        // 之前在等待，但当前 pane 已无面板 → 用户决策已被消化，cc 进入 working/idle
-        // 清掉 awaiting，让后续 tryFinish 走常规终态流程
+        // 面板消失 → 用户决策已被消化，cc 进入 working/idle
+        // 清掉 awaiting 并立即重启 stable 计时，确保 tryFinish 能被触发
         if (session.awaiting) {
           session.awaiting = null;
-          // 触发 stable 重新计时（输出已经在变化）
+          if (session.stableTimer) clearTimeout(session.stableTimer);
+          session.stableTimer = setTimeout(() => {
+            tryFinish(session, adapter, handlers);
+          }, stableMs);
         }
 
         pollCount++;
@@ -195,21 +197,36 @@ export function startOutputPolling(
             tryFinish(session, adapter, handlers);
           }, stableMs);
         } else if (pollCount % stateCheckEvery === 0) {
-          // 输出长度没变化，但已经轮询了 N 次 → 主动 detectState
-          // 防止 CC 已回到 idle 但 pane 长度不变导致 tryFinish 永远不触发
           tryFinish(session, adapter, handlers);
         }
         lastLength = res.output.length;
+
+        // 进度通知：前 10 分钟每 1 分钟，之后每 10 分钟
+        if (!session.awaiting && !session.replied && handlers.onProgress) {
+          const elapsedMs = Date.now() - session.startedAt;
+          const sinceLastMs = Date.now() - session.lastProgressNotifiedAt;
+          const progressIntervalMs = elapsedMs < 600_000 ? 60_000 : 600_000;
+          if (sinceLastMs >= progressIntervalMs) {
+            handlers.onProgress(session);
+            session.lastProgressNotifiedAt = Date.now();
+          }
+        }
+
+        scheduleNext(randomPollMs());
       })
       .catch((e: Error) => {
-        clearInterval(timerId);
         import('../middleware/logger.js').then((m) =>
-          m.default.log('error', '轮询异常，停止轮询', e.message),
+          m.default.log('error', '轮询异常', e.message),
         );
+        // 异常后仍继续轮询（除非 session 已结束）
+        scheduleNext(randomPollMs());
       });
-  }, pollInterval);
+  }
 
-  setTimeout(() => tryFinish(session, adapter, handlers), 7000);
+  // 7 秒后主动检测一次终态（快速响应场景的安全网）
+  setTimeout(() => tryFinish(session, adapter, handlers), 7_000);
+  // 启动轮询
+  scheduleNext(randomPollMs());
 }
 
 /** 只提取最后一个 ❯ 提示符之后的工具调用，避免把旧对话的工具调用捞出来 */

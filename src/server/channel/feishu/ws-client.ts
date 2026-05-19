@@ -20,7 +20,6 @@ import { getAdapter } from '../../cli/factory.js';
 import { getExecutor } from '../../executor/factory.js';
 import {
   createSession,
-  startProgressTimer,
   startHardDeadline,
   startOutputPolling,
   endSession,
@@ -411,8 +410,14 @@ function handleCardAction(binding: BindingRecord, event: CardActionEvent): void 
     if (value.processName !== processName) return;
     const adapter = getAdapter(binding.cliKind);
     const sessionName = `${adapter.sessionPrefix}-${processName}`;
-    const targetType: 'chat_id' | 'open_id' = event.open_chat_id ? 'chat_id' : 'open_id';
-    const targetId = event.open_chat_id || event.operator?.open_id || '';
+    const session = getSession(processName);
+    // 使用 session.ctx 的 target（来自原始消息），回退到 event 的 open_chat_id
+    const targetType: 'chat_id' | 'open_id' = session
+      ? session.ctx.targetType as 'chat_id' | 'open_id'
+      : (event.open_chat_id ? 'chat_id' : 'open_id');
+    const targetId = session
+      ? session.ctx.targetId
+      : (event.open_chat_id || event.operator?.open_id || '');
     if (!targetId || !binding.feishuAppId || !binding.feishuAppSecret) return;
 
     getExecutor(binding.machineId ?? null)
@@ -460,8 +465,9 @@ function handleCardAction(binding: BindingRecord, event: CardActionEvent): void 
     return;
   }
   const panel = session.awaiting.panel;
-  const targetType: 'chat_id' | 'open_id' = event.open_chat_id ? 'chat_id' : 'open_id';
-  const targetId = event.open_chat_id || event.operator?.open_id || '';
+  // 使用 session.ctx 的 target（来自原始消息），确保回执发到群聊而非私聊
+  const targetType = session.ctx.targetType as 'chat_id' | 'open_id';
+  const targetId = session.ctx.targetId;
   if (!targetId || !binding.feishuAppId || !binding.feishuAppSecret) {
     logger.log('warn', '[CardAction] 缺少回执路由信息');
     return;
@@ -675,41 +681,28 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
     }
     logger.log('info', `消息已路由到进程 ${processName}: ${msgText.slice(0, 60)}`);
 
-    startProgressTimer(session, (s: SessionState) => {
-      // 等待用户决策时不发"处理中"卡片（避免误导）；决策卡片已推送
-      if (s.awaiting) return;
-      const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
-      const card = sender.buildWorkingCard(s.processName, elapsed, s.ctx.msgText, s.lastToolCalls);
-      sender
-        .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
-        .catch((e: Error) => logger.log('error', '发送进度卡片失败', e.message));
-    });
-
     startHardDeadline(session, (s: SessionState) => {
       if (s.replied) return;
-      // 等待用户决策中 → 不算超时（用户可能正在飞书外离开），保持 session
-      if (s.awaiting) {
-        logger.log('info', `进程 ${s.processName} 处于 awaiting_choice，跳过硬超时`);
-        return;
-      }
 
       // 硬超时前再检测一次：如果 cc 正在等待决策但之前 extractChoicePanel
       // 没识别出来（新格式），此时尝试用全量 pane 重新检测
-      const panel = adapter.extractChoicePanel(s.accumulated);
-      if (panel) {
-        s.awaiting = { panel, panelKey: panelFingerprint(panel), pushedAt: Date.now() };
-        const card = sender.buildAwaitingCard(
-          s.processName,
-          panel.title,
-          panel.options,
-          panel.defaultIndex,
-          s.ctx.msgText,
-        );
-        sender
-          .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
-          .catch((e: Error) => logger.log('error', '发送决策卡片失败', e.message));
-        logger.log('info', `硬超时检测到决策面板: ${panel.title}（${panel.options.length} 个选项）`);
-        return; // 保持 session，让用户选择
+      if (!s.awaiting) {
+        const panel = adapter.extractChoicePanel(s.accumulated);
+        if (panel) {
+          s.awaiting = { panel, panelKey: panelFingerprint(panel), pushedAt: Date.now() };
+          const card = sender.buildAwaitingCard(
+            s.processName,
+            panel.title,
+            panel.options,
+            panel.defaultIndex,
+            s.ctx.msgText,
+          );
+          sender
+            .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+            .catch((e: Error) => logger.log('error', '发送决策卡片失败', e.message));
+          logger.log('info', `硬超时检测到决策面板: ${panel.title}（${panel.options.length} 个选项）`);
+          return;
+        }
       }
 
       const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
@@ -759,6 +752,14 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
           .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
           .catch((e: Error) => logger.log('error', '发送决策卡片失败', e.message));
         logger.log('info', `cc 等待决策: ${panel.title}（${panel.options.length} 个选项）`);
+      },
+      onProgress: (s: SessionState) => {
+        if (s.awaiting) return;
+        const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
+        const card = sender.buildWorkingCard(s.processName, elapsed, s.ctx.msgText, s.lastToolCalls);
+        sender
+          .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+          .catch((e: Error) => logger.log('error', '发送进度卡片失败', e.message));
       },
     });
     } catch (e: any) {
