@@ -1,3 +1,20 @@
+## v1.1.28.3 - 2026-05-19
+### 变更内容
+**修复决策后无限轮询 — v1.1.28.2 引入的回归 Bug**
+- 根因1：`decisionJustMade=true` 且面板仍在 pane 中时，`if (panel)` 分支 return early，decisionJustMade 永远不被消费，stableTimer 被清除，tryFinish 永远无法触发
+- 根因2：tryFinish 中 detectState 因 scrollback 旧面板返回 `awaiting_choice` 直接 return，CC 实际 idle 但检测不到
+- 修复：
+  - poll()：decisionJustMade 或已决策面板时不 return early，让 5s stable 计时器生效
+  - poll()：decisionJustMade 后用 3-5s 快速轮询替代 8-15s 随机间隔
+  - 新增 `lastDecidedPanelKey` 字段，防止决策后面板重复推送
+  - tryFinish()：awaiting_choice + session.awaiting===null 时检查 pane 底部 idle 指示符，覆写为 idle
+  - 面板消失时清除 lastDecidedPanelKey
+
+### 影响范围
+- `src/server/session/state.ts` — poll() 不再 return early + tryFinish stale 面板覆写 + lastDecidedPanelKey
+- `src/server/channel/feishu/ws-client.ts` — CardAction + text choice handler 设 lastDecidedPanelKey
+- `src/server/session/state.test.ts` — 新增 lastDecidedPanelKey 测试
+
 ## v1.1.28.2 - 2026-05-19
 ### 变更内容
 **修复决策后 AI 回复延迟 2 分钟的关键 Bug**
