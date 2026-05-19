@@ -1,3 +1,22 @@
+## v1.1.28.1 - 2026-05-19
+### 变更内容
+**连续决策面板支持 + inline 面板检测修复 + 新增 19 条测试**
+- 修复 inline 格式面板检测 Bug：`raw.match(inlineRe)` 从上往下找第一个匹配，连续 inline 面板时会误取旧面板
+  - 改为 `raw.matchAll(inlineRe)` 取最后一个匹配（最新的 inline 面板）
+- 验证连续决策面板场景完整支持：
+  - box 格式：倒序扫描 `╰──╯` 天然取最新 ✅
+  - borderless 格式：倒序找 `❯ N.` 天然取最新 ✅
+  - inline 格式：修复后取最后一个匹配 ✅
+  - awaiting 清除后 `!session.awaiting` 为 true，相同指纹面板仍会推送 ✅
+- 新增 7 条 cc-adapter 连续面板测试（box 重复、inline 重复、Edit 权限、Bash 权限、工作状态、idle 回复提取、inline accept→reject）
+- 新增 12 条 state.ts 单元测试（session 生命周期、panelFingerprint、awaiting 连续转换、ctx 保持、进度通知时间逻辑）
+- 新建 `src/server/session/state.test.ts` 测试文件
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — inline 面板匹配修复（matchAll 取最后）
+- `src/server/cli/cc-adapter.test.ts` — 新增 7 条连续面板测试
+- `src/server/session/state.test.ts` — 新建，12 条状态机测试
+
 ## v1.1.28 - 2026-05-19
 ### 变更内容
 **决策后回复丢失修复 + chatId 路由修复 + 轮询机制重构**
