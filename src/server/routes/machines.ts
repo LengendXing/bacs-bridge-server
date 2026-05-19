@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
 import { encryptCredential, sanitizeMachine } from '../crypto/credentials.js';
 import { invalidateExecutor } from '../executor/factory.js';
+import { provisionMachine } from '../executor/provision.js';
 
 const router = Router();
 
@@ -66,6 +67,14 @@ router.post('/api/machines', requireAuth, (req, res) => {
 
     logger.log('info', `机器创建: ${name} (${host})`);
     res.json({ code: 0, data: sanitizeMachine({ ...result }) });
+
+    // 后台异步预装（不阻塞响应）
+    const newId = result.id;
+    if (!result.builtin) {
+      provisionMachine(newId).catch(e => {
+        logger.log('error', `自动预装失败: machine=${newId}`, e?.message || e);
+      });
+    }
   } catch (e: any) {
     logger.log('error', '机器创建失败', e.message);
     res.json({ code: 1001, message: '创建失败: ' + e.message });
@@ -175,6 +184,7 @@ router.post('/api/machines/:id/test', requireAuth, async (req, res) => {
     const hostnameResult = await executor.exec('hostname', { timeout: 5000 });
     const osResult = await executor.exec('uname -a', { timeout: 5000 });
     const tmuxResult = await executor.exec('tmux -V', { timeout: 5000 });
+    const claudeResult = await executor.exec('claude --version 2>/dev/null || echo "not_found"', { timeout: 10000 });
     const latencyMs = Date.now() - start;
 
     if (executor.dispose) await executor.dispose();
@@ -196,6 +206,10 @@ router.post('/api/machines/:id/test', requireAuth, async (req, res) => {
       updatedAt: new Date().toISOString(),
     }).where(eq(machines.id, id)).run();
 
+    const claudeVersion = claudeResult.ok && claudeResult.stdout.trim() !== 'not_found'
+      ? claudeResult.stdout.trim().split('\n')[0]
+      : undefined;
+
     res.json({
       code: 0,
       data: {
@@ -203,6 +217,7 @@ router.post('/api/machines/:id/test', requireAuth, async (req, res) => {
         hostname: hostnameResult.ok ? hostnameResult.stdout.trim() : undefined,
         os: osResult.ok ? osResult.stdout.trim() : undefined,
         tmuxVersion: tmuxResult.ok ? tmuxResult.stdout.trim() : undefined,
+        claudeVersion,
         latencyMs,
         error: ok ? undefined : hostnameResult.error,
       },
@@ -216,6 +231,32 @@ router.post('/api/machines/:id/test', requireAuth, async (req, res) => {
     }).where(eq(machines.id, id)).run();
 
     res.json({ code: 0, data: { ok: false, latencyMs: 0, error: e.message } });
+  }
+});
+
+// POST /api/machines/:id/provision
+router.post('/api/machines/:id/provision', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const db = getDb();
+  const machine = db.select().from(machines).where(eq(machines.id, id)).get();
+  if (!machine) return res.json({ code: 1004, message: '机器不存在' });
+  if (machine.builtin) return res.json({ code: 1002, message: '本机记录无需预装' });
+
+  try {
+    const result = await provisionMachine(id);
+
+    const userId = req.user?.sub;
+    db.insert(auditLogs).values({
+      userId,
+      action: 'machine_provision',
+      target: String(id),
+      detail: `ok=${result.ok} steps=${result.steps?.join(',') || ''}`,
+      ipAddress: req.ip,
+    }).run();
+
+    res.json({ code: 0, data: result });
+  } catch (e: any) {
+    res.json({ code: 0, data: { ok: false, error: e.message } });
   }
 });
 

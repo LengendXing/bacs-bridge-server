@@ -16,15 +16,16 @@
             <th>{{ t('machines.thOs') }}</th>
             <th>{{ t('machines.thAuth') }}</th>
             <th>{{ t('machines.thStatus') }}</th>
+            <th>{{ t('machines.thProvision') }}</th>
             <th>{{ t('machines.thAction') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="6" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
+            <td colspan="7" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
           </tr>
           <tr v-else-if="pagedMachines.length === 0">
-            <td colspan="6" class="text-center" style="color: var(--text-secondary)">{{ t('machines.empty') }}</td>
+            <td colspan="7" class="text-center" style="color: var(--text-secondary)">{{ t('machines.empty') }}</td>
           </tr>
           <tr v-for="m in pagedMachines" :key="m.id">
             <td style="font-weight: 500">
@@ -39,10 +40,20 @@
             </td>
             <td>
               <span v-if="m.builtin" style="color: var(--text-secondary)">-</span>
+              <span v-else-if="provisionStatusMap[m.id]?.ok" class="badge badge-online">{{ t('machines.provisionDone') }}</span>
+              <span v-else-if="provisionStatusMap[m.id]?.provisioning" style="color: var(--warning)">{{ t('machines.provisioning') }}</span>
+              <span v-else-if="provisionStatusMap[m.id]?.error" class="badge badge-offline">{{ t('machines.provisionFailed') }}</span>
+              <span v-else style="color: var(--text-secondary)">{{ t('machines.provisionPending') }}</span>
+            </td>
+            <td>
+              <span v-if="m.builtin" style="color: var(--text-secondary)">-</span>
               <div v-else class="flex items-center gap-1">
                 <button class="btn-mac btn-mac-sm" @click="openEdit(m)">{{ t('common.edit') }}</button>
                 <button class="btn-mac btn-mac-sm" :disabled="testingId === m.id" @click="testConn(m)">
                   {{ testingId === m.id ? t('machines.testing') : t('machines.test') }}
+                </button>
+                <button class="btn-mac btn-mac-sm" :disabled="provisionStatusMap[m.id]?.provisioning" @click="doProvision(m)">
+                  {{ provisionStatusMap[m.id]?.provisioning ? t('machines.provisioning') : t('machines.provision') }}
                 </button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmDelete(m)">{{ t('common.delete') }}</button>
               </div>
@@ -67,6 +78,7 @@
           <p v-if="testResult.hostname" style="color: var(--text-secondary)">{{ t('machines.testHostname') }} {{ testResult.hostname }}</p>
           <p v-if="testResult.os" style="color: var(--text-secondary)">{{ t('machines.testOs') }} {{ testResult.os }}</p>
           <p v-if="testResult.tmuxVersion" style="color: var(--text-secondary)">{{ t('machines.testTmux') }} {{ testResult.tmuxVersion }}</p>
+          <p v-if="testResult.claudeVersion" style="color: var(--text-secondary)">{{ t('machines.testClaude') }} {{ testResult.claudeVersion }}</p>
           <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">{{ t('machines.testLatency') }} {{ testResult.latencyMs }}ms</p>
         </div>
         <div v-else>
@@ -74,6 +86,41 @@
           <p v-if="testResult.latencyMs" style="color: var(--text-secondary)">{{ t('machines.testElapsed') }} {{ testResult.latencyMs }}ms</p>
         </div>
         <button class="btn-mac btn-mac-sm mt-4" @click="testResult = null">{{ t('common.close') }}</button>
+      </div>
+    </div>
+
+    <!-- 预装结果弹窗 -->
+    <div v-if="provisionResult" class="modal-overlay" @click.self="provisionResult = null">
+      <div class="modal-card" style="width: 460px">
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">{{ t('machines.provisionResultTitle') }}</h3>
+        <div v-if="provisionResult.ok" class="mb-3">
+          <p style="color: var(--text-secondary)">{{ t('machines.provisionStatus') }} <span class="badge badge-online">{{ t('machines.provisionDone') }}</span></p>
+          <p v-if="provisionResult.node" style="color: var(--text-secondary)">Node.js: {{ provisionResult.node }}</p>
+          <p v-if="provisionResult.tmux" style="color: var(--text-secondary)">tmux: {{ provisionResult.tmux }}</p>
+          <p v-if="provisionResult.claude" style="color: var(--text-secondary)">Claude: {{ provisionResult.claude }}</p>
+          <div v-if="provisionResult.steps?.length" class="mt-2">
+            <p class="text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.provisionSteps') }}</p>
+            <div v-for="step in provisionResult.steps" :key="step" class="flex items-center gap-1 text-xs" style="color: var(--text-secondary)">
+              <span v-if="step.endsWith(':skip') || step.endsWith(':skip')" style="color: var(--success)">&#10003;</span>
+              <span v-else-if="step.endsWith(':installed') || step.endsWith(':upgraded') || step.endsWith(':created')" style="color: var(--success)">&#10003;+</span>
+              <span v-else-if="step.endsWith(':failed')" style="color: var(--danger)">&#10007;</span>
+              <span v-else>&#8226;</span>
+              <span>{{ step }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else>
+          <p style="color: var(--danger)">{{ t('machines.provisionFailed') }} {{ provisionResult.error }}</p>
+          <div v-if="provisionResult.steps?.length" class="mt-2">
+            <p class="text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('machines.provisionSteps') }}</p>
+            <div v-for="step in provisionResult.steps" :key="step" class="flex items-center gap-1 text-xs" style="color: var(--text-secondary)">
+              <span v-if="step.endsWith(':failed')" style="color: var(--danger)">&#10007;</span>
+              <span v-else>&#8226;</span>
+              <span>{{ step }}</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-mac btn-mac-sm mt-4" @click="provisionResult = null">{{ t('common.close') }}</button>
       </div>
     </div>
 
@@ -149,7 +196,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
-import type { Machine, MachineTestResult } from '@shared/types';
+import type { Machine, MachineTestResult, ProvisionResult } from '@shared/types';
 
 const { t } = useI18n();
 const { get, post, put, del } = useApi();
@@ -164,6 +211,8 @@ const pagedMachines = computed(() => {
 });
 const testingId = ref<number | null>(null);
 const testResult = ref<MachineTestResult | null>(null);
+const provisionResult = ref<ProvisionResult | null>(null);
+const provisionStatusMap = ref<Record<number, { ok?: boolean; provisioning?: boolean; error?: string }>>({});
 
 const showModal = ref(false);
 const editId = ref<number | null>(null);
@@ -272,6 +321,25 @@ async function confirmDelete(m: Machine) {
     }
     await refresh();
   } catch { /* */ }
+}
+
+async function doProvision(m: Machine) {
+  provisionStatusMap.value[m.id] = { provisioning: true };
+  try {
+    const res = await post<ProvisionResult>(`/api/machines/${m.id}/provision`, {});
+    if (res.code === 0 && res.data) {
+      provisionResult.value = res.data;
+      provisionStatusMap.value[m.id] = {
+        ok: res.data.ok,
+        error: res.data.ok ? undefined : res.data.error,
+      };
+    } else {
+      provisionStatusMap.value[m.id] = { error: res?.message || 'Failed' };
+    }
+    await refresh();
+  } catch {
+    provisionStatusMap.value[m.id] = { error: t('common.networkError') };
+  }
 }
 
 onMounted(refresh);

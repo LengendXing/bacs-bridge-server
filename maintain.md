@@ -1,3 +1,28 @@
+## v1.1.29 - 2026-05-19
+### 变更内容
+**机器自动预装（Provision）— 创建机器后自动 SSH 上去安装环境**
+- 新增：幂等预装脚本 `scripts/provision-remote.sh`
+  - 自动检测/安装 Node.js ≥18、tmux、Claude Code CLI
+  - 自动创建 PATH symlink（`/usr/local/bin/claude`）
+  - 输出 JSON 结果供后端解析
+- 新增：后端预装模块 `src/server/executor/provision.ts`
+  - `provisionMachine(machineId)` 读取脚本 → base64 编码 → SSH 远程执行
+  - 解析 JSON 结果 → 更新 machines 表 osVersion
+- 新增：API `POST /api/machines/:id/provision` 手动预装端点
+- 优化：`POST /api/machines` 创建机器后，后台异步自动触发预装
+- 优化：`POST /api/machines/:id/test` 增加 Claude 版本检测结果
+- 前端：MachinesView 新增「预装」按钮 + 预装结果弹窗 + 预装状态列
+- i18n：zh/en 新增预装相关文案
+- 类型：shared/types 新增 ProvisionResult 类型
+
+### 影响范围
+- `scripts/provision-remote.sh` — 新建
+- `src/server/executor/provision.ts` — 新建
+- `src/server/routes/machines.ts` — 加 provision 端点 + 创建后自动预装
+- `src/client/views/MachinesView.vue` — 加预装按钮/弹窗/状态列
+- `src/client/locales/zh.ts` / `en.ts` — 加预装文案
+- `src/shared/types.ts` — 加 ProvisionResult + MachineTestResult.claudeVersion
+
 ## v1.1.28.6 - 2026-05-19
 ### 变更内容
 **修复多轮决策后 AI 回复丢失 + 轮询加速到 1 秒**
