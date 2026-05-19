@@ -118,15 +118,15 @@ export function startOutputPolling(
   handlers: PollingHandlers,
 ): void {
   const adapter = getAdapter(session.cliKind);
-  const stableMs = 20_000; // 20s — CC 输出稳定阈值
+  const stableMs = 3_000; // 3s — CC 输出稳定阈值（1s 轮询下 3 次不变即可确认）
 
   let lastLength = 0;
   let pollCount = 0;
-  const stateCheckEvery = 3; // 每 3 次轮询主动检测一次终态
+  const stateCheckEvery = 5; // 每 5 次轮询主动检测一次终态（~5s）
 
-  // 8～15 秒随机轮询间隔
+  // 1 秒轮询间隔（轻微随机抖动避免整齐同步）
   function randomPollMs(): number {
-    return (8 + Math.random() * 7) * 1000;
+    return 800 + Math.random() * 400; // 800~1200ms
   }
 
   let _executor: RemoteExecutor | null = null;
@@ -201,15 +201,15 @@ export function startOutputPolling(
           }, stableMs);
         }
 
-        // 用户刚做了决策 → 用更短间隔（5s）检测终态，避免等 20s stable 或 3 轮 pollCount
+        // 用户刚做了决策 → 加速检测终态
         if (session.decisionJustMade) {
           session.decisionJustMade = false;
           if (session.stableTimer) clearTimeout(session.stableTimer);
           session.stableTimer = setTimeout(() => {
             tryFinish(session, adapter, handlers);
-          }, 5_000);
+          }, 2_000);
           lastLength = res.output.length;
-          scheduleNext(3_000 + Math.random() * 2_000); // 3-5s 快速轮询
+          scheduleNext(500); // 决策后首轮 500ms 快速轮询
           return;
         }
 
@@ -248,8 +248,8 @@ export function startOutputPolling(
       });
   }
 
-  // 7 秒后主动检测一次终态（快速响应场景的安全网）
-  setTimeout(() => tryFinish(session, adapter, handlers), 7_000);
+  // 3 秒后主动检测一次终态（快速响应场景的安全网）
+  setTimeout(() => tryFinish(session, adapter, handlers), 3_000);
   // 启动轮询
   scheduleNext(randomPollMs());
 }
@@ -303,14 +303,26 @@ function tryFinish(
             if (sessions.get(processName) !== session) return;
             const lastLines = fresh.output.split(/\r?\n/).slice(-5).join('\n');
             if (/❯/.test(lastLines) && /\?\s*for shortcuts/.test(lastLines)) {
-              // CC 实际 idle → 走 idle 确认流程
-              state = 'idle';
+              // CC 实际 idle → stale panel override 已验证 idle，跳过双重确认直接提取回复
+              // （双重确认会再调 detectState，scrollback 旧面板会让它再次返回 awaiting_choice，
+              //   且该路径无 stale panel override → 回复永远不会被发送）
+              const freshFull = await adapter.capturePane(
+                `${adapter.sessionPrefix}-${processName}`,
+                undefined,
+                executor,
+              );
+              if (!freshFull.error && freshFull.output.length > (session.accumulated || '').length) {
+                session.accumulated = freshFull.output;
+              }
+              const reply = adapter.extractReply(session.accumulated, session.ctx.msgText);
+              handlers.onReply(session, reply || '');
+              return;
             } else {
-              // 还在工作 → 5s 后重试
+              // 还在工作 → 2s 后重试
               if (!session.stableTimer) {
                 session.stableTimer = setTimeout(() => {
                   tryFinish(session, adapter, handlers);
-                }, 5_000);
+                }, 2_000);
               }
               return;
             }
@@ -318,7 +330,7 @@ function tryFinish(
             if (!session.stableTimer) {
               session.stableTimer = setTimeout(() => {
                 tryFinish(session, adapter, handlers);
-              }, 5_000);
+              }, 2_000);
             }
             return;
           }
@@ -329,7 +341,7 @@ function tryFinish(
       }
       if (state === 'working') return;
 
-      // state === 'idle'：双重确认（500ms 后再 detectState 一次，避免过渡帧误判）
+      // state === 'idle'（由 detectState 直接返回，非 stale panel override）：双重确认
       setTimeout(() => {
         if (session.replied) return;
         if (sessions.get(processName) !== session) return;

@@ -1,3 +1,22 @@
+## v1.1.28.6 - 2026-05-19
+### 变更内容
+**修复多轮决策后 AI 回复丢失 + 轮询加速到 1 秒**
+- Bug 修复：多轮决策（如 Submit answers）后 AI 回复永远无法转发回飞书
+  - 根因：tryFinish stale panel override 将 state 从 `awaiting_choice` 改写为 `idle` 后，
+    代码落入双重确认路径（500ms 后再调 detectState），但 detectState 因 scrollback
+    旧面板文本再次返回 `awaiting_choice`，双重确认检查 `state2 !== 'idle'` 直接 return，
+    回复永远不会被提取发送
+  - 修复：stale panel override 成功后，跳过双重确认，直接用已有的 executor 捕获
+    全量 pane 提取回复并发送（stale panel override 已经验证了 idle 状态，无需重复确认）
+- 轮询间隔从 8-15 秒随机改为 ~1 秒（800-1200ms 抖动）
+  - stableMs 从 20s 降为 3s（1s 轮询下 3 次不变即确认稳定）
+  - stateCheckEvery 从 3 改为 5（每 ~5s 主动检测终态）
+  - 决策后快速轮询从 3-5s 改为 500ms，stableTimer 从 5s 改为 2s
+  - 初始安全网检测从 7s 改为 3s
+
+### 影响范围
+- `src/server/session/state.ts` — stale panel override 跳过双重确认 + 轮询参数全量调整
+
 ## v1.1.28.5 - 2026-05-19
 ### 变更内容
 **修复中断后消息路由完全阻断 — session 未释放**
