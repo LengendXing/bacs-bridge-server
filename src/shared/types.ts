@@ -115,7 +115,21 @@ export interface MachineTestResult {
   hostname?: string;
   os?: string;
   tmuxVersion?: string;
+  claudeVersion?: string;
   latencyMs?: number;
+  error?: string;
+}
+
+/** 机器预装步骤状态 */
+export type ProvisionStepStatus = 'skip' | 'installed' | 'upgraded' | 'created' | 'failed' | 'skipped-no-claude' | 'installed-via-npx';
+
+/** 机器预装响应 */
+export interface ProvisionResult {
+  ok: boolean;
+  node?: string;
+  tmux?: string;
+  claude?: string;
+  steps?: string[];
   error?: string;
 }
 
