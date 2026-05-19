@@ -570,6 +570,82 @@ Enter to select · Esc to cancel`;
   });
 });
 
+describe('cc-adapter.extractChoicePanel — cc v2.1.138 permission panels (real capture)', () => {
+  it('识别 Bash 权限面板（含 ────── 顶部分隔线 + Esc to cancel · Tab to amend · ctrl+e to explain）', () => {
+    const pane = `────────────────────────────────────────────────────────────────────────────────
+ Bash command
+
+   cat /etc/hostname
+   Read hostname file
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, allow reading from etc/ from this project
+   3. No
+
+ Esc to cancel · Tab to amend · ctrl+e to explain`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toBe('Do you want to proceed?');
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.options[0]).toBe('1. Yes');
+    expect(panel!.options[1]).toMatch(/^2\..*allow reading/);
+    expect(panel!.options[2]).toBe('3. No');
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别 Edit 权限面板（含 ╌╌ diff 分隔线 + (shift+tab) 选项）', () => {
+    const pane = `────────────────────────────────────────────────────────────────────────────────
+ Edit file
+ app.js
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ 1 -function hello() { return 2; }
+ 1 +function hello() { return 3; }
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Do you want to make this edit to app.js?
+ ❯ 1. Yes
+   2. Yes, allow all edits during this session (shift+tab)
+   3. No
+
+ Esc to cancel · Tab to amend`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Do you want to make this edit/);
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.options[0]).toBe('1. Yes');
+    expect(panel!.options[1]).toMatch(/^2\..*allow all edits/);
+    expect(panel!.options[2]).toBe('3. No');
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别 Write 权限面板（创建新文件）', () => {
+    const pane = `────────────────────────────────────────────────────────────────────────────────
+ Write file
+ config.json
+ Do you want to create config.json?
+ ❯ 1. Yes
+   2. Yes, and allow writing new files for this project
+   3. No
+
+ Esc to cancel · Tab to amend`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Do you want to create/);
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('选项含 (shift+tab) 不会被误判为 hint 行（关键 Bug 回归）', () => {
+    const pane = `❯ 1. Yes
+   2. Yes, allow all edits during this session (shift+tab)
+   3. No
+ Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(3);
+  });
+});
+
 describe('cc-adapter.extractChoicePanel — cc v2.1.x inline format (⏵⏵)', () => {
   it('识别 ⏵⏵ accept edits on (shift+tab to cycle)', () => {
     const pane = `● Bash(echo hello)

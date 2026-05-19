@@ -299,16 +299,13 @@ function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
   while (i < lines.length) {
     const trimmed = lines[i].trim();
 
-    // 底栏提示行 → 终止扫描
-    if (hintRe.test(trimmed)) break;
-
     // 空行 → 跳过
     if (!trimmed) { i++; continue; }
 
-    // 分隔线（──────） → 跳过，选项可能在分隔线后继续
-    if (separatorRe.test(trimmed)) { i++; continue; }
+    // 分隔线（────── / ╌╌╌╌） → 跳过，选项可能在分隔线后继续
+    if (/^[─━╌]{10,}$/.test(trimmed)) { i++; continue; }
 
-    // 选项行
+    // 选项行：优先检查（选项文本可能包含 "shift+tab" 等提示关键词）
     const m = lines[i].match(optLineRe);
     if (m) {
       opts.push({
@@ -320,6 +317,9 @@ function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
       i++;
       continue;
     }
+
+    // 底栏提示行（非选项行）→ 终止扫描
+    if (hintRe.test(trimmed)) break;
 
     // 描述子行（深度缩进 ≥4 空格，非选项行）→ 跳过
     if (/^\s{4,}/.test(lines[i]) && !optLineRe.test(lines[i])) { i++; continue; }
@@ -369,8 +369,8 @@ function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
     // 非 ❯ N. 格式的 ❯ 行 → 停止（用户输入提示等）
     if (/^\s*❯/.test(lines[titleIdx]) && !/^\s*❯\s*\d+[.)]/.test(lines[titleIdx])) break;
     if (/^\s*●/.test(lines[titleIdx])) break;
-    if (/^[─━│┃╭╰╯╮┌┐└┘]+$/.test(t)) break;
-    if (/(esc to |ctrl\+|for shortcuts)/i.test(t)) break;
+    if (/^[─━╌│┃╭╰╯╮┌┐└┘]+$/.test(t)) break;
+    if (/(esc to |ctrl\+|tab to amend|for shortcuts)/i.test(t)) break;
     // 去掉 ☐ 复选框标记
     const clean = t.replace(/^☐\s*/, '');
     if (clean) titleParts.unshift(clean);
@@ -685,7 +685,7 @@ function extractReply(raw: string, userMessage: string): string {
   for (const line of rawLines) {
     const trimmed = line.trim();
 
-    if (trimmed && /^[╭╰╯╮─━│┃┌┐└┘\s]+$/.test(trimmed)) continue;
+    if (/^[╭╰╯╮─━│┃┌┐└┘╌\s]+$/.test(trimmed)) continue;
     if (/^\s*[╭╰]/.test(line)) continue;
     if (/^\s*│.*(Welcome back|Tips for getting started|Claude Code v|What.s new|Fixed:|API Usage|\/release-notes|\/login|\/logout|\/settings|cwd:|Try ")/.test(line)) continue;
     if (/^\s*│\s*>\s/.test(line)) continue;
@@ -697,8 +697,8 @@ function extractReply(raw: string, userMessage: string): string {
     // 过滤 cc v2.1.x 内联选择提示（⏵⏵ accept edits on ...）
     if (/[⏵▶▸][⏵▶▸]?\s+(accept|reject|allow|deny|edit)\b/i.test(line)) continue;
     if (/\(shift\+tab to cycle\)/i.test(line)) continue;
-    // 过滤无边框决策面板底栏提示
-    if (/(esc to cancel|enter to confirm|enter to select|↑\/↓\s*to (?:select|navigate)|to navigate)/i.test(line)) continue;
+    // 过滤无边框决策面板底栏提示（含 CC v2.1.138 新增的 Tab to amend / ctrl+e to explain）
+    if (/(esc to cancel|enter to confirm|enter to select|↑\/↓\s*to (?:select|navigate)|to navigate|tab to amend|ctrl\+e to explain)/i.test(line)) continue;
 
     cleaned.push(line);
   }

@@ -1,3 +1,20 @@
+## v1.1.27 - 2026-05-19
+### 变更内容
+**CC v2.1.138 全量面板类型测试 + 修复**
+- 在远程机器创建 CC v2.1.138 测试进程，实测捕获所有面板格式
+- 发现并修复关键 Bug：`extractBorderlessPanel` 向下扫描时 hint 检查先于选项检查执行，导致含 `(shift+tab)` 的选项行（如 `2. Yes, allow all edits during this session (shift+tab)`）被误判为 hint 行，提前终止扫描，面板返回 null
+- 新增 CC v2.1.138 面板格式识别：
+  - Bash 权限面板（`────── 顶部分隔 + Bash command + ❯ N. 选项 + Esc to cancel · Tab to amend · ctrl+e to explain`）
+  - Edit 权限面板（`╌╌╌ diff 分隔线 + Do you want to make this edit? + ❯ N. 选项`）
+  - Write 权限面板（`────── + Write file + Do you want to create? + ❯ N. 选项`）
+- `╌`（U+254C）分隔符加入识别：separatorRe、title 扫描 break 判断、extractReply 清洗
+- `Tab to amend` / `ctrl+e to explain` 提示加入 detectState 兜底 + extractReply 过滤
+- 新增 4 条单元测试覆盖 CC v2.1.138 实际面板格式（Bash/Edit/Write + shift+tab 选项回归）
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — extractBorderlessPanel 选项/hint 检查顺序 + ╌ 分隔符 + Tab to amend
+- `src/server/cli/cc-adapter.test.ts` — 新增 4 条 v2.1.138 面板测试
+
 ## v1.1.26.5 - 2026-05-19
 ### 变更内容
 **修复 CC v2.1.126 无边框决策面板识别（v1.1.26.4 修复失败后的二次修复）**
