@@ -1,3 +1,21 @@
+## v1.1.28.2 - 2026-05-19
+### 变更内容
+**修复决策后 AI 回复延迟 2 分钟的关键 Bug**
+- 根因：handler 调 sendChoice 后立即设 `session.awaiting = null`，但轮询循环中「面板消失后重启 stable 计时器」的分支只在 `session.awaiting !== null` 时触发
+  - 导致面板消失时 stable 计时器不会重启，系统只能依赖 pollCount（每 3 轮 ~30-45s）触发 tryFinish
+  - 若输出长度不变（面板消失 + CC 输出长度接近），stable 计时器也不设置
+  - 多轮 pollCount 循环 + tryFinish 返回 working → 累计延迟 2 分钟+
+- 修复：新增 `decisionJustMade: boolean` 标志
+  - handler 设 `awaiting = null` 时同时设 `decisionJustMade = true`
+  - 轮询检测到 `decisionJustMade` → 立即启动 5s 短 stable 计时器（而非等 20s 或 3 轮 pollCount）
+  - 面板仍在 pane 中（CC 未处理按键）+ `decisionJustMade` → 跳过重复推送决策卡片
+- 实测日志对照：08:56:12 选择 No → 08:57:53 回复发送（101s 延迟），修复后预期 ~15-20s
+
+### 影响范围
+- `src/server/session/state.ts` — SessionState 新增 decisionJustMade + 轮询逻辑修改
+- `src/server/channel/feishu/ws-client.ts` — CardAction + text choice handler 设 decisionJustMade
+- `src/server/session/state.test.ts` — 补充 decisionJustMade 初始值断言
+
 ## v1.1.28.1 - 2026-05-19
 ### 变更内容
 **连续决策面板支持 + inline 面板检测修复 + 新增 19 条测试**

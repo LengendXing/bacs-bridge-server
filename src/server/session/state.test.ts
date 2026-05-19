@@ -48,6 +48,7 @@ describe('session/state — createSession & endSession', () => {
     expect(session.stableTimer).toBeNull();
     expect(session.hardDeadlineTimer).toBeNull();
     expect(session.lastProgressNotifiedAt).toBeGreaterThan(0);
+    expect(session.decisionJustMade).toBe(false);
   });
 });
 

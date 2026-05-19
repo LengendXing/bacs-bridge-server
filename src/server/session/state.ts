@@ -25,6 +25,8 @@ export interface SessionState {
   lastToolCalls: string[];
   /** 上次发送进度通知的时间戳，用于 1min/10min 降级逻辑 */
   lastProgressNotifiedAt: number;
+  /** 用户刚做出决策（handler 已发送 sendChoice），轮询需要用更短间隔检测终态 */
+  decisionJustMade: boolean;
 }
 
 export interface SessionContext {
@@ -62,6 +64,7 @@ export function createSession(ctx: SessionContext): SessionState {
     awaiting: null,
     lastToolCalls: [],
     lastProgressNotifiedAt: Date.now(),
+    decisionJustMade: false,
   };
   sessions.set(ctx.processName, session);
   return session;
@@ -164,7 +167,8 @@ export function startOutputPolling(
         const panel = adapter.extractChoicePanel(res.output);
         if (panel) {
           const fp = panelFingerprint(panel);
-          if (!session.awaiting || session.awaiting.panelKey !== fp) {
+          // 用户刚做了决策但面板还在 pane 中（CC 尚未处理按键）→ 不重复推送
+          if (!session.decisionJustMade && (!session.awaiting || session.awaiting.panelKey !== fp)) {
             session.awaiting = { panel, panelKey: fp, pushedAt: Date.now() };
             handlers.onAwaiting(session, panel);
           }
@@ -179,13 +183,21 @@ export function startOutputPolling(
         }
 
         // 面板消失 → 用户决策已被消化，cc 进入 working/idle
-        // 清掉 awaiting 并立即重启 stable 计时，确保 tryFinish 能被触发
         if (session.awaiting) {
           session.awaiting = null;
           if (session.stableTimer) clearTimeout(session.stableTimer);
           session.stableTimer = setTimeout(() => {
             tryFinish(session, adapter, handlers);
           }, stableMs);
+        }
+
+        // 用户刚做了决策 → 用更短间隔（5s）检测终态，避免等 20s stable 或 3 轮 pollCount
+        if (session.decisionJustMade) {
+          session.decisionJustMade = false;
+          if (session.stableTimer) clearTimeout(session.stableTimer);
+          session.stableTimer = setTimeout(() => {
+            tryFinish(session, adapter, handlers);
+          }, 5_000);
         }
 
         pollCount++;
