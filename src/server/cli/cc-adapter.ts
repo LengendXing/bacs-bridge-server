@@ -82,8 +82,10 @@ function detectState(processName: string, executor: RemoteExecutor): Promise<Cli
     //     但如果 pane 里出现选择/确认类提示，说明 cc 正在等用户操作
     if (/\(shift\+tab to cycle\)/i.test(tail)) return 'awaiting_choice';
     if (/enter to confirm/i.test(tail) && /(?:↑|↑|↓|⬆|⬇|up|down)\s*(?:\/|or)?\s*(?:↓|↓|↑|⬆|⬇|up|down)?\s*to select/i.test(tail)) return 'awaiting_choice';
-    // cc v2.1.x 无边框选项列表特征：❯ N. 选项 + 底栏 "Esc to cancel"
+    // cc v2.1.x 无边框选项列表特征：❯ N. 选项 + 底栏提示
     if (/esc to cancel/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
+    if (/enter to select/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
+    if (/↑\/↓\s*to navigate/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
 
     // 2. 工作中：明确的"运行中"信号
     if (/esc to interrupt/i.test(tail)) return 'working';
@@ -209,7 +211,7 @@ function parseChoiceOptions(stripped: string[]): ChoicePanel | null {
     // 排除分隔线、纯框线
     if (/^[─━┃│┌┐└┘╭╰╯╮]+$/.test(t)) continue;
     // 排除底栏快捷键提示（"Esc to cancel" / "↑/↓ to select" / "Enter to confirm"）
-    if (/(esc to cancel|to select|enter to confirm|to expand|to redo|tab to|shift\+tab)/i.test(t)) continue;
+    if (/(esc to cancel|to select|to navigate|enter to confirm|to expand|to redo|tab to|shift\+tab)/i.test(t)) continue;
 
     // 选项行判定：必须明显是"被列出的可选项"——开头有 ❯ 或者 数字. 序号
     // 单纯短句（如 "Yes" 也可能是选项，但只在已经"看到序号选项"之后再接受裸文本）
@@ -250,91 +252,140 @@ function parseChoiceOptions(stripped: string[]): ChoicePanel | null {
 
 /** 检测无边框的选项列表（cc v2.1.x 新 UI 格式）
  *
- * 典型形态（无 ╭──╮ 框线）：
+ * 典型形态（无 ╭──╮ 框线，cc v2.1.126 实测）：
+ *   ☐ Test
+ *   能看到上下选择吗？
  *   ❯ 1. Yes
+ *         affirmative
  *     2. No
- *     3. ...
- *   Esc to cancel · Enter to confirm · ↑/↓ to select
+ *         negative
+ *     3. Type something.
+ *   ────────────────────────────────────────
+ *     4. Chat about this
+ *   Enter to select · ↑/↓ to navigate · Esc to cancel
  *
- * 或更简洁的：
- *   ❯ 1. Allow once
- *     2. Allow for this session
- *     3. Deny
+ * 算法：找到 ❯ N. 行（当前高亮选项），然后向下扫描收集后续选项行，
+ *       同时也向上扫描收集前置选项（处理 ❯ 不在第 1 项的罕见情况）。
  */
 function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
-  // 找含 ❯ N. 格式的选项行（从下往上，找最近的连续选项块）
   const optLineRe = /^\s*(❯)?\s*(\d+)[.)]\s+(.+?)\s*$/;
+  const hintRe = /(esc to cancel|enter to select|enter to confirm|↑\/↓|to navigate|shift\+tab)/i;
+  const separatorRe = /^[─━]{10,}$/;
 
-  // 从下往上找第一个 ❯ N. 行，然后向上收集连续选项
-  let lastOptIdx = -1;
+  // 找最后一个 ❯ N. 行（最新面板的高亮选项）
+  let markerLineIdx = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
     if (/^\s*❯\s*\d+[.)]/.test(lines[i])) {
-      lastOptIdx = i;
+      markerLineIdx = i;
       break;
     }
   }
-  if (lastOptIdx < 0) return null;
+  if (markerLineIdx < 0) return null;
 
-  // 从 lastOptIdx 向上收集所有连续选项行
-  const optLines: { marker: boolean; idx: number; body: string }[] = [];
-  let i = lastOptIdx;
-  // 先处理 lastOptIdx 本身
-  while (i >= 0) {
+  const markerMatch = lines[markerLineIdx].match(optLineRe);
+  if (!markerMatch) return null;
+
+  const markerIdx = parseInt(markerMatch[2], 10);
+  const opts: { lineIdx: number; marker: boolean; idx: number; body: string }[] = [];
+  opts.push({
+    lineIdx: markerLineIdx,
+    marker: true,
+    idx: markerIdx,
+    body: markerMatch[3].trim().replace(/\s{2,}/g, ' '),
+  });
+
+  // ── 向下扫描：收集高亮项之后的选项 ──
+  let i = markerLineIdx + 1;
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+
+    // 底栏提示行 → 终止扫描
+    if (hintRe.test(trimmed)) break;
+
+    // 空行 → 跳过
+    if (!trimmed) { i++; continue; }
+
+    // 分隔线（──────） → 跳过，选项可能在分隔线后继续
+    if (separatorRe.test(trimmed)) { i++; continue; }
+
+    // 选项行
     const m = lines[i].match(optLineRe);
     if (m) {
-      optLines.unshift({ marker: !!m[1], idx: parseInt(m[2], 10), body: m[3].trim() });
-      i--;
+      opts.push({
+        lineIdx: i,
+        marker: !!m[1],
+        idx: parseInt(m[2], 10),
+        body: m[3].trim().replace(/\s{2,}/g, ' '),
+      });
+      i++;
       continue;
     }
-    // 非 ❯ 开头但可能是未高亮的选项行（如 "  2. No"）
-    const plainOpt = lines[i].match(/^\s*(\d+)[.)]\s+(.+?)\s*$/);
-    if (plainOpt && optLines.length > 0) {
-      // 检查序号是否与已有选项连续
-      const prevIdx = optLines[0].idx;
-      if (parseInt(plainOpt[1], 10) === prevIdx - 1) {
-        optLines.unshift({ marker: false, idx: parseInt(plainOpt[1], 10), body: plainOpt[2].trim() });
-        i--;
-        continue;
-      }
-    }
+
+    // 描述子行（深度缩进 ≥4 空格，非选项行）→ 跳过
+    if (/^\s{4,}/.test(lines[i]) && !optLineRe.test(lines[i])) { i++; continue; }
+
+    // 其他内容 → 终止扫描
     break;
   }
 
-  if (optLines.length < 2) return null;
+  // ── 向上扫描：如果 ❯ 不在第 1 项，收集前面的选项 ──
+  if (markerIdx > 1) {
+    i = markerLineIdx - 1;
+    while (i >= 0) {
+      const trimmed = lines[i].trim();
+      if (!trimmed) break;
 
-  // 检查选项行下方是否有确认提示（证明这是决策面板而非普通文本）
-  let hasConfirmHint = false;
-  for (let j = lastOptIdx + 1; j < Math.min(lines.length, lastOptIdx + 5); j++) {
-    if (/(esc to cancel|enter to confirm|to select|shift\+tab)/i.test(lines[j])) {
-      hasConfirmHint = true;
+      const m = lines[i].match(optLineRe);
+      if (m) {
+        const optIdx = parseInt(m[2], 10);
+        if (optIdx < opts[0].idx) {
+          opts.unshift({
+            lineIdx: i,
+            marker: false,
+            idx: optIdx,
+            body: m[3].trim().replace(/\s{2,}/g, ' '),
+          });
+          i--;
+          continue;
+        }
+      }
+
+      // 描述子行 → 跳过
+      if (/^\s{4,}/.test(lines[i]) && trimmed) { i--; continue; }
+
       break;
     }
   }
-  // 如果没有确认提示，但也可能是面板（某些场景 cc 不显示底栏）
-  // 此时要求选项行的序号连续且 ≥ 2 个
 
-  // 收集选项行上方的标题文本
+  if (opts.length < 2) return null;
+
+  // ── 收集标题：从第一个选项行向上找问句或上下文文本 ──
+  const firstOptLineIdx = opts[0].lineIdx;
   const titleParts: string[] = [];
-  let titleIdx = i;
+  let titleIdx = firstOptLineIdx - 1;
   while (titleIdx >= 0) {
     const t = lines[titleIdx].trim();
     if (!t) break;
-    // 排除 ❯ prompt 行、工具调用行、纯框线、快捷键提示
-    if (/^\s*❯/.test(lines[titleIdx])) break;
+    // 非 ❯ N. 格式的 ❯ 行 → 停止（用户输入提示等）
+    if (/^\s*❯/.test(lines[titleIdx]) && !/^\s*❯\s*\d+[.)]/.test(lines[titleIdx])) break;
     if (/^\s*●/.test(lines[titleIdx])) break;
     if (/^[─━│┃╭╰╯╮┌┐└┘]+$/.test(t)) break;
     if (/(esc to |ctrl\+|for shortcuts)/i.test(t)) break;
-    // 可能是标题行
-    titleParts.unshift(t);
+    // 去掉 ☐ 复选框标记
+    const clean = t.replace(/^☐\s*/, '');
+    if (clean) titleParts.unshift(clean);
     titleIdx--;
   }
 
-  const options = optLines.map(o => `${o.idx}. ${o.body}`);
-  const defaultIdx = optLines.find(o => o.marker)?.idx ?? 1;
+  const options = opts.map((o) => `${o.idx}. ${o.body}`);
+  const defaultIdx = opts.find((o) => o.marker)?.idx ?? 1;
 
   let title = '';
   for (let ti = titleParts.length - 1; ti >= 0; ti--) {
-    if (/[?？]\s*$/.test(titleParts[ti])) { title = titleParts[ti]; break; }
+    if (/[?？]\s*$/.test(titleParts[ti])) {
+      title = titleParts[ti];
+      break;
+    }
   }
   if (!title) title = titleParts.join(' ').trim();
   if (!title) title = '请选择';
@@ -647,7 +698,7 @@ function extractReply(raw: string, userMessage: string): string {
     if (/[⏵▶▸][⏵▶▸]?\s+(accept|reject|allow|deny|edit)\b/i.test(line)) continue;
     if (/\(shift\+tab to cycle\)/i.test(line)) continue;
     // 过滤无边框决策面板底栏提示
-    if (/(esc to cancel|enter to confirm|↑\/↓ to select|to select and enter)/i.test(line)) continue;
+    if (/(esc to cancel|enter to confirm|enter to select|↑\/↓\s*to (?:select|navigate)|to navigate)/i.test(line)) continue;
 
     cleaned.push(line);
   }

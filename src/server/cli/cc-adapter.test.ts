@@ -500,6 +500,76 @@ describe('cc-adapter.extractChoicePanel', () => {
   });
 });
 
+describe('cc-adapter.extractChoicePanel — cc v2.1.x borderless format', () => {
+  it('识别 CC v2.1.126 无边框 4 选项面板（含描述子行 + 分隔线 + Enter to select）', () => {
+    const pane = `☐ Test
+能看到上下选择吗？
+❯ 1. Yes
+      affirmative
+  2. No
+      negative
+  3. Type something.
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+  4. Chat about this
+Enter to select · ↑/↓ to navigate · Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/能看到上下选择吗/);
+    expect(panel!.options).toHaveLength(4);
+    expect(panel!.options[0]).toBe('1. Yes');
+    expect(panel!.options[1]).toBe('2. No');
+    expect(panel!.options[2]).toBe('3. Type something.');
+    expect(panel!.options[3]).toBe('4. Chat about this');
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别无边框 2 选项面板（简洁 Yes/No，无描述）', () => {
+    const pane = `Do you want to continue?
+❯ 1. Yes
+  2. No
+Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(2);
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('识别无边框 3 选项权限面板（Allow once / Allow for session / Deny）', () => {
+    const pane = `Allow Bash command "ls -la"?
+❯ 1. Allow once
+  2. Allow for this session
+  3. Deny
+Enter to select · ↑/↓ to navigate · Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.options).toHaveLength(3);
+    expect(panel!.options[0]).toBe('1. Allow once');
+    expect(panel!.defaultIndex).toBe(1);
+  });
+
+  it('无边框面板嵌入在工具调用后也能识别', () => {
+    const pane = `● Bash(git push origin main)
+  ⎿  Pushed successfully
+
+Allow this command?
+❯ 1. Yes
+  2. No
+Enter to select · Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toMatch(/Allow this command/);
+    expect(panel!.options).toHaveLength(2);
+  });
+
+  it('普通 idle 状态（❯ + ? for shortcuts）不应被识别为无边框面板', () => {
+    const pane = `❯
+────────────────────────────────────────────────────────────────────────────────
+  ? for shortcuts`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).toBeNull();
+  });
+});
+
 describe('cc-adapter.extractChoicePanel — cc v2.1.x inline format (⏵⏵)', () => {
   it('识别 ⏵⏵ accept edits on (shift+tab to cycle)', () => {
     const pane = `● Bash(echo hello)
