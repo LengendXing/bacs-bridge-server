@@ -51,6 +51,14 @@ describe('session/state — createSession & endSession', () => {
     expect(session.decisionJustMade).toBe(false);
     expect(session.lastDecidedPanelKey).toBeNull();
   });
+
+  it('endSession 清除 session 后 hasActiveSession 返回 false，新消息可路由', () => {
+    const session = createSession(baseCtx);
+    expect(hasActiveSession(baseCtx.processName)).toBe(true);
+    endSession(baseCtx.processName);
+    expect(hasActiveSession(baseCtx.processName)).toBe(false);
+    expect(getSession(baseCtx.processName)).toBeUndefined();
+  });
 });
 
 describe('session/state — panelFingerprint', () => {
