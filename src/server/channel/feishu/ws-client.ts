@@ -26,6 +26,7 @@ import {
   endSession,
   hasActiveSession,
   getSession,
+  panelFingerprint,
   type SessionState,
   type SessionContext,
 } from '../../session/state.js';
@@ -691,6 +692,26 @@ function handleIncomingMessage(binding: BindingRecord, event: FeishuMessageEvent
         logger.log('info', `进程 ${s.processName} 处于 awaiting_choice，跳过硬超时`);
         return;
       }
+
+      // 硬超时前再检测一次：如果 cc 正在等待决策但之前 extractChoicePanel
+      // 没识别出来（新格式），此时尝试用全量 pane 重新检测
+      const panel = adapter.extractChoicePanel(s.accumulated);
+      if (panel) {
+        s.awaiting = { panel, panelKey: panelFingerprint(panel), pushedAt: Date.now() };
+        const card = sender.buildAwaitingCard(
+          s.processName,
+          panel.title,
+          panel.options,
+          panel.defaultIndex,
+          s.ctx.msgText,
+        );
+        sender
+          .sendCard(s.ctx.feishuAppId, s.ctx.feishuAppSecret, s.ctx.targetType, s.ctx.targetId, card)
+          .catch((e: Error) => logger.log('error', '发送决策卡片失败', e.message));
+        logger.log('info', `硬超时检测到决策面板: ${panel.title}（${panel.options.length} 个选项）`);
+        return; // 保持 session，让用户选择
+      }
+
       const elapsed = Math.floor((Date.now() - s.startedAt) / 1000);
       const reply = adapter.extractReply(s.accumulated, s.ctx.msgText);
       if (reply && reply.length > 5) {
