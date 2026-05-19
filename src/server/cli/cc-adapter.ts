@@ -78,12 +78,22 @@ function detectState(processName: string, executor: RemoteExecutor): Promise<Cli
     const panel = extractChoicePanel(tail);
     if (panel) return 'awaiting_choice';
 
+    // 1.5 决策面板指示符兜底：即使 extractChoicePanel 没识别出完整面板，
+    //     但如果 pane 里出现选择/确认类提示，说明 cc 正在等用户操作
+    if (/\(shift\+tab to cycle\)/i.test(tail)) return 'awaiting_choice';
+    if (/enter to confirm/i.test(tail) && /(?:↑|↑|↓|⬆|⬇|up|down)\s*(?:\/|or)?\s*(?:↓|↓|↑|⬆|⬇|up|down)?\s*to select/i.test(tail)) return 'awaiting_choice';
+    // cc v2.1.x 无边框选项列表特征：❯ N. 选项 + 底栏 "Esc to cancel"
+    if (/esc to cancel/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
+
     // 2. 工作中：明确的"运行中"信号
     if (/esc to interrupt/i.test(tail)) return 'working';
 
-    // 3. 空闲：cc 输入框光标 + 快捷键提示同时存在 → 真 idle
-    //    单看 ❯ 不够（决策面板里也有 ❯，但已被第 1 步排除）
-    if (/❯/.test(tail) && /\? for shortcuts/.test(tail)) return 'idle';
+    // 3. 空闲：cc 输入框光标 + 快捷键提示 同时出现在 pane **底部**
+    //    必须最后几行含 ❯ + ? for shortcuts（相邻出现），避免历史残留行误判
+    //    单看 ❯ 不够（决策面板里也有 ❯，但已被第 1/1.5 步排除）
+    const tailLines = tail.split(/\r?\n/);
+    const lastN = tailLines.slice(-5).join('\n');
+    if (/❯/.test(lastN) && /\?\s*for shortcuts/.test(lastN)) return 'idle';
 
     // 默认按"还在工作"处理，避免在过渡帧把 working 误判为 idle 提前结束本轮
     return 'working';
@@ -104,7 +114,8 @@ export function extractChoicePanel(raw: string): ChoicePanel | null {
   // ⏵⏵ reject edits on (shift+tab to cycle)
   // ⏵⏵ allow once on (shift+tab to cycle)
   // 此格式无 ╭──╮ 框线，用 ⏵⏵ 标记 + "on (shift+tab to cycle)" 提示
-  const inlineRe = /⏵⏵\s+(.+?)\s+on\s+\(shift\+tab to cycle\)/;
+  // 同时兼容单 ⏵ 格式和 ▶▶ / ▸▸ 等变体
+  const inlineRe = /[⏵▶▸][⏵▶▸]?\s+(.+?)\s+on\s+\(shift\+tab to cycle\)/;
   const inlineMatch = raw.match(inlineRe);
   if (inlineMatch) {
     const action = inlineMatch[1].trim();
@@ -157,19 +168,32 @@ export function extractChoicePanel(raw: string): ChoicePanel | null {
   for (let i = lines.length - 1; i >= 0; i--) {
     if (/╰[─━]+╯/.test(lines[i])) { bottom = i; break; }
   }
-  if (bottom < 0) return null;
-  let top = -1;
-  for (let i = bottom - 1; i >= 0; i--) {
-    if (/╭[─━]+╮/.test(lines[i])) { top = i; break; }
+  if (bottom >= 0) {
+    let top = -1;
+    for (let i = bottom - 1; i >= 0; i--) {
+      if (/╭[─━]+╮/.test(lines[i])) { top = i; break; }
+    }
+    if (top >= 0) {
+      const inside = lines.slice(top + 1, bottom);
+      const stripped = inside.map((l) =>
+        l.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, ''),
+      );
+      const panel = parseChoiceOptions(stripped);
+      if (panel) return panel;
+    }
   }
-  if (top < 0) return null;
 
-  const inside = lines.slice(top + 1, bottom);
-  // 剥掉左右 │ 边框 + 两端空格
-  const stripped = inside.map((l) =>
-    l.replace(/^\s*│\s?/, '').replace(/\s*│\s*$/, ''),
-  );
+  // ── cc v2.1.x 无边框选项列表检测 ──
+  // 格式：❯ 1. Yes /   2. No /   3. ... + 底栏 Esc to cancel / Enter to confirm
+  // 没有 ╭──╮ 边框，但含 ❯ N. 序号选项行
+  const borderlessPanel = extractBorderlessPanel(lines);
+  if (borderlessPanel) return borderlessPanel;
 
+  return null;
+}
+
+/** 解析已知的选项行列表（╭──╮ 框内 或 无框列表），提取 title + options */
+function parseChoiceOptions(stripped: string[]): ChoicePanel | null {
   // 选项行：`❯ 1. Yes` / `  2. No (recommended)` / `❯ Yes` / `  No`
   // 必须容忍前导 `❯` 或空格，序号可选（cc 也有不带数字的纯 Yes/No 面板）
   const optRe = /^\s*(❯)?\s*(?:(\d+)[.)]\s*)?(.+?)\s*$/;
@@ -224,6 +248,100 @@ export function extractChoicePanel(raw: string): ChoicePanel | null {
   return { title, options, defaultIndex };
 }
 
+/** 检测无边框的选项列表（cc v2.1.x 新 UI 格式）
+ *
+ * 典型形态（无 ╭──╮ 框线）：
+ *   ❯ 1. Yes
+ *     2. No
+ *     3. ...
+ *   Esc to cancel · Enter to confirm · ↑/↓ to select
+ *
+ * 或更简洁的：
+ *   ❯ 1. Allow once
+ *     2. Allow for this session
+ *     3. Deny
+ */
+function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
+  // 找含 ❯ N. 格式的选项行（从下往上，找最近的连续选项块）
+  const optLineRe = /^\s*(❯)?\s*(\d+)[.)]\s+(.+?)\s*$/;
+
+  // 从下往上找第一个 ❯ N. 行，然后向上收集连续选项
+  let lastOptIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^\s*❯\s*\d+[.)]/.test(lines[i])) {
+      lastOptIdx = i;
+      break;
+    }
+  }
+  if (lastOptIdx < 0) return null;
+
+  // 从 lastOptIdx 向上收集所有连续选项行
+  const optLines: { marker: boolean; idx: number; body: string }[] = [];
+  let i = lastOptIdx;
+  // 先处理 lastOptIdx 本身
+  while (i >= 0) {
+    const m = lines[i].match(optLineRe);
+    if (m) {
+      optLines.unshift({ marker: !!m[1], idx: parseInt(m[2], 10), body: m[3].trim() });
+      i--;
+      continue;
+    }
+    // 非 ❯ 开头但可能是未高亮的选项行（如 "  2. No"）
+    const plainOpt = lines[i].match(/^\s*(\d+)[.)]\s+(.+?)\s*$/);
+    if (plainOpt && optLines.length > 0) {
+      // 检查序号是否与已有选项连续
+      const prevIdx = optLines[0].idx;
+      if (parseInt(plainOpt[1], 10) === prevIdx - 1) {
+        optLines.unshift({ marker: false, idx: parseInt(plainOpt[1], 10), body: plainOpt[2].trim() });
+        i--;
+        continue;
+      }
+    }
+    break;
+  }
+
+  if (optLines.length < 2) return null;
+
+  // 检查选项行下方是否有确认提示（证明这是决策面板而非普通文本）
+  let hasConfirmHint = false;
+  for (let j = lastOptIdx + 1; j < Math.min(lines.length, lastOptIdx + 5); j++) {
+    if (/(esc to cancel|enter to confirm|to select|shift\+tab)/i.test(lines[j])) {
+      hasConfirmHint = true;
+      break;
+    }
+  }
+  // 如果没有确认提示，但也可能是面板（某些场景 cc 不显示底栏）
+  // 此时要求选项行的序号连续且 ≥ 2 个
+
+  // 收集选项行上方的标题文本
+  const titleParts: string[] = [];
+  let titleIdx = i;
+  while (titleIdx >= 0) {
+    const t = lines[titleIdx].trim();
+    if (!t) break;
+    // 排除 ❯ prompt 行、工具调用行、纯框线、快捷键提示
+    if (/^\s*❯/.test(lines[titleIdx])) break;
+    if (/^\s*●/.test(lines[titleIdx])) break;
+    if (/^[─━│┃╭╰╯╮┌┐└┘]+$/.test(t)) break;
+    if (/(esc to |ctrl\+|for shortcuts)/i.test(t)) break;
+    // 可能是标题行
+    titleParts.unshift(t);
+    titleIdx--;
+  }
+
+  const options = optLines.map(o => `${o.idx}. ${o.body}`);
+  const defaultIdx = optLines.find(o => o.marker)?.idx ?? 1;
+
+  let title = '';
+  for (let ti = titleParts.length - 1; ti >= 0; ti--) {
+    if (/[?？]\s*$/.test(titleParts[ti])) { title = titleParts[ti]; break; }
+  }
+  if (!title) title = titleParts.join(' ').trim();
+  if (!title) title = '请选择';
+
+  return { title, options, defaultIndex: defaultIdx };
+}
+
 /** 在决策面板下，把用户飞书自由文本回复 → tmux key 序列并发送。
  *
  * 解析规则（按优先级）：
@@ -268,7 +386,7 @@ export async function sendChoice(
     return { ok: true, chosenIndex: idx };
   }
 
-  // box 格式（╭──╮ 框）的按键策略
+  // box 格式（╭──╮ 框）和无边框格式的按键策略
   if (panel.defaultIndex > 0 && idx !== panel.defaultIndex) {
     const diff = idx - panel.defaultIndex;
     const dir = diff > 0 ? 'Down' : 'Up';
@@ -525,6 +643,11 @@ function extractReply(raw: string, userMessage: string): string {
     if (/^\s*✻/.test(line)) continue;
     if (/(\? for shortcuts|ctrl\+o to expand|ctrl\+r to redo|ctrl\+c to)/i.test(line)) continue;
     if (/^\s*Listed\s+\d+\s+(director|file)/i.test(line)) continue;
+    // 过滤 cc v2.1.x 内联选择提示（⏵⏵ accept edits on ...）
+    if (/[⏵▶▸][⏵▶▸]?\s+(accept|reject|allow|deny|edit)\b/i.test(line)) continue;
+    if (/\(shift\+tab to cycle\)/i.test(line)) continue;
+    // 过滤无边框决策面板底栏提示
+    if (/(esc to cancel|enter to confirm|↑\/↓ to select|to select and enter)/i.test(line)) continue;
 
     cleaned.push(line);
   }

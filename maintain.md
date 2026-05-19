@@ -1,3 +1,18 @@
+## v1.1.26.4 - 2026-05-19
+### 变更内容
+**修复 CC 决策面板检测严重 Bug**
+- `extractChoicePanel` 新增无边框选项列表检测（cc v2.1.x 新 UI 格式：`❯ 1. Yes` / `  2. No` 无 ╭──╮ 框线）
+- `detectState` 新增决策面板指示符兜底检测（`shift+tab to cycle`、`Enter to confirm`、`Esc to cancel` + `❯ N.`）
+- `detectState` 修复 idle 误判：改为只检查 pane 底部 5 行内 `❯` + `? for shortcuts` 相邻出现，避免历史残留行误判为 idle
+- 内联选择正则兼容单 ⏵ 格式和 ▶▶ / ▸▸ 变体
+- `extractReply` 新增过滤规则：过滤 `⏵⏵ accept/reject/allow/deny` 行、`(shift+tab to cycle)` 提示、无边框决策面板底栏提示
+- 硬超时处理器新增全量 pane 决策面板重检测：超时前再尝试 `extractChoicePanel`，发现面板则推送决策卡而非发送兜底文本
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — extractChoicePanel / detectState / extractReply
+- `src/server/channel/feishu/ws-client.ts` — 硬超时处理器 + panelFingerprint import
+- `src/server/session/state.ts` — panelFingerprint export
+
 ## v1.1.26 - 2026-05-17
 ### 变更内容
 **UI 国际化 + 帮助页面 + 面包屑导航**
