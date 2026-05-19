@@ -938,4 +938,51 @@ Esc to interrupt`;
     expect(panel!.format).toBe('inline');
     expect(panel!.defaultIndex).toBe(2); // reject = index 2
   });
+
+  it('无边框面板：问题与选项间有空行——标题仍能提取', () => {
+    const pane = ` ☐ OK
+
+要不要回去继续写代码？
+
+❯ 1. Yes
+     好的
+  2. No
+     不要
+  3. Type something.
+────────────────────────────────────────────────────────
+  4. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel`;
+    const panel = adapter.extractChoicePanel(pane);
+    expect(panel).not.toBeNull();
+    expect(panel!.title).toBe('要不要回去继续写代码？');
+    expect(panel!.options).toHaveLength(4);
+  });
+
+  it('extractReply 过滤 CC 决策确认文本（User answered）', () => {
+    const raw = `● User answered Claude's questions:
+  ⎿  · 真的够了？ → Yes
+
+● 行，真够了。有事再叫我。
+
+✻ Crunched for 19s
+
+❯
+  ? for shortcuts`;
+    const reply = adapter.extractReply(raw, '嘿嘿，再试一下');
+    expect(reply).not.toContain('User answered');
+    expect(reply).toContain('行，真够了');
+  });
+
+  it('extractReply 过滤 CC 编辑确认文本（Accepted edits）', () => {
+    const raw = `● Accepted edits on config.json
+
+● 已完成修改。
+
+❯
+  ? for shortcuts`;
+    const reply = adapter.extractReply(raw, '修改配置');
+    expect(reply).not.toContain('Accepted edits');
+    expect(reply).toContain('已完成修改');
+  });
 });

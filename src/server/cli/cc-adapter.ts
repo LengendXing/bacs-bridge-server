@@ -365,9 +365,17 @@ function extractBorderlessPanel(lines: string[]): ChoicePanel | null {
   const firstOptLineIdx = opts[0].lineIdx;
   const titleParts: string[] = [];
   let titleIdx = firstOptLineIdx - 1;
+  let emptySkip = 0;
   while (titleIdx >= 0) {
     const t = lines[titleIdx].trim();
-    if (!t) break;
+    if (!t) {
+      // CC 面板中问题与选项间可能有空行，跳过而非中断（最多跳 3 行）
+      emptySkip++;
+      if (emptySkip > 3) break;
+      titleIdx--;
+      continue;
+    }
+    emptySkip = 0;
     // 非 ❯ N. 格式的 ❯ 行 → 停止（用户输入提示等）
     if (/^\s*❯/.test(lines[titleIdx]) && !/^\s*❯\s*\d+[.)]/.test(lines[titleIdx])) break;
     if (/^\s*●/.test(lines[titleIdx])) break;
@@ -726,6 +734,19 @@ function extractReply(raw: string, userMessage: string): string {
     if (bulletMatch) {
       commit();
       const content = bulletMatch[2];
+      // CC 内部决策确认文本 → 跳过（不属于 AI 回复）
+      if (/^User answered/i.test(content)) {
+        current = { skip: true, lines: [] };
+        continue;
+      }
+      if (/^(Accepted|Rejected) (edits?|changes?)/i.test(content)) {
+        current = { skip: true, lines: [] };
+        continue;
+      }
+      if (/^(Allowed|Denied) (Bash|once|for session)/i.test(content)) {
+        current = { skip: true, lines: [] };
+        continue;
+      }
       if (/^[A-Za-z_][\w.-]*\s*\(/.test(content)) {
         current = { skip: true, lines: [] };
         continue;
