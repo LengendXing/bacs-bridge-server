@@ -544,3 +544,15 @@
 ### 功能列表
 - 刷新按钮：点击后保留配置重启 CLI，用户无感知，PID 变化
 - 刷新按钮仅在线状态可点击，操作中显示「重启中...」loading 态
+
+## v1.1.29.1 - 2026-05-20
+### 变更内容
+**修复 scrollback 残留 "esc to interrupt" 导致 idle 误判为 working，回复后仍轮询**
+- Bug 修复：CC 完成回复回到 idle 后，scrollback 仍残留 `esc to interrupt`
+  - 根因：`detectState` 全文搜 `esc to interrupt` → 返回 `working`
+  - 底部实际已出现 `❯` + `? for shortcuts`（真实 idle 信号），但 working 检测优先级更高
+  - `tryFinish` 永远判定 working → 回复无法提取/发送 → 轮询不停止
+- 修复：idle 检测提升到 working 之前 + `esc to interrupt` 只看底部 8 行
+
+### 影响范围
+- `src/server/cli/cc-adapter.ts` — `detectState` 函数调整检测顺序和范围
