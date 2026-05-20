@@ -87,15 +87,16 @@ function detectState(processName: string, executor: RemoteExecutor): Promise<Cli
     if (/enter to select/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
     if (/↑\/↓\s*to navigate/i.test(tail) && /^\s*❯\s*\d+[.)]/m.test(tail)) return 'awaiting_choice';
 
-    // 2. 工作中：明确的"运行中"信号
-    if (/esc to interrupt/i.test(tail)) return 'working';
-
-    // 3. 空闲：cc 输入框光标 + 快捷键提示 同时出现在 pane **底部**
-    //    必须最后几行含 ❯ + ? for shortcuts（相邻出现），避免历史残留行误判
-    //    单看 ❯ 不够（决策面板里也有 ❯，但已被第 1/1.5 步排除）
+    // 2. 空闲：cc 输入框光标 + 快捷键提示 同时出现在 pane **底部**
+    //    优先于 working 检测：CC 从 working→idle 后 scrollback 仍残留 "esc to interrupt"，
+    //    但底部已出现 ❯ + ? for shortcuts → 底部信号才是真实状态
     const tailLines = tail.split(/\r?\n/);
     const lastN = tailLines.slice(-5).join('\n');
     if (/❯/.test(lastN) && /\?\s*for shortcuts/.test(lastN)) return 'idle';
+
+    // 3. 工作中：esc to interrupt 只看底部几行，避免 scrollback 残留误判
+    const lastWorkingN = tailLines.slice(-8).join('\n');
+    if (/esc to interrupt/i.test(lastWorkingN)) return 'working';
 
     // 默认按"还在工作"处理，避免在过渡帧把 working 误判为 idle 提前结束本轮
     return 'working';
