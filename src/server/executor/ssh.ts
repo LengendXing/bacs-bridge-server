@@ -159,56 +159,78 @@ export class SshExecutor implements RemoteExecutor {
   }
 
   async exec(cmd: string, options?: ExecOptions): Promise<ExecResult> {
-    try {
-      const client = await this.ensureConnected();
-      this.pool.lastUsed = Date.now();
-      this.startIdleTimer();
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const client = await this.ensureConnected();
+        this.pool.lastUsed = Date.now();
+        this.startIdleTimer();
 
-      return await new Promise<ExecResult>((resolve) => {
-        const timeout = options?.timeout ?? this.EXEC_TIMEOUT;
-        let settled = false;
+        const result = await new Promise<ExecResult>((resolve) => {
+          const timeout = options?.timeout ?? this.EXEC_TIMEOUT;
+          let settled = false;
 
-        const timer = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            resolve({ stdout: '', stderr: '', exitCode: null, ok: false, error: `命令执行超时 (${timeout}ms): ${cmd.slice(0, 100)}` });
-          }
-        }, timeout);
-
-        client.exec(cmd, (err, stream) => {
-          if (err) {
-            clearTimeout(timer);
+          const timer = setTimeout(() => {
             if (!settled) {
               settled = true;
-              resolve({ stdout: '', stderr: '', exitCode: null, ok: false, error: `SSH exec 错误: ${err.message}` });
+              resolve({ stdout: '', stderr: '', exitCode: null, ok: false, error: `命令执行超时 (${timeout}ms): ${cmd.slice(0, 100)}` });
             }
-            return;
-          }
+          }, timeout);
 
-          let stdout = '';
-          let stderr = '';
-          stream
-            .on('data', (data: Buffer) => { stdout += data.toString('utf-8'); })
-            .on('error', (e: Error) => {
+          client.exec(cmd, (err, stream) => {
+            if (err) {
               clearTimeout(timer);
               if (!settled) {
                 settled = true;
-                resolve({ stdout, stderr, exitCode: null, ok: false, error: e.message });
+                resolve({ stdout: '', stderr: '', exitCode: null, ok: false, error: `SSH exec 错误: ${err.message}` });
+              }
+              return;
+            }
+
+            let stdout = '';
+            let stderr = '';
+            stream
+              .on('data', (data: Buffer) => { stdout += data.toString('utf-8'); })
+              .on('error', (e: Error) => {
+                clearTimeout(timer);
+                if (!settled) {
+                  settled = true;
+                  resolve({ stdout, stderr, exitCode: null, ok: false, error: e.message });
+                }
+              });
+            stream.stderr?.on('data', (data: Buffer) => { stderr += data.toString('utf-8'); });
+            stream.on('close', (code: number | null) => {
+              clearTimeout(timer);
+              if (!settled) {
+                settled = true;
+                resolve({ stdout, stderr, exitCode: code, ok: code === 0 });
               }
             });
-          stream.stderr?.on('data', (data: Buffer) => { stderr += data.toString('utf-8'); });
-          stream.on('close', (code: number | null) => {
-            clearTimeout(timer);
-            if (!settled) {
-              settled = true;
-              resolve({ stdout, stderr, exitCode: code, ok: code === 0 });
-            }
           });
         });
-      });
-    } catch (e: any) {
-      return { stdout: '', stderr: '', exitCode: null, ok: false, error: `SSH 连接失败: ${e.message}` };
+
+        // 连接级错误（非命令执行失败）→ 标记断连并重试
+        if (!result.ok && this.isConnectionError(result.error) && attempt < maxAttempts) {
+          this.pool.state = 'disconnected';
+          logger.log('warn', `SSH exec 连接断开，正在重连: machine=${this.machineId}`, result.error);
+          continue;
+        }
+        return result;
+      } catch (e: any) {
+        if (attempt < maxAttempts) {
+          this.pool.state = 'disconnected';
+          logger.log('warn', `SSH 连接失败，正在重试: machine=${this.machineId}`, e.message);
+          continue;
+        }
+        return { stdout: '', stderr: '', exitCode: null, ok: false, error: `SSH 连接失败: ${e.message}` };
+      }
     }
+    return { stdout: '', stderr: '', exitCode: null, ok: false, error: 'SSH exec 重试耗尽' };
+  }
+
+  private isConnectionError(msg?: string | null): boolean {
+    if (!msg) return false;
+    return /SSH exec 错误|SSH 连接失败|Not connected|ECONNRESET|EPIPE|ETIMEDOUT|Connection lost|socket hang up/i.test(msg);
   }
 
   async sessionExists(sessionName: string): Promise<boolean> {
