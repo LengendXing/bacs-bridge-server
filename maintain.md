@@ -1,3 +1,19 @@
+## v1.1.29.2 - 2026-05-21
+### 变更内容
+**SSH 断连自动重连 + config 自动加载 .env**
+- 修复：SshExecutor.exec() 增加连接级错误检测和自动重连（一次重试）
+  - 识别 Not connected / ECONNRESET / EPIPE / ETIMEDOUT 等错误
+  - 标记 state=disconnected 后 ensureConnected 自动重建 SSH 连接
+  - 根因：SSH TCP 连接断开后 state 仍为 connected，exec 返回 ok:false 但不触发重连
+- 修复：config.ts 启动时自动从 .env 文件加载环境变量到 process.env
+  - 不再依赖 pm2 ecosystem 手动配置 JWT_SECRET 等敏感变量
+  - 根因：pm2 重启后不加载 .env → JWT_SECRET 回退 config.yaml 默认值 → SSH 凭据解密失败
+- 修复：c1 绑定记录丢失，通过直接 DB 操作重建（bot_id=9, 正确飞书凭据）
+
+### 影响范围
+- `src/server/executor/ssh.ts` — exec 重连逻辑
+- `src/server/config.ts` — .env 自动加载
+
 ## v1.1.29 - 2026-05-19
 ### 变更内容
 **机器自动预装（Provision）— 创建机器后自动 SSH 上去安装环境**
