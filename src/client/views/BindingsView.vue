@@ -38,17 +38,16 @@
             <th>{{ t('bindings.thStatus') }}</th>
             <th>{{ t('bindings.thCli') }}</th>
             <th>{{ t('bindings.thMachine') }}</th>
-            <th>{{ t('bindings.thProvider') }}</th>
             <th>{{ t('bindings.thModel') }}</th>
             <th>{{ t('bindings.thAction') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
+            <td colspan="8" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
           </tr>
           <tr v-else-if="bindings.length === 0">
-            <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.noData') }}</td>
+            <td colspan="8" class="text-center" style="color: var(--text-secondary)">{{ t('common.noData') }}</td>
           </tr>
           <tr v-for="b in bindings" :key="b.id">
             <td style="font-weight: 500">{{ b.processName }}</td>
@@ -72,9 +71,6 @@
             </td>
             <td>{{ b.cliKind }}</td>
             <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : t('common.local') }}</td>
-            <td style="color: var(--text-secondary)">
-              <span class="provider-name-truncate" :title="b.provider?.name || ''">{{ truncateProviderName(b.provider?.name) }}</span>
-            </td>
             <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
             <td>
               <div class="flex items-center gap-1">
