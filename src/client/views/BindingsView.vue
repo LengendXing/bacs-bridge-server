@@ -72,7 +72,9 @@
             </td>
             <td>{{ b.cliKind }}</td>
             <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : t('common.local') }}</td>
-            <td style="color: var(--text-secondary)">{{ b.provider?.name || '-' }}</td>
+            <td style="color: var(--text-secondary)">
+              <span class="provider-name-truncate" :title="b.provider?.name || ''">{{ truncateProviderName(b.provider?.name) }}</span>
+            </td>
             <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
             <td>
               <div class="flex items-center gap-1">
@@ -83,6 +85,7 @@
                 <button class="btn-mac btn-mac-sm" :disabled="rebindingMap[b.id] || b.status !== 'online'"
                   @click="rebind(b)" :title="t('bindings.rebindTitle')">{{ rebindingMap[b.id] ? t('bindings.rebinding') : t('bindings.rebind') }}</button>
                 <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">{{ t('bindings.unbind') }}</button>
+                <button class="btn-mac btn-mac-sm" @click="openDetail(b)">{{ t('bindings.detail') }}</button>
               </div>
             </td>
           </tr>
