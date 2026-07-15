@@ -2,7 +2,7 @@
  * @module db/schema
  * @description Drizzle ORM 表定义
  *
- * 定义全部 9 张数据表：
+ * 定义全部 13 张数据表：
  * 1. users         — 管理员账户
  * 2. trusted_devices — 2FA 信任设备
  * 3. providers     — 服务商（API 网关）
@@ -14,7 +14,7 @@
  * 9. bacs_bots     — 多平台机器人凭据统一管理（v1.1.10 引入）
  */
 
-import { sqliteTable, text, integer, real, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // ════════════════════════════════════════════════════════════════════
@@ -183,7 +183,19 @@ export const machines = sqliteTable('machines', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 6. bindings — 绑定关系
+// 6. binding_groups — 绑定分组
+// ════════════════════════════════════════════════════════════════════
+
+export const bindingGroups = sqliteTable('binding_groups', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: text('created_at').default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').default(sql`(datetime('now'))`),
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 7. bindings — 绑定关系
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -237,15 +249,24 @@ export const bindings = sqliteTable('bindings', {
   /** 进程状态：'online' | 'offline' */
   status: text('status').default('offline'),
 
+  /** 分组 ID（NULL = 未分组） */
+  groupId: text('group_id').references(() => bindingGroups.id, { onDelete: 'set null' }),
+
+  /** 排序序号（越小越靠前） */
+  sortOrder: integer('sort_order').notNull().default(0),
+
   /** 创建时间 */
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 
   /** 更新时间 */
   updatedAt: text('updated_at').default(sql`(datetime('now'))`),
-});
+}, (table) => ({
+  groupIdIdx: index('bindings_group_id_idx').on(table.groupId),
+  sortOrderIdx: index('bindings_sort_order_idx').on(table.sortOrder),
+}));
 
 // ════════════════════════════════════════════════════════════════════
-// 7. audit_logs — 审计日志
+// 8. audit_logs — 审计日志
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -277,7 +298,7 @@ export const auditLogs = sqliteTable('audit_logs', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 9. bacs_chat_time_line — 消息发送时间线
+// 10. bacs_chat_time_line — 消息发送时间线
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -306,7 +327,7 @@ export const chatTimeLine = sqliteTable('bacs_chat_time_line', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 8. app_settings — 应用级 KV 设置
+// 9. app_settings — 应用级 KV 设置
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -326,7 +347,7 @@ export const appSettings = sqliteTable('app_settings', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 9. bacs_bots — 多平台机器人凭据统一管理（v1.1.10 引入）
+// 10. bacs_bots — 多平台机器人凭据统一管理（v1.1.10 引入）
 // ════════════════════════════════════════════════════════════════════
 
 /**
@@ -366,7 +387,7 @@ export const bots = sqliteTable('bacs_bots', {
 }));
 
 // ════════════════════════════════════════════════════════════════════
-// 10. bacs_billing_records — 计费主表（v1.1.25 引入）
+// 11. bacs_billing_records — 计费主表（v1.1.25 引入）
 // ════════════════════════════════════════════════════════════════════
 
 export const billingRecords = sqliteTable('bacs_billing_records', {
@@ -388,7 +409,7 @@ export const billingRecords = sqliteTable('bacs_billing_records', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 11. bacs_billing_details — 计费明细表（v1.1.25 引入）
+// 12. bacs_billing_details — 计费明细表（v1.1.25 引入）
 // ════════════════════════════════════════════════════════════════════
 
 export const billingDetails = sqliteTable('bacs_billing_details', {
@@ -405,7 +426,7 @@ export const billingDetails = sqliteTable('bacs_billing_details', {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// 12. bacs_conversation_billing — 对话关联计费表（v1.1.25 引入）
+// 13. bacs_conversation_billing — 对话关联计费表（v1.1.25 引入）
 // ════════════════════════════════════════════════════════════════════
 
 export const conversationBilling = sqliteTable('bacs_conversation_billing', {

@@ -27,72 +27,127 @@
     <div class="tab-area">
       <Transition :name="tabTransitionName" mode="out-in">
         <div v-if="activeTab === 'list'" key="list" class="tab-pane">
-          <!-- Bindings table -->
-          <div class="glass-card" style="padding: 0; overflow: hidden">
-      <table class="table-mac">
-        <thead>
-          <tr>
-            <th>{{ t('bindings.thProcess') }}</th>
-            <th>{{ t('bindings.thBot') }}</th>
-            <th>{{ t('bindings.thWs') }}</th>
-            <th>{{ t('bindings.thStatus') }}</th>
-            <th>{{ t('bindings.thCli') }}</th>
-            <th>{{ t('bindings.thMachine') }}</th>
-            <th>{{ t('bindings.thModel') }}</th>
-            <th>{{ t('bindings.thAction') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="8" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
-          </tr>
-          <tr v-else-if="bindings.length === 0">
-            <td colspan="8" class="text-center" style="color: var(--text-secondary)">{{ t('common.noData') }}</td>
-          </tr>
-          <tr v-for="b in bindings" :key="b.id">
-            <td style="font-weight: 500">{{ b.processName }}</td>
-            <td>
-              <div style="display: flex; align-items: center; gap: 6px">
-                <span style="padding: 2px 6px; border-radius: 4px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary)">
-                  {{ b.botPlatform === 'feishu' ? t('bindings.platform.feishu') : b.botPlatform === 'telegram' ? t('bindings.platform.telegram') : b.botPlatform === 'qq' ? t('bindings.platform.qq') : b.botPlatform === 'wechat' ? t('bindings.platform.wechat') : t('bindings.platform.feishu') }}
-                </span>
-                <span :title="b.feishuAppId || ''">{{ b.botName || t('bindings.unlinked') }}</span>
+          <div class="list-layout">
+            <!-- Group sidebar -->
+            <div class="group-sidebar">
+              <div class="sidebar-header">
+                <span class="sidebar-title">{{ t('bindings.groups') }}</span>
+                <button class="btn-mac btn-mac-sm btn-icon" @click="openCreateGroup" :title="t('bindings.createGroup')"><Plus :size="12" /></button>
               </div>
-            </td>
-            <td>
-              <span :class="b.wsConnected ? 'badge badge-online' : 'badge badge-offline'">
-                {{ b.wsConnected ? t('bindings.wsConnected') : t('bindings.wsDisconnected') }}
-              </span>
-            </td>
-            <td>
-              <span :class="b.status === 'online' ? 'badge badge-online' : 'badge badge-offline'">
-                {{ b.status === 'online' ? t('common.online') : t('common.offline') }}
-              </span>
-            </td>
-            <td>{{ b.cliKind }}</td>
-            <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : t('common.local') }}</td>
-            <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
-            <td>
-              <div class="flex items-center gap-1">
-                <button class="btn-mac btn-mac-sm btn-icon" @click="copyAttach(b)" :title="t('bindings.attachTitle')"><Paperclip :size="14" /></button>
-                <button class="btn-mac btn-mac-sm btn-icon" :disabled="b.status !== 'online'"
-                  @click="openTerminal(b)" :title="t('bindings.openTerminalTitle')"><Terminal :size="14" /></button>
-                <button class="btn-mac btn-mac-sm btn-icon" @click="openEdit(b)" :title="t('bindings.edit')"><Pencil :size="14" /></button>
-                <button class="btn-mac btn-mac-sm btn-icon" :disabled="rebindingMap[b.id] || b.status !== 'online'"
-                  @click="rebind(b)" :title="t('bindings.rebindTitle')"><RefreshCw :size="14" :class="{ 'spin-icon': rebindingMap[b.id] }" /></button>
-                <button class="btn-mac btn-mac-danger btn-mac-sm btn-icon" @click="confirmUnbind(b)" :title="t('bindings.unbind')"><Trash2 :size="14" /></button>
-                <button class="btn-mac btn-mac-sm btn-icon" @click="openDetail(b)" :title="t('bindings.detail')"><Info :size="14" /></button>
+              <div class="sidebar-nav">
+                <div
+                  class="sidebar-item"
+                  :class="{ active: selectedGroupId === null }"
+                  @click="selectedGroupId = null; page = 1"
+                >
+                  <span class="sidebar-item-name">{{ t('bindings.allBindings') }}</span>
+                  <span class="sidebar-count">{{ allBindings.length }}</span>
+                </div>
+                <div
+                  class="sidebar-item"
+                  :class="{ active: selectedGroupId === '__ungrouped__' }"
+                  @click="selectedGroupId = '__ungrouped__'; page = 1"
+                >
+                  <span class="sidebar-item-name">{{ t('bindings.ungrouped') }}</span>
+                  <span class="sidebar-count">{{ ungroupedCount }}</span>
+                </div>
+                <div v-if="groups.length > 0" class="sidebar-divider" />
+                <div
+                  v-for="g in groups"
+                  :key="g.id"
+                  class="sidebar-item sidebar-group-item"
+                  :class="{ active: selectedGroupId === g.id }"
+                  @click="selectedGroupId = g.id; page = 1"
+                >
+                  <Folder :size="13" style="flex-shrink: 0; color: var(--text-secondary)" />
+                  <span class="sidebar-item-name">{{ g.name }}</span>
+                  <span class="sidebar-count">{{ groupBindingCounts[g.id] || 0 }}</span>
+                  <span class="sidebar-item-actions" @click.stop>
+                    <button class="sidebar-action-btn" @click="openEditGroup(g)" :title="t('common.edit')"><Pencil :size="11" /></button>
+                    <button class="sidebar-action-btn sidebar-action-danger" @click="confirmDeleteGroup(g)" :title="t('common.delete')"><Trash2 :size="11" /></button>
+                  </span>
+                </div>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-            <Pagination
-              v-model:page="page"
-              v-model:pageSize="pageSize"
-              :total="total"
-              :disabled="loading"
-            />
+            </div>
+
+            <!-- Main table area -->
+            <div class="main-table-area">
+              <div class="glass-card" style="padding: 0; overflow: hidden">
+                <table class="table-mac">
+                  <thead>
+                    <tr>
+                      <th class="th-order">#</th>
+                      <th>{{ t('bindings.thProcess') }}</th>
+                      <th>{{ t('bindings.thBot') }}</th>
+                      <th>{{ t('bindings.thWs') }}</th>
+                      <th>{{ t('bindings.thStatus') }}</th>
+                      <th>{{ t('bindings.thCli') }}</th>
+                      <th>{{ t('bindings.thMachine') }}</th>
+                      <th>{{ t('bindings.thModel') }}</th>
+                      <th>{{ t('bindings.thAction') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="loading">
+                      <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.loading') }}</td>
+                    </tr>
+                    <tr v-else-if="pagedBindings.length === 0">
+                      <td colspan="9" class="text-center" style="color: var(--text-secondary)">{{ t('common.noData') }}</td>
+                    </tr>
+                    <tr v-for="b in pagedBindings" :key="b.id">
+                      <td class="td-order">
+                        <button class="order-btn" @click="moveUp(b)" :disabled="!canMoveUp(b)" :title="t('bindings.moveUp')"><ChevronUp :size="12" /></button>
+                        <button class="order-btn" @click="moveDown(b)" :disabled="!canMoveDown(b)" :title="t('bindings.moveDown')"><ChevronDown :size="12" /></button>
+                      </td>
+                      <td style="font-weight: 500">{{ b.processName }}</td>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 6px">
+                          <span style="padding: 2px 6px; border-radius: 4px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary)">
+                            {{ b.botPlatform === 'feishu' ? t('bindings.platform.feishu') : b.botPlatform === 'telegram' ? t('bindings.platform.telegram') : b.botPlatform === 'qq' ? t('bindings.platform.qq') : b.botPlatform === 'wechat' ? t('bindings.platform.wechat') : t('bindings.platform.feishu') }}
+                          </span>
+                          <span :title="b.feishuAppId || ''">{{ b.botName || t('bindings.unlinked') }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span :class="b.wsConnected ? 'badge badge-online' : 'badge badge-offline'">
+                          {{ b.wsConnected ? t('bindings.wsConnected') : t('bindings.wsDisconnected') }}
+                        </span>
+                      </td>
+                      <td>
+                        <span :class="b.status === 'online' ? 'badge badge-online' : 'badge badge-offline'">
+                          {{ b.status === 'online' ? t('common.online') : t('common.offline') }}
+                        </span>
+                      </td>
+                      <td>{{ b.cliKind }}</td>
+                      <td style="color: var(--text-secondary)">{{ b.machineId ? (b.machineName || `#${b.machineId}`) : t('common.local') }}</td>
+                      <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
+                      <td>
+                        <div class="flex items-center gap-1">
+                          <select class="group-select" :value="b.groupId || ''" @change="onGroupChange(b, ($event.target as HTMLSelectElement).value)" :title="t('bindings.moveToGroup')">
+                            <option value="">{{ t('bindings.noGroup') }}</option>
+                            <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                          </select>
+                          <button class="btn-mac btn-mac-sm btn-icon" @click="copyAttach(b)" :title="t('bindings.attachTitle')"><Paperclip :size="14" /></button>
+                          <button class="btn-mac btn-mac-sm btn-icon" :disabled="b.status !== 'online'"
+                            @click="openTerminal(b)" :title="t('bindings.openTerminalTitle')"><Terminal :size="14" /></button>
+                          <button class="btn-mac btn-mac-sm btn-icon" @click="openEdit(b)" :title="t('bindings.edit')"><Pencil :size="14" /></button>
+                          <button class="btn-mac btn-mac-sm btn-icon" :disabled="rebindingMap[b.id] || b.status !== 'online'"
+                            @click="rebind(b)" :title="t('bindings.rebindTitle')"><RefreshCw :size="14" :class="{ 'spin-icon': rebindingMap[b.id] }" /></button>
+                          <button class="btn-mac btn-mac-danger btn-mac-sm btn-icon" @click="confirmUnbind(b)" :title="t('bindings.unbind')"><Trash2 :size="14" /></button>
+                          <button class="btn-mac btn-mac-sm btn-icon" @click="openDetail(b)" :title="t('bindings.detail')"><Info :size="14" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <Pagination
+                  v-model:page="page"
+                  v-model:pageSize="pageSize"
+                  :total="filteredBindings.length"
+                  :disabled="loading"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div v-else key="terminal" class="tab-pane terminal-pane">
@@ -123,6 +178,26 @@
         <span v-else-if="terminalSession.status.value === 'connecting'" class="tab-indicator dot-yellow" />
         <span v-else-if="terminalSession.status.value === 'closed'" class="tab-indicator dot-red" />
       </button>
+    </div>
+
+    <!-- Group modal (create/edit) -->
+    <div v-if="showGroupModal" class="modal-overlay" @click.self="showGroupModal = false">
+      <div class="modal-card" style="width: 360px">
+        <h3 class="text-base font-semibold mb-4" style="color: var(--text)">
+          {{ groupModalMode === 'create' ? t('bindings.createGroupTitle') : t('bindings.editGroupTitle') }}
+        </h3>
+        <form @submit.prevent="handleGroupSubmit">
+          <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.groupPlaceholder') }}</label>
+          <input v-model="groupFormName" type="text" class="input-mac mb-3" :placeholder="t('bindings.groupPlaceholder')" required />
+          <p v-if="groupFormError" class="text-sm mb-3" style="color: var(--danger)">{{ groupFormError }}</p>
+          <div class="flex items-center gap-2">
+            <button type="submit" class="btn-mac btn-mac-primary btn-mac-sm" :disabled="groupFormLoading">
+              {{ groupFormLoading ? t('common.saving') : (groupModalMode === 'create' ? t('common.submit') : t('common.save')) }}
+            </button>
+            <button type="button" class="btn-mac btn-mac-sm" @click="showGroupModal = false">{{ t('common.cancel') }}</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Attach 复制弹窗 -->
@@ -192,7 +267,6 @@
           </select>
 
           <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.thModel') }}</label>
-          <!-- 探查失败提示 -->
           <p v-if="probeFailed" class="text-xs mb-1" style="color: var(--warning)">
             {{ t('bindings.probeFailedHint') }}
           </p>
@@ -210,7 +284,6 @@
           <input v-if="useCustomModel" v-model="form.modelOverride" type="text" class="input-mac mb-3"
             :placeholder="t('bindings.customModelPlaceholder')" />
 
-          <!-- effort 选择（仅当选了模型且该模型支持 effort 时显示） -->
           <template v-if="showEffortSelect">
             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary)">{{ t('bindings.effortLabel') }}</label>
             <select v-model="form.effort" class="input-mac mb-3">
@@ -327,22 +400,192 @@ import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
 import TerminalPanel from '../components/TerminalPanel.vue';
 import { useTerminalSession, IDLE_TIMEOUT } from '../composables/useTerminalSession';
-import { Plus, FolderOpen, RefreshCw, Paperclip, Terminal, Pencil, Trash2, Info } from 'lucide-vue-next';
+import { Plus, FolderOpen, RefreshCw, Paperclip, Terminal, Pencil, Trash2, Info, ChevronUp, ChevronDown, Folder } from 'lucide-vue-next';
 
 defineOptions({ name: 'BindingsView' });
-import type { Binding, BindingDetail, Provider, Machine, Model } from '@shared/types';
+import type { Binding, BindingDetail, BindingGroup, Provider, Machine, Model } from '@shared/types';
 import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '@shared/defaultModels';
 import type { CliKind } from '@shared/defaultModels';
 
-const { get, post, del } = useApi();
+const { get, post, put, del } = useApi();
 const { t } = useI18n();
 
-const bindings = ref<Binding[]>([]);
+/* ── Grouping ── */
+const allBindings = ref<Binding[]>([]);
+const groups = ref<BindingGroup[]>([]);
+const selectedGroupId = ref<string | null>(null);
+
+const groupBindingCounts = computed(() => {
+  const counts: Record<string, number> = {};
+  for (const b of allBindings.value) {
+    if (b.groupId) {
+      counts[b.groupId] = (counts[b.groupId] || 0) + 1;
+    }
+  }
+  return counts;
+});
+
+const ungroupedCount = computed(() => allBindings.value.filter((b) => !b.groupId).length);
+
+const filteredBindings = computed(() => {
+  let list: Binding[];
+  if (selectedGroupId.value === null) {
+    list = [...allBindings.value];
+  } else if (selectedGroupId.value === '__ungrouped__') {
+    list = allBindings.value.filter((b) => !b.groupId);
+  } else {
+    list = allBindings.value.filter((b) => b.groupId === selectedGroupId.value);
+  }
+  list.sort((a, b) => a.sortOrder - b.sortOrder);
+  return list;
+});
+
+/* ── Client-side pagination ── */
 const loading = ref(false);
 const page = ref(1);
 const pageSize = ref(10);
-const total = ref(0);
 
+const pagedBindings = computed(() => {
+  const start = (page.value - 1) * pageSize.value;
+  return filteredBindings.value.slice(start, start + pageSize.value);
+});
+
+watch([page, pageSize], () => { /* no-op: computed-driven re-render */ });
+
+/* ── Reordering ── */
+function canMoveUp(b: Binding) {
+  const list = filteredBindings.value;
+  const idx = list.findIndex((x) => x.id === b.id);
+  return idx > 0;
+}
+
+function canMoveDown(b: Binding) {
+  const list = filteredBindings.value;
+  const idx = list.findIndex((x) => x.id === b.id);
+  return idx < list.length - 1;
+}
+
+async function moveUp(b: Binding) {
+  const list = filteredBindings.value;
+  const idx = list.findIndex((x) => x.id === b.id);
+  if (idx <= 0) return;
+  const prev = list[idx - 1];
+  const items = [
+    { id: b.id, sortOrder: prev.sortOrder },
+    { id: prev.id, sortOrder: b.sortOrder },
+  ];
+  await post('/api/bindings/reorder', { items });
+  await refresh();
+}
+
+async function moveDown(b: Binding) {
+  const list = filteredBindings.value;
+  const idx = list.findIndex((x) => x.id === b.id);
+  if (idx < 0 || idx >= list.length - 1) return;
+  const next = list[idx + 1];
+  const items = [
+    { id: b.id, sortOrder: next.sortOrder },
+    { id: next.id, sortOrder: b.sortOrder },
+  ];
+  await post('/api/bindings/reorder', { items });
+  await refresh();
+}
+
+/* ── Group assignment ── */
+async function onGroupChange(b: Binding, groupId: string) {
+  try {
+    await post(`/api/bindings/${b.id}/group`, { groupId: groupId || null });
+    b.groupId = groupId || null;
+    await refresh();
+  } catch { /* */ }
+}
+
+/* ── Group CRUD ── */
+const showGroupModal = ref(false);
+const groupModalMode = ref<'create' | 'edit'>('create');
+const groupEditId = ref('');
+const groupFormName = ref('');
+const groupFormLoading = ref(false);
+const groupFormError = ref('');
+
+async function loadGroups() {
+  try {
+    const res = await get<BindingGroup[]>('/api/groups');
+    if (res.code === 0) groups.value = res.data || [];
+  } catch { /* */ }
+}
+
+function openCreateGroup() {
+  groupModalMode.value = 'create';
+  groupEditId.value = '';
+  groupFormName.value = '';
+  groupFormError.value = '';
+  showGroupModal.value = true;
+}
+
+function openEditGroup(g: BindingGroup) {
+  groupModalMode.value = 'edit';
+  groupEditId.value = g.id;
+  groupFormName.value = g.name;
+  groupFormError.value = '';
+  showGroupModal.value = true;
+}
+
+async function handleGroupSubmit() {
+  groupFormError.value = '';
+  groupFormLoading.value = true;
+  try {
+    if (groupModalMode.value === 'create') {
+      const res = await post<BindingGroup>('/api/groups', { name: groupFormName.value });
+      if (res.code === 0) {
+        showGroupModal.value = false;
+        await loadGroups();
+      } else {
+        groupFormError.value = res.message || t('common.operationFailed');
+      }
+    } else {
+      const res = await put<BindingGroup>(`/api/groups/${groupEditId.value}`, { name: groupFormName.value });
+      if (res.code === 0) {
+        showGroupModal.value = false;
+        await loadGroups();
+      } else {
+        groupFormError.value = res.message || t('common.operationFailed');
+      }
+    }
+  } catch {
+    groupFormError.value = t('common.networkError');
+  } finally {
+    groupFormLoading.value = false;
+  }
+}
+
+async function confirmDeleteGroup(g: BindingGroup) {
+  if (!confirm(t('bindings.deleteGroupConfirm', { name: g.name }))) return;
+  try {
+    const res = await del(`/api/groups/${g.id}`);
+    if (res.code === 0) {
+      if (selectedGroupId.value === g.id) selectedGroupId.value = null;
+      await loadGroups();
+      await loadBindings();
+    }
+  } catch { /* */ }
+}
+
+/* ── Data loading ── */
+async function loadBindings() {
+  try {
+    const res = await get<Binding[]>('/api/status');
+    if (res.code === 0) allBindings.value = res.data || [];
+  } catch { /* */ }
+}
+
+async function refresh() {
+  loading.value = true;
+  await Promise.all([loadBindings(), loadGroups()]);
+  loading.value = false;
+}
+
+/* ── Terminal ── */
 const terminalSession = useTerminalSession();
 type TabKey = 'list' | 'terminal';
 const activeTab = ref<TabKey>('list');
@@ -351,8 +594,8 @@ const tabTransitionName = ref<'tab-forward' | 'tab-backward'>('tab-forward');
 const currentBindingName = computed(() => {
   const id = terminalSession.bindingId.value;
   if (!id) return '';
-  const b = bindings.value.find((x) => x.id === id);
-  return b ? `${b.machine}:${b.workdir}` : id;
+  const b = allBindings.value.find((x) => x.id === id);
+  return b ? `${b.machineName || 'local'}:${b.processName}` : id;
 });
 
 function setTab(t: TabKey) {
@@ -381,10 +624,12 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   terminalSession.cancelIdleTimer();
 });
+
+/* ── Provider / Machine / Model ── */
 const providerList = ref<Provider[]>([]);
 const machineList = ref<Machine[]>([]);
 const modelList = ref<Model[]>([]);
-const defaultModelList = ref<any[]>([]);  // 从 /api/models/defaults 拿到的内置回退列表
+const defaultModelList = ref<any[]>([]);
 const probeFailed = ref(false);
 const useCustomModel = ref(false);
 const unboundSessions = ref<string[]>([]);
@@ -400,12 +645,10 @@ const form = ref({
   modelOverride: '' as string,
   effort: null as string | null,
   machineId: null as number | null,
-  // v1.1.14：绑定改为关联 bacs_bots（先选平台再选 Bot）
   platform: 'feishu' as 'feishu' | 'telegram' | 'qq' | 'wechat',
   botId: null as number | null,
 });
 
-// v1.1.14：当前平台下可选的机器人列表（来自 /api/bots?platform=xxx）
 interface BotItem { id: number; platform: string; name: string; appId: string; remark: string | null }
 const botList = ref<BotItem[]>([]);
 
@@ -418,12 +661,10 @@ async function loadBots(platform: string) {
 }
 
 function onPlatformChange() {
-  // 切换平台时清空已选 Bot 并重新加载该平台的 Bot 列表
   form.value.botId = null;
   loadBots(form.value.platform);
 }
 
-// 模型按 CLI 类型 + 服务商过滤；探查失败时 fallback 到内置默认模型
 const filteredModels = computed(() => {
   const byCli = modelList.value.filter(m => m.cliKind === form.value.cliKind);
   if (form.value.providerId) {
@@ -437,11 +678,10 @@ const filteredModels = computed(() => {
   });
 });
 
-// 合并探查结果与默认回退：探查成功用探查列表，失败时用默认清单
 const modelOptions = computed(() => {
   if (probeFailed.value) {
     return defaultModelList.value.map(m => ({
-      id: null,          // 不走 FK
+      id: null,
       modelId: m.id,
       displayName: m.label,
       cliKind: form.value.cliKind,
@@ -451,7 +691,6 @@ const modelOptions = computed(() => {
   return filteredModels.value;
 });
 
-// 当前选中的模型字符串 ID（用于判断 effort 支持）
 const currentModelStrId = computed(() => {
   if (useCustomModel.value && form.value.modelOverride) return form.value.modelOverride;
   if (form.value.modelId) {
@@ -476,24 +715,6 @@ const submitLabel = computed(() =>
   modalMode.value === 'mount' ? t('bindings.mountSubmit') : t('bindings.editSubmit')
 );
 
-async function refresh() {
-  loading.value = true;
-  try {
-    const res = await get<{ items: Binding[]; total: number; page: number; pageSize: number }>(
-      `/api/status?page=${page.value}&pageSize=${pageSize.value}`
-    );
-    if (res.code === 0 && res.data) {
-      bindings.value = res.data.items || [];
-      total.value = res.data.total || 0;
-      if (bindings.value.length === 0 && page.value > 1 && total.value > 0) {
-        page.value = Math.max(1, Math.ceil(total.value / pageSize.value));
-      }
-    }
-  } catch { /* */ } finally { loading.value = false; }
-}
-
-watch([page, pageSize], () => { refresh(); });
-
 async function loadProviders() {
   try {
     const res = await get<Provider[]>('/api/providers');
@@ -516,21 +737,17 @@ async function loadModels() {
 }
 
 function onCliOrProviderChange() {
-  // CLI 或服务商变更时，若当前 modelId 不在过滤后列表中则清空
   const stillValid = filteredModels.value.some(m => m.id === form.value.modelId);
   if (!stillValid) form.value.modelId = null;
   form.value.modelOverride = '';
   useCustomModel.value = false;
   form.value.effort = null;
-  // 尝试按新 provider 刷新模型探查
   loadProviderModels();
 }
 
 function onModelChange() {
-  // 从下拉选了模型后，同步 modelOverride（供后端 modelOverride 优先逻辑使用）
   const selected = modelOptions.value.find(m => m.id === form.value.modelId);
   form.value.modelOverride = selected?.modelId || '';
-  // 选了新模型后清 effort 让用户重选
   form.value.effort = null;
 }
 
@@ -539,7 +756,6 @@ async function loadProviderModels() {
   try {
     const res = await get<Model[]>(`/api/models?providerId=${form.value.providerId}`);
     if (res.code === 0 && res.data && res.data.length > 0) {
-      // 把拉到的合并进 modelList
       const existing = modelList.value.filter(m => m.providerId !== form.value.providerId);
       modelList.value = [...existing, ...res.data];
       probeFailed.value = false;
@@ -628,7 +844,6 @@ function openEdit(b: Binding) {
 
 async function handleSubmit() {
   formError.value = '';
-  // v1.1.14：先校验必须选了 Bot
   if (!form.value.botId) {
     formError.value = t('bindings.selectBot');
     return;
@@ -762,7 +977,7 @@ function openTerminal(b: Binding) {
 
 onMounted(() => { refresh(); loadMachines(); });
 
-// 详情抽屉
+/* ── Detail drawer ── */
 const showDetailDrawer = ref(false);
 const detailLoading = ref(false);
 const detailData = ref<BindingDetail | null>(null);
@@ -980,9 +1195,166 @@ function closeDetail() {
   max-height: 360px; overflow-y: auto;
   white-space: pre-wrap; word-break: break-all;
 }
+
+/* ── Group sidebar ── */
+.list-layout {
+  display: flex;
+  gap: 16px;
+}
+.group-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 120ms, color 120ms;
+}
+.sidebar-item:hover {
+  background: var(--bg-secondary);
+}
+.sidebar-item.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+.sidebar-item.active .sidebar-count {
+  color: var(--bg);
+  opacity: 0.7;
+}
+.sidebar-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-count {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+.sidebar-group-item {
+  position: relative;
+}
+.sidebar-item-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.sidebar-group-item:hover .sidebar-item-actions {
+  display: flex;
+}
+.sidebar-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+.sidebar-action-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+.sidebar-action-danger:hover {
+  color: var(--danger);
+}
+
+.main-table-area {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Order column ── */
+.th-order {
+  width: 48px;
+  text-align: center;
+}
+.td-order {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+.order-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+.order-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ── Group select in action column ── */
+.group-select {
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 80px;
+  cursor: pointer;
+}
+.group-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 </style>
 
-<!-- 全局：确保 warning 颜色变量存在 -->
 <style>
 :root {
   --warning: #f59e0b;

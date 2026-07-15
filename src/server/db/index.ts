@@ -74,6 +74,9 @@ export function initDatabase(dbPath?: string): ReturnType<typeof drizzle> {
   // 运行时确保 bindings.bot_id 列存在（v1.1.14 引入）
   ensureBindingBotIdColumn(sqlite);
 
+  // 运行时确保 binding_groups 表 + bindings.group_id / sort_order 列存在（v1.1.29.8 引入）
+  ensureBindingGroupsTable(sqlite);
+
   // 运行时确保计费相关表存在（v1.1.25 引入）
   ensureBillingTables(sqlite);
 
@@ -318,6 +321,36 @@ function ensureBillingTables(sqlite: Database.Database): void {
     )
   `);
   sqlite.exec(`CREATE INDEX IF NOT EXISTS idx_conv_billing_billing ON bacs_conversation_billing (billing_id)`);
+}
+
+/**
+ * 运行时确保 binding_groups 表 + bindings.group_id / sort_order 列存在（v1.1.29.8 引入）
+ */
+function ensureBindingGroupsTable(sqlite: Database.Database): void {
+  // 创建 binding_groups 表
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS binding_groups (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // 为 bindings 表补齐 group_id 列
+  const cols = sqlite.prepare(`PRAGMA table_info(bindings)`).all() as { name: string }[];
+  const names = new Set(cols.map(c => c.name));
+  if (!names.has('group_id')) {
+    sqlite.exec(`ALTER TABLE bindings ADD COLUMN group_id TEXT REFERENCES binding_groups(id) ON DELETE SET NULL`);
+  }
+  if (!names.has('sort_order')) {
+    sqlite.exec(`ALTER TABLE bindings ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  // 确保索引存在
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS bindings_group_id_idx ON bindings(group_id)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS bindings_sort_order_idx ON bindings(sort_order)`);
 }
 
 /**

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, sql } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { getDb } from '../db/index.js';
-import { bindings, providers, models, machines, auditLogs, bots } from '../db/schema.js';
+import { bindings, bindingGroups, providers, models, machines, auditLogs, bots } from '../db/schema.js';
 import { requireAuth } from '../middleware/auth.js';
 import logger from '../middleware/logger.js';
 import { buildCliConfig, startCliProcess } from '../session/manager.js';
@@ -160,6 +160,8 @@ router.get('/api/status', requireAuth, async (req, res) => {
         machineId: b.machineId ?? null,
         machineName,
         botId: b.botId ?? null,
+        groupId: b.groupId ?? null,
+        sortOrder: b.sortOrder ?? 0,
         botName,
         botPlatform,
         feishuAppId: b.feishuAppId,
@@ -203,6 +205,7 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
     let state: string = 'unknown';
     let paneOutput = '';
     let sessionExists = false;
+    let conversationName = sessionName;
 
     try {
       let executor = null;
@@ -218,6 +221,10 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
           state = await adapter.detectState(binding.processName, executor);
           const capture = await adapter.capturePane(sessionName, 80, executor);
           paneOutput = capture.output || '';
+          try {
+            const cn = await adapter.getConversationName(binding.processName, executor);
+            if (cn) conversationName = cn;
+          } catch { /* keep tmux session name */ }
         }
       }
     } catch { /* runtime状态获取失败不影响详情返回 */ }
@@ -264,7 +271,7 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
         updatedAt: binding.updatedAt,
         provider: provider ? { id: provider.id, name: provider.name } : null,
         model: model ? { id: model.id, modelId: model.modelId, displayName: model.displayName } : null,
-        runtime: { state, paneOutput, sessionExists, sessionName },
+        runtime: { state, paneOutput, sessionExists, sessionName: conversationName },
       },
     });
   } catch (e: any) {
@@ -675,6 +682,131 @@ router.post('/api/unbind', requireAuth, async (req, res) => {
 
   logger.log('info', `绑定已解绑: ${existing.processName}`);
   res.json({ code: 0, message: '已解绑' });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 分组管理（v1.1.29.8 引入）
+// ════════════════════════════════════════════════════════════════════
+
+router.get('/api/groups', requireAuth, (_req, res) => {
+  try {
+    const db = getDb();
+    const groups = db.select().from(bindingGroups).orderBy(bindingGroups.sortOrder).all();
+
+    // 为每个分组加载其下绑定
+    const result = groups.map((g) => {
+      const groupBindings = db
+        .select()
+        .from(bindings)
+        .where(eq(bindings.groupId, g.id))
+        .orderBy(bindings.sortOrder)
+        .all();
+      return { ...g, bindings: groupBindings };
+    });
+
+    res.json({ code: 0, data: result });
+  } catch (e: any) {
+    res.json({ code: 1001, message: '获取分组失败: ' + e.message });
+  }
+});
+
+router.post('/api/groups', requireAuth, (req, res) => {
+  const { name } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.json({ code: 1003, message: '请填写分组名称' });
+  }
+
+  const db = getDb();
+  const id = uuid();
+  const maxOrder = (db.select({ m: sql<number>`coalesce(max(sort_order), 0)` }).from(bindingGroups).get()?.m ?? 0) + 1;
+
+  db.insert(bindingGroups).values({
+    id,
+    name: String(name).trim(),
+    sortOrder: maxOrder,
+  }).run();
+
+  const group = db.select().from(bindingGroups).where(eq(bindingGroups.id, id)).get();
+  res.json({ code: 0, data: group });
+});
+
+router.put('/api/groups/:id', requireAuth, (req, res) => {
+  const { name } = req.body;
+  const db = getDb();
+  const id = req.params.id as string;
+  const existing = db.select().from(bindingGroups).where(eq(bindingGroups.id, id)).get();
+  if (!existing) {
+    return res.json({ code: 1004, message: '分组不存在' });
+  }
+
+  const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
+  if (name !== undefined) updates.name = String(name).trim();
+
+  db.update(bindingGroups).set(updates).where(eq(bindingGroups.id, id)).run();
+  const group = db.select().from(bindingGroups).where(eq(bindingGroups.id, id)).get();
+  res.json({ code: 0, data: group });
+});
+
+router.delete('/api/groups/:id', requireAuth, (req, res) => {
+  const db = getDb();
+  const id = req.params.id as string;
+  const existing = db.select().from(bindingGroups).where(eq(bindingGroups.id, id)).get();
+  if (!existing) {
+    return res.json({ code: 1004, message: '分组不存在' });
+  }
+
+  // 将分组下的绑定移出分组
+  db.update(bindings).set({ groupId: null, updatedAt: new Date().toISOString() }).where(eq(bindings.groupId, id)).run();
+  db.delete(bindingGroups).where(eq(bindingGroups.id, id)).run();
+
+  res.json({ code: 0, message: '已删除' });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 绑定分组分配与排序（v1.1.29.8 引入）
+// ════════════════════════════════════════════════════════════════════
+
+router.post('/api/bindings/:id/group', requireAuth, (req, res) => {
+  const { groupId } = req.body; // null = 移出分组
+  const db = getDb();
+  const bindingId = req.params.id as string;
+  const existing = db.select().from(bindings).where(eq(bindings.id, bindingId)).get();
+  if (!existing) {
+    return res.json({ code: 1004, message: '绑定不存在' });
+  }
+
+  if (groupId !== null && groupId !== undefined) {
+    const group = db.select().from(bindingGroups).where(eq(bindingGroups.id, groupId)).get();
+    if (!group) {
+      return res.json({ code: 1004, message: '分组不存在' });
+    }
+  }
+
+  db.update(bindings).set({
+    groupId: groupId ?? null,
+    updatedAt: new Date().toISOString(),
+  }).where(eq(bindings.id, bindingId)).run();
+
+  res.json({ code: 0, message: '已更新' });
+});
+
+router.post('/api/bindings/reorder', requireAuth, (req, res) => {
+  const { items } = req.body; // [{ id: string, sortOrder: number }]
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.json({ code: 1003, message: '请提供排序列表' });
+  }
+
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  try {
+    for (const item of items) {
+      db.update(bindings).set({ sortOrder: item.sortOrder, updatedAt: now }).where(eq(bindings.id, item.id)).run();
+    }
+    res.json({ code: 0, message: '排序已更新' });
+  } catch (e: any) {
+    res.json({ code: 1001, message: '排序更新失败: ' + e.message });
+  }
 });
 
 export default router;

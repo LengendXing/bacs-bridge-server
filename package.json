@@ -1,6 +1,6 @@
 {
   "name": "bacs-bridge-server",
-  "version": "1.1.29.7",
+  "version": "1.1.29.8",
   "description": "BACS Bridge Server — 机器人 × AI-CLI 消息桥接系统（支持 Claude Code / Codex）",
   "type": "module",
   "scripts": {

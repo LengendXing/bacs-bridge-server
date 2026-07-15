@@ -46,6 +46,16 @@ export interface Model {
   fetchedAt: string;
 }
 
+/** 绑定分组 */
+export interface BindingGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  bindings?: Binding[];
+}
+
 /** 绑定信息 */
 export interface Binding {
   id: string;
@@ -65,6 +75,8 @@ export interface Binding {
   feishuAppSecret: string | null;
   status: 'online' | 'offline';
   wsConnected: boolean;
+  groupId: string | null;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
   /** 关联查询结果 */

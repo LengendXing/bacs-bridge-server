@@ -131,6 +131,13 @@ export interface CliAdapter {
   /** tmux 会话名前缀（如 'cc' / 'codex'） */
   sessionPrefix: string;
 
+  /** 获取当前 CLI 会话的 conversation 名称
+   *  @param processName - 进程名（不含前缀）
+   *  @param executor - 远程执行器
+   *  @returns conversation 名称，获取失败返回 null
+   */
+  getConversationName(processName: string, executor: RemoteExecutor): Promise<string | null>;
+
   /** 从 pane 文本中提取当前可见的工具调用列表
    *  @param raw - capturePane 返回的原始输出
    *  @param maxItems - 最多返回几个（默认 3）

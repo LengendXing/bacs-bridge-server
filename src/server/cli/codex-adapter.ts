@@ -131,6 +131,21 @@ const codexAdapter: CliAdapter = {
     return executor.sessionExists(`${SESSION_PREFIX}-${processName}`);
   },
 
+  async getConversationName(processName: string, executor: RemoteExecutor): Promise<string | null> {
+    try {
+      const result = await executor.exec(`tmux list-panes -t ${SESSION_PREFIX}-${processName} -F '#{pane_pid}' 2>/dev/null`);
+      const panePid = (result?.stdout || '').trim();
+      if (!panePid) return null;
+      const sessionFile = `${process.env.HOME || '/root'}/.codex/sessions/${panePid}.json`;
+      const catResult = await executor.exec(`cat ${sessionFile} 2>/dev/null`);
+      if (!catResult?.stdout) return null;
+      const sessionData = JSON.parse(catResult.stdout);
+      return sessionData?.name || null;
+    } catch {
+      return null;
+    }
+  },
+
   extractToolCalls(_raw: string, _maxItems?: number): string[] {
     return [];
   },
