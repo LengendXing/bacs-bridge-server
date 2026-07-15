@@ -182,6 +182,91 @@ router.get('/api/status', requireAuth, async (req, res) => {
   }
 });
 
+router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
+  try {
+    const db = getDb();
+    const bindingId = req.params.id as string;
+    const binding = db.select().from(bindings).where(eq(bindings.id, bindingId)).get();
+
+    if (!binding) {
+      res.json({ code: 1004, message: '绑定不存在' });
+      return;
+    }
+
+    const adapter = getAdapter(binding.cliKind);
+    const sessionName = `${adapter.sessionPrefix}-${binding.processName}`;
+
+    let state: string = 'unknown';
+    let paneOutput = '';
+    let sessionExists = false;
+
+    try {
+      let executor = null;
+      if (binding.machineId) {
+        try { executor = getExecutor(binding.machineId); } catch { /* fall through */ }
+      }
+      if (!executor) {
+        try { executor = getExecutor(0); } catch { /* fall through */ }
+      }
+      if (executor) {
+        sessionExists = await adapter.sessionExists(sessionName, executor);
+        if (sessionExists) {
+          state = await adapter.detectState(binding.processName, executor);
+          const capture = await adapter.capturePane(sessionName, 80, executor);
+          paneOutput = capture.output || '';
+        }
+      }
+    } catch { /* runtime状态获取失败不影响详情返回 */ }
+
+    // 查询关联数据
+    let provider = null;
+    if (binding.providerId) {
+      provider = db.select().from(providers).where(eq(providers.id, binding.providerId)).get();
+    }
+    let model = null;
+    if (binding.modelId) {
+      model = db.select().from(models).where(eq(models.id, binding.modelId)).get();
+    }
+    let machine = null;
+    if (binding.machineId) {
+      machine = db.select({ name: machines.name }).from(machines).where(eq(machines.id, binding.machineId)).get();
+    }
+    let bot = null;
+    if (binding.botId) {
+      bot = db.select({ name: bots.name, platform: bots.platform, appId: bots.appId }).from(bots).where(eq(bots.id, binding.botId)).get();
+    }
+
+    res.json({
+      code: 0,
+      data: {
+        id: binding.id,
+        processName: binding.processName,
+        cliKind: binding.cliKind,
+        providerId: binding.providerId,
+        modelId: binding.modelId,
+        modelOverride: binding.modelOverride,
+        effort: binding.effort,
+        machineId: binding.machineId,
+        machineName: binding.machineName,
+        botId: binding.botId,
+        botName: binding.botName,
+        botPlatform: binding.botPlatform,
+        feishuAppId: binding.feishuAppId,
+        status: binding.status,
+        wsConnected: binding.wsConnected,
+        createdAt: binding.createdAt,
+        updatedAt: binding.updatedAt,
+        provider: provider ? { id: provider.id, name: provider.name } : null,
+        model: model ? { id: model.id, modelId: model.modelId, displayName: model.displayName } : null,
+        runtime: { state, paneOutput, sessionExists },
+      },
+    });
+  } catch (e: any) {
+    logger.log('error', '获取绑定详情失败', e.message);
+    res.json({ code: 1001, message: '获取详情失败: ' + e.message });
+  }
+});
+
 router.post('/api/bind', requireAuth, async (req, res) => {
   const { processName, cliKind, providerId, modelId, modelOverride, effort, machineId } = req.body;
 

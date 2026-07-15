@@ -253,6 +253,71 @@
         </form>
       </div>
     </div>
+    <!-- 详情抽屉 -->
+    <div v-if="showDetailDrawer" class="drawer-overlay" @click.self="closeDetail">
+      <div class="drawer-panel" :class="{ 'drawer-open': showDetailDrawer }">
+        <div class="drawer-header">
+          <h3>{{ t('bindings.detailTitle') }}</h3>
+          <button class="btn-mac btn-mac-sm" @click="closeDetail">{{ t('common.close') }}</button>
+        </div>
+        <div class="drawer-body">
+          <template v-if="detailLoading">
+            <p style="color: var(--text-secondary)">{{ t('common.loading') }}</p>
+          </template>
+          <template v-else-if="detailData">
+            <section class="detail-section">
+              <h4>{{ t('bindings.detailBasic') }}</h4>
+              <div class="detail-grid">
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.id') }}</label><span class="detail-value mono">{{ detailData.id }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.processName') }}</label><span>{{ detailData.processName }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.status') }}</label><span :class="detailData.status === 'online' ? 'badge badge-online' : 'badge badge-offline'">{{ detailData.status === 'online' ? t('common.online') : t('common.offline') }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.wsConnected') }}</label><span :class="detailData.wsConnected ? 'badge badge-online' : 'badge badge-offline'">{{ detailData.wsConnected ? t('bindings.wsConnected') : t('bindings.wsDisconnected') }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.createdAt') }}</label><span>{{ detailData.createdAt }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.updatedAt') }}</label><span>{{ detailData.updatedAt }}</span></div>
+              </div>
+            </section>
+            <section v-if="detailData.botPlatform || detailData.botName" class="detail-section">
+              <h4>{{ t('bindings.detailBot') }}</h4>
+              <div class="detail-grid">
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.platform') }}</label><span>{{ detailData.botPlatform }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.botName') }}</label><span>{{ detailData.botName || '-' }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.feishuAppId') }}</label><span class="detail-value mono">{{ detailData.feishuAppId || '-' }}</span></div>
+              </div>
+            </section>
+            <section class="detail-section">
+              <h4>{{ t('bindings.detailCLI') }}</h4>
+              <div class="detail-grid">
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.cliKind') }}</label><span>{{ detailData.cliKind }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.machine') }}</label><span>{{ detailData.machineName || t('common.local') }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.provider') }}</label><span>{{ detailData.provider?.name || '-' }}</span></div>
+                <div class="detail-item"><label>{{ t('bindings.detailLabel.model') }}</label><span>{{ detailData.modelOverride || detailData.model?.modelId || '-' }}</span></div>
+                <div v-if="detailData.effort" class="detail-item"><label>{{ t('bindings.detailLabel.effort') }}</label><span>{{ detailData.effort }}</span></div>
+              </div>
+            </section>
+            <section class="detail-section">
+              <h4>{{ t('bindings.detailRuntime') }}</h4>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <label>{{ t('bindings.detailLabel.status') }}</label>
+                  <span>{{ detailData.runtime.sessionExists ? t('bindings.sessionRunning') : t('bindings.sessionStopped') }}</span>
+                </div>
+                <div class="detail-item">
+                  <label>CLI {{ t('bindings.thStatus') }}</label>
+                  <span>{{ t(`bindings.cliState.${detailData.runtime.state}`) }}</span>
+                </div>
+              </div>
+              <div v-if="detailData.runtime.paneOutput" class="pane-output">
+                <label class="block text-xs font-medium mb-2" style="color: var(--text-secondary)">{{ t('bindings.paneOutput') }}</label>
+                <pre class="pane-output-pre">{{ detailData.runtime.paneOutput }}</pre>
+              </div>
+            </section>
+          </template>
+          <template v-else>
+            <p style="color: var(--text-secondary)">{{ t('common.noData') }}</p>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -265,7 +330,7 @@ import TerminalPanel from '../components/TerminalPanel.vue';
 import { useTerminalSession, IDLE_TIMEOUT } from '../composables/useTerminalSession';
 
 defineOptions({ name: 'BindingsView' });
-import type { Binding, Provider, Machine, Model } from '@shared/types';
+import type { Binding, BindingDetail, Provider, Machine, Model } from '@shared/types';
 import { DEFAULT_MODELS, getEffortOptions, modelSupportsEffort } from '@shared/defaultModels';
 import type { CliKind } from '@shared/defaultModels';
 
@@ -696,6 +761,36 @@ function openTerminal(b: Binding) {
 }
 
 onMounted(() => { refresh(); loadMachines(); });
+
+// 详情抽屉
+const showDetailDrawer = ref(false);
+const detailLoading = ref(false);
+const detailData = ref<BindingDetail | null>(null);
+
+function truncateProviderName(name: string | undefined | null): string {
+  if (!name) return '-';
+  if (name.length <= 2) return name;
+  return name.slice(0, 2) + '...';
+}
+
+async function openDetail(b: Binding) {
+  showDetailDrawer.value = true;
+  detailLoading.value = true;
+  detailData.value = null;
+  try {
+    const res = await get<BindingDetail>(`/api/status/${b.id}/detail`);
+    if (res.code === 0 && res.data) {
+      detailData.value = res.data;
+    }
+  } catch { /* */ } finally {
+    detailLoading.value = false;
+  }
+}
+
+function closeDetail() {
+  showDetailDrawer.value = false;
+  detailData.value = null;
+}
 </script>
 
 <style scoped>
@@ -798,6 +893,76 @@ onMounted(() => { refresh(); loadMachines(); });
   display: block; margin-top: 4px; font-size: 13px;
   padding: 4px 8px; border-radius: 4px; word-break: break-all;
   background: var(--bg); color: var(--text); font-family: ui-monospace, monospace;
+}
+
+.provider-name-truncate {
+  cursor: default;
+  border-bottom: 1px dotted var(--text-secondary);
+}
+
+.drawer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+  display: flex; justify-content: flex-end; z-index: 200;
+  backdrop-filter: blur(2px);
+}
+.drawer-panel {
+  width: 420px; max-width: 90vw; height: 100%;
+  background: var(--card); box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.drawer-panel.drawer-open {
+  transform: translateX(0);
+}
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.drawer-header h3 {
+  font-size: 16px; font-weight: 600; color: var(--text);
+}
+.drawer-body {
+  flex: 1; overflow-y: auto; padding: 20px;
+}
+.detail-section {
+  margin-bottom: 20px;
+}
+.detail-section h4 {
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-grid {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.detail-item {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px;
+}
+.detail-item label {
+  color: var(--text-secondary); flex-shrink: 0;
+}
+.detail-item span {
+  color: var(--text); text-align: right; word-break: break-all;
+}
+.detail-value.mono {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+}
+
+.pane-output {
+  margin-top: 12px;
+}
+.pane-output-pre {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px; line-height: 1.5;
+  padding: 12px; border-radius: 8px;
+  background: #1e1e2e; color: #cdd6f4;
+  max-height: 360px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
 }
 </style>
 

@@ -183,3 +183,15 @@ export interface CreateProviderRequest {
   baseUrl?: string;
   apiKey?: string;
 }
+
+/** 绑定运行时状态 */
+export interface BindingRuntime {
+  state: 'idle' | 'working' | 'awaiting_choice' | 'unknown';
+  paneOutput: string;
+  sessionExists: boolean;
+}
+
+/** 绑定详情（含运行时状态） */
+export interface BindingDetail extends Binding {
+  runtime: BindingRuntime;
+}
