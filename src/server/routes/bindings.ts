@@ -203,10 +203,10 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
     try {
       let executor = null;
       if (binding.machineId) {
-        try { executor = getExecutor(binding.machineId); } catch { /* fall through */ }
+        try { executor = await getExecutor(binding.machineId); } catch { /* fall through */ }
       }
       if (!executor) {
-        try { executor = getExecutor(0); } catch { /* fall through */ }
+        try { executor = await getExecutor(0); } catch { /* fall through */ }
       }
       if (executor) {
         sessionExists = await adapter.sessionExists(sessionName, executor);
@@ -247,13 +247,15 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
         modelOverride: binding.modelOverride,
         effort: binding.effort,
         machineId: binding.machineId,
-        machineName: binding.machineName,
+        machineName: machine?.name ?? null,
         botId: binding.botId,
-        botName: binding.botName,
-        botPlatform: binding.botPlatform,
+        botName: bot?.name ?? null,
+        botPlatform: bot?.platform ?? null,
         feishuAppId: binding.feishuAppId,
-        status: binding.status,
-        wsConnected: binding.wsConnected,
+        status: sessionExists ? 'online' : 'offline',
+        wsConnected: binding.feishuAppId
+          ? (getChannel('feishu')?.isConnected(binding.feishuAppId) ?? false)
+          : false,
         createdAt: binding.createdAt,
         updatedAt: binding.updatedAt,
         provider: provider ? { id: provider.id, name: provider.name } : null,
