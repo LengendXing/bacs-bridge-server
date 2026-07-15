@@ -1,3 +1,22 @@
+## v1.1.29.4 - 2026-07-15
+### 变更内容
+**绑定详情抽屉 + 服务商列截断**
+- 新增：右侧详情抽屉
+  - API `GET /api/status/:id/detail` — 返回绑定完整信息 + 运行时状态（idle/working/awaiting_choice）+ tmux pane 输出
+  - 前端 BindingsView.vue 操作列新增「详情」按钮，点击打开右侧 sliding 抽屉
+  - 4 个信息分区：基础信息 / Bot 信息 / CLI 配置 / 运行时状态（含终端输出）
+- 修复：服务商列名称过长时截断至 1-2 字符 + hover tooltip 显示全名
+- 新增：`shared/types.ts` BindingRuntime + BindingDetail 类型
+- 新增：zh/en i18n（detailTitle/detailBasic/detailBot/detailCLI/detailRuntime/detailLabel/cliState/paneOutput 等 25+ key）
+- 管理：auto-deploy.sh 纳入版本管理
+
+### 影响范围
+- `src/shared/types.ts` — 新增 BindingRuntime / BindingDetail
+- `src/server/routes/bindings.ts` — 新增 GET /api/status/:id/detail
+- `src/client/views/BindingsView.vue` — 服务商截断 + 详情按钮 + 右侧抽屉模板/脚本/CSS
+- `src/client/locales/zh.ts` / `en.ts` — 新增 detail 相关 key
+- `auto-deploy.sh` — 纳入 git
+
 ## v1.1.29.2 - 2026-05-21
 ### 变更内容
 **SSH 断连自动重连 + config 自动加载 .env**
