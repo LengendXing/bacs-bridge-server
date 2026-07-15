@@ -189,6 +189,7 @@ export interface BindingRuntime {
   state: 'idle' | 'working' | 'awaiting_choice' | 'unknown';
   paneOutput: string;
   sessionExists: boolean;
+  sessionName: string;
 }
 
 /** 绑定详情（含运行时状态） */

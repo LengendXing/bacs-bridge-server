@@ -264,7 +264,7 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
         updatedAt: binding.updatedAt,
         provider: provider ? { id: provider.id, name: provider.name } : null,
         model: model ? { id: model.id, modelId: model.modelId, displayName: model.displayName } : null,
-        runtime: { state, paneOutput, sessionExists },
+        runtime: { state, paneOutput, sessionExists, sessionName },
       },
     });
   } catch (e: any) {

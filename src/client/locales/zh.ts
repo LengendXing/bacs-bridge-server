@@ -159,6 +159,7 @@ export default {
       feishuAppId: 'App ID',
       createdAt: '创建时间',
       updatedAt: '更新时间',
+      sessionName: 'CLI 会话',
     },
     cliState: {
       idle: '空闲',

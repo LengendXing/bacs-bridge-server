@@ -301,8 +301,8 @@
                   <span>{{ detailData.runtime.sessionExists ? t('bindings.sessionRunning') : t('bindings.sessionStopped') }}</span>
                 </div>
                 <div class="detail-item">
-                  <label>CLI {{ t('bindings.thStatus') }}</label>
-                  <span>{{ t(`bindings.cliState.${detailData.runtime.state}`) }}</span>
+                  <label>{{ t('bindings.detailLabel.sessionName') }}</label>
+                  <span class="detail-value mono">{{ detailData.runtime.sessionName }}</span>
                 </div>
               </div>
               <div v-if="detailData.runtime.paneOutput" class="pane-output">

@@ -159,6 +159,7 @@ export default {
       feishuAppId: 'App ID',
       createdAt: 'Created At',
       updatedAt: 'Updated At',
+      sessionName: 'CLI Session',
     },
     cliState: {
       idle: 'Idle',
