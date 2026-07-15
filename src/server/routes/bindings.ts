@@ -115,15 +115,19 @@ router.get('/api/status', requireAuth, async (req, res) => {
 
       let provider = null;
       if (b.providerId) {
-        provider = db.select().from(providers).where(eq(providers.id, b.providerId)).get() ?? null;
-        if (provider?.apiKey) {
-          provider = { ...provider, apiKey: `${provider.apiKey.slice(0, 6)}...${provider.apiKey.slice(-4)}` };
-        }
+        try {
+          provider = db.select().from(providers).where(eq(providers.id, b.providerId)).get() ?? null;
+          if (provider?.apiKey) {
+            provider = { ...provider, apiKey: `${provider.apiKey.slice(0, 6)}...${provider.apiKey.slice(-4)}` };
+          }
+        } catch { /* providers 表不存在 */ }
       }
 
       let model = null;
       if (b.modelId) {
-        model = db.select().from(models).where(eq(models.id, b.modelId)).get() ?? null;
+        try {
+          model = db.select().from(models).where(eq(models.id, b.modelId)).get() ?? null;
+        } catch { /* models 表不存在 */ }
       }
 
       let machineName: string | null = null;

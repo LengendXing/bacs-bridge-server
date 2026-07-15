@@ -7,9 +7,9 @@
       </h2>
       <div class="flex items-center gap-2">
         <template v-if="activeTab === 'list'">
-          <button class="btn-mac btn-mac-primary btn-mac-sm" @click="openCreate">{{ t('bindings.add') }}</button>
-          <button class="btn-mac btn-mac-sm" @click="openMount">{{ t('bindings.mount') }}</button>
-          <button class="btn-mac btn-mac-sm" :disabled="loading" @click="refresh">{{ t('common.refresh') }}</button>
+          <button class="btn-mac btn-mac-primary btn-mac-sm btn-icon" @click="openCreate" :title="t('bindings.add')"><Plus :size="14" /></button>
+          <button class="btn-mac btn-mac-sm btn-icon" @click="openMount" :title="t('bindings.mount')"><FolderOpen :size="14" /></button>
+          <button class="btn-mac btn-mac-sm btn-icon" :disabled="loading" @click="refresh" :title="t('common.refresh')"><RefreshCw :size="14" /></button>
         </template>
         <template v-else>
           <span v-if="terminalSession.bindingId.value" class="text-xs" style="color: var(--text-secondary)">
@@ -78,14 +78,14 @@
             <td style="color: var(--text-secondary)">{{ b.modelOverride || b.model?.modelId || '-' }}</td>
             <td>
               <div class="flex items-center gap-1">
-                <button class="btn-mac btn-mac-sm" @click="copyAttach(b)" :title="t('bindings.attachTitle')">{{ t('bindings.attach') }}</button>
-                <button class="btn-mac btn-mac-sm" :disabled="b.status !== 'online'"
-                  @click="openTerminal(b)" :title="t('bindings.openTerminalTitle')">{{ t('bindings.openTerminal') }}</button>
-                <button class="btn-mac btn-mac-sm" @click="openEdit(b)">{{ t('bindings.edit') }}</button>
-                <button class="btn-mac btn-mac-sm" :disabled="rebindingMap[b.id] || b.status !== 'online'"
-                  @click="rebind(b)" :title="t('bindings.rebindTitle')">{{ rebindingMap[b.id] ? t('bindings.rebinding') : t('bindings.rebind') }}</button>
-                <button class="btn-mac btn-mac-danger btn-mac-sm" @click="confirmUnbind(b)">{{ t('bindings.unbind') }}</button>
-                <button class="btn-mac btn-mac-sm" @click="openDetail(b)">{{ t('bindings.detail') }}</button>
+                <button class="btn-mac btn-mac-sm btn-icon" @click="copyAttach(b)" :title="t('bindings.attachTitle')"><Paperclip :size="14" /></button>
+                <button class="btn-mac btn-mac-sm btn-icon" :disabled="b.status !== 'online'"
+                  @click="openTerminal(b)" :title="t('bindings.openTerminalTitle')"><Terminal :size="14" /></button>
+                <button class="btn-mac btn-mac-sm btn-icon" @click="openEdit(b)" :title="t('bindings.edit')"><Pencil :size="14" /></button>
+                <button class="btn-mac btn-mac-sm btn-icon" :disabled="rebindingMap[b.id] || b.status !== 'online'"
+                  @click="rebind(b)" :title="t('bindings.rebindTitle')"><RefreshCw :size="14" :class="{ 'spin-icon': rebindingMap[b.id] }" /></button>
+                <button class="btn-mac btn-mac-danger btn-mac-sm btn-icon" @click="confirmUnbind(b)" :title="t('bindings.unbind')"><Trash2 :size="14" /></button>
+                <button class="btn-mac btn-mac-sm btn-icon" @click="openDetail(b)" :title="t('bindings.detail')"><Info :size="14" /></button>
               </div>
             </td>
           </tr>
@@ -331,6 +331,7 @@ import { useApi } from '../composables/useApi';
 import Pagination from '../components/Pagination.vue';
 import TerminalPanel from '../components/TerminalPanel.vue';
 import { useTerminalSession, IDLE_TIMEOUT } from '../composables/useTerminalSession';
+import { Plus, FolderOpen, RefreshCw, Paperclip, Terminal, Pencil, Trash2, Info } from 'lucide-vue-next';
 
 defineOptions({ name: 'BindingsView' });
 import type { Binding, BindingDetail, Provider, Machine, Model } from '@shared/types';
@@ -901,6 +902,22 @@ function closeDetail() {
 .provider-name-truncate {
   cursor: default;
   border-bottom: 1px dotted var(--text-secondary);
+}
+
+.btn-icon {
+  padding: 4px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .drawer-overlay {
