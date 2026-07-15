@@ -10,16 +10,16 @@ log() {
 }
 
 cd "$SOURCE_DIR"
-
-BEFORE=$(git rev-parse HEAD 2>/dev/null)
 git pull origin dev 2>&1 | tee -a "$LOG_FILE"
-AFTER=$(git rev-parse HEAD 2>/dev/null)
 
-if [ "$BEFORE" = "$AFTER" ]; then
+SRC_VER=$(node -p "require('$SOURCE_DIR/package.json').version" 2>/dev/null || echo "0")
+DEP_VER=$(node -p "require('$DEPLOY_DIR/package.json').version" 2>/dev/null || echo "0")
+
+if [ "$SRC_VER" = "$DEP_VER" ]; then
   exit 0
 fi
 
-log "变更检测到，开始部署..."
+log "版本变更: $DEP_VER → $SRC_VER，开始部署..."
 
 cd "$SOURCE_DIR"
 npm install --silent 2>&1 | tee -a "$LOG_FILE"
@@ -30,7 +30,6 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# 复制 dist 到 deploy 目录
 cp -r "$SOURCE_DIR/dist/"* "$DEPLOY_DIR/dist/" 2>&1 | tee -a "$LOG_FILE"
 cp "$SOURCE_DIR/package.json" "$DEPLOY_DIR/package.json" 2>&1 | tee -a "$LOG_FILE"
 
@@ -39,4 +38,4 @@ npm install --silent --production 2>&1 | tee -a "$LOG_FILE"
 
 pm2 restart bacs-bridge-server 2>&1 | tee -a "$LOG_FILE"
 
-log "部署完成"
+log "部署完成: $SRC_VER"
