@@ -17,3 +17,4 @@
 - [x] UI 国际化（vue-i18n）+ 帮助页面 + 面包屑 + 主题图标 + 侧边栏展开修复（v1.1.26 ✅ 2026-05-17）
 - [x] 机器自动预装（Provision）— 创建机器后自动 SSH 上去安装 Node.js/tmux/Claude Code，绑定直接可用（v1.1.29 ✅ 2026-05-19）
 - [x] 绑定详情抽屉 - 服务商列截断hover、详情按钮、右侧抽屉（基础信息/Bot/CLI/运行时/pane输出）+ auto-deploy.sh 纳入版本管理（v1.1.29.4 ✅ 2026-07-15）
+- [x] 详情面板 sessionExists 双前缀 Bug 修复 - 详情 API sessionExists 调参传错导致 status 永久 offline（v1.1.29.10 ✅ 2026-07-15）

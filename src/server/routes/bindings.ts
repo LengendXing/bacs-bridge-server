@@ -216,7 +216,7 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
         try { executor = await getExecutor(0); } catch { /* fall through */ }
       }
       if (executor) {
-        sessionExists = await adapter.sessionExists(sessionName, executor);
+        sessionExists = await adapter.sessionExists(binding.processName, executor);
         if (sessionExists) {
           state = await adapter.detectState(binding.processName, executor);
           const capture = await adapter.capturePane(sessionName, 80, executor);

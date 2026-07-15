@@ -1,3 +1,16 @@
+## v1.1.29.10 - 2026-07-15
+### 变更内容
+**详情面板 sessionExists 双前缀 Bug 修复**
+- 修复：`GET /api/status/:id/detail` 中 `adapter.sessionExists()` 传入参数错误
+  - `sessionExists(sessionName, executor)` → `sessionExists(binding.processName, executor)`
+  - cc-adapter 内部会拼 `cc-` 前缀，传入全名 `cc-a2` 会导致双重前缀 `cc-cc-a2`，永远查不到对应 tmux session
+  - 后果：详情面板 status 永远显示 "offline"，与列表页显示不一致
+  - 根因：第 203 行预拼了 `sessionName` 变量给 `capturePane` 使用（正确），但 `sessionExists` 不应该用这个全名变量
+
+### 影响范围
+- `src/server/routes/bindings.ts` — 第 219 行，一处参数修正
+- `package.json` — version 1.1.29.9 → 1.1.29.10
+
 ## v1.1.29.4 - 2026-07-15
 ### 变更内容
 **绑定详情抽屉 + 服务商列截断**
