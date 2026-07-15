@@ -213,7 +213,7 @@ router.get('/api/status/:id/detail', requireAuth, async (req, res) => {
         try { executor = await getExecutor(binding.machineId); } catch { /* fall through */ }
       }
       if (!executor) {
-        try { executor = await getExecutor(0); } catch { /* fall through */ }
+        try { executor = await getExecutor(null); } catch { /* fall through */ }
       }
       if (executor) {
         sessionExists = await adapter.sessionExists(binding.processName, executor);
