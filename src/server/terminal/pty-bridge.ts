@@ -14,7 +14,6 @@
  */
 
 import * as pty from 'node-pty';
-import type { ClientChannel } from 'ssh2';
 import type { SshExecutor } from '../executor/ssh.js';
 
 /** Web Terminal 会话抽象接口 */
@@ -110,20 +109,7 @@ export async function openSshTerminal(
     throw new Error(`不安全的 session 名: ${sessionName}`);
   }
 
-  const client = await executor.acquireClient();
-
-  const channel = await new Promise<ClientChannel>((resolve, reject) => {
-    client.shell(
-      { term: 'xterm-256color', cols, rows },
-      (err, ch) => {
-        if (err) return reject(err);
-        resolve(ch);
-      },
-    );
-  });
-
-  // 用 exec 让 tmux 替换 bash —— channel 关闭时干净 SIGHUP
-  channel.write(`exec tmux attach -t ${sessionName}\n`);
+  const channel = await executor.openShellChannel(sessionName, cols, rows);
 
   let exitCb: ((code: number | null, signal?: string | null) => void) | null = null;
   let exited = false;

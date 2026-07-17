@@ -1,3 +1,16 @@
+## v1.1.29.11 - 2026-07-17
+### 变更内容
+**SSH Web Terminal "Channel open failure" Bug 修复**
+- 根因：ssh2 `Client` 不支持并发 channel 操作。`setInterval` 心跳 `client.exec()` 与 web terminal 的 `client.shell()` 在同一连接上竞态，触发 `Channel open failure: open failed`
+- 修复：`SshExecutor` 新增 promise 链互斥锁 `_opLock` + `_withLock()`，串行化所有 SSH channel 操作
+  - `exec()` — `client.exec()` 包裹在 `_withLock()` 内
+  - 新增 `openShellChannel()` — `client.shell()` 包裹在 `_withLock()` 内，统一创建 channel + 发送 `exec tmux attach`
+- `pty-bridge.ts` — `openSshTerminal()` 改用 `executor.openShellChannel()` 替代直接 `acquireClient()` + `client.shell()`
+
+### 影响范围
+- `src/server/executor/ssh.ts` — 新增 `_opLock` / `_withLock()` / `openShellChannel()`，`exec()` 包裹锁
+- `src/server/terminal/pty-bridge.ts` — 改用 `openShellChannel()`，移除直接 channel 操作
+
 ## v1.1.29.10 - 2026-07-15
 ### 变更内容
 **详情面板 sessionExists 双前缀 Bug 修复**

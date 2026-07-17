@@ -1,4 +1,4 @@
-import { Client, type ConnectConfig } from 'ssh2';
+import { Client, type ConnectConfig, type ClientChannel } from 'ssh2';
 import type { RemoteExecutor, ExecResult, ExecOptions } from './types.js';
 import logger from '../middleware/logger.js';
 
@@ -34,6 +34,9 @@ export class SshExecutor implements RemoteExecutor {
   private readonly HEARTBEAT_INTERVAL = 30_000;
   private readonly CONNECT_TIMEOUT = 10_000;
   private readonly EXEC_TIMEOUT = 15_000;
+  // ssh2 Client 不支持并发 channel 操作（exec / shell 同时调用会触发
+  // "Channel open failure: open failed"）。用 promise 链串行化所有操作。
+  private _opLock: Promise<void> = Promise.resolve();
 
   constructor(machineId: number, config: SshConnectConfig) {
     this.machineId = machineId;
@@ -46,6 +49,18 @@ export class SshExecutor implements RemoteExecutor {
       heartbeatTimer: null,
       connectPromise: null,
     };
+  }
+
+  private async _withLock<T>(fn: () => Promise<T>): Promise<T> {
+    const prev = this._opLock;
+    let release: () => void;
+    this._opLock = new Promise(resolve => { release = resolve; });
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release!();
+    }
   }
 
   private async ensureConnected(): Promise<Client> {
@@ -158,6 +173,17 @@ export class SshExecutor implements RemoteExecutor {
     return this.ensureConnected();
   }
 
+  async openShellChannel(sessionName: string, cols: number, rows: number): Promise<ClientChannel> {
+    const client = await this.ensureConnected();
+    return this._withLock(() => new Promise<ClientChannel>((resolve, reject) => {
+      client.shell({ term: 'xterm-256color', cols, rows }, (err, channel) => {
+        if (err) return reject(err);
+        channel.write(`exec tmux attach -t ${sessionName}\n`);
+        resolve(channel);
+      });
+    }));
+  }
+
   async exec(cmd: string, options?: ExecOptions): Promise<ExecResult> {
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -166,7 +192,7 @@ export class SshExecutor implements RemoteExecutor {
         this.pool.lastUsed = Date.now();
         this.startIdleTimer();
 
-        const result = await new Promise<ExecResult>((resolve) => {
+        const result = await this._withLock(() => new Promise<ExecResult>((resolve) => {
           const timeout = options?.timeout ?? this.EXEC_TIMEOUT;
           let settled = false;
 
@@ -207,7 +233,7 @@ export class SshExecutor implements RemoteExecutor {
               }
             });
           });
-        });
+        }));
 
         // 连接级错误（非命令执行失败）→ 标记断连并重试
         if (!result.ok && this.isConnectionError(result.error) && attempt < maxAttempts) {
